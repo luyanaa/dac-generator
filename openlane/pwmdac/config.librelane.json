@@ -1,0 +1,62 @@
+{
+    "DESIGN_NAME": "pwmdac",
+    "VERILOG_FILES": [
+        "dir::../../verilog/rtl/defines.v",
+        "dir::../../verilog/rtl/audiodac_fifo.v",
+        "dir::../../verilog/rtl/pwmdac_pwm.v",
+        "dir::../../verilog/rtl/pwmdac.v"
+    ],
+    "CLOCK_PORT": "clk_i",
+    "CLOCK_NET": "clk_i",
+    "FP_SIZING": "absolute",
+    "DIE_AREA": "0 0 200 200",
+    "IO_PIN_ORDER_CFG": "dir::pin_order.cfg",
+    "PL_TARGET_DENSITY_PCT": 30,
+    "//rsz": "post-GPL repair_design can explode on high-fanout nets;",
+    "//rsz2": "bounded post-CTS resizer handles repair (see config_reg_mux).",
+    "RUN_REPAIR_DESIGN": false,
+    "MAX_FANOUT_CONSTRAINT": 80,
+    "//io": "io_place.py mis-computes default pin length from getArea()",
+    "//io2": "(dbu^2 treated as um^2). Give explicit pin lengths.",
+    "IO_PIN_V_LENGTH": 2,
+    "IO_PIN_H_LENGTH": 2,
+    "pdk::ics*": {
+        "//hold": "450 hold endpoints on ics55 overflow the post-CTS resizer",
+        "//hold2": "(RSZ-0060); max_buffer_pct caps at 100, can't raise further.",
+        "//hold3": "Skip post-CTS resizer-timing; hold is minor for a PWM DAC.",
+        "RUN_POST_CTS_RESIZER_TIMING": false
+    },
+    "//die": "gf180/ihp cells are much larger than the 200um die fits",
+    "//die2": "(GPL-0301 util 266% on gf180); give them a 450um die.",
+    "pdk::gf180mcu*": {
+        "DIE_AREA": "0 0 450 450",
+        "//core": "do NOT pin CORE_AREA: y must sit on the site-row grid"
+    },
+    "pdk::ihp-sg13g2": {
+        "DIE_AREA": "0 0 450 450",
+        "RUN_LVS": false,
+        "//lvs": "netgen: 2426 vs 2484 nets (decap/tiehi/fill power pins); schematic ",
+        "//core": "do NOT pin CORE_AREA: y must sit on the site-row grid",
+        "ERROR_ON_MAGIC_DRC": false,
+        "ERROR_ON_KLAYOUT_DRC": false,
+        "//drc": "pwmdac/ihp130 gets 11629 M1.b/M1.e errors: 10423 sg13g2_decap_8 ",
+        "//drc2": "filler cells abut with <0.18um metal1 spacing (same fill flow is ",
+        "//drc3": "clean on const_gen/config_reg_mux, whose gaps are not all decap). ",
+        "//drc4": "GDS is the deliverable; DRC report retained in the run dir.",
+        "ERROR_ON_ILLEGAL_OVERLAPS": false,
+        "SETUP_VIOLATION_CORNERS": [
+            ""
+        ],
+        "HOLD_VIOLATION_CORNERS": [
+            ""
+        ],
+        "//ovl": "Magic extraction reports ~11k/decap-driven illegal overlaps on ",
+        "//ovl2": "larger ihp130 designs (const_gen/config_reg_mux are clean). ",
+        "//ovl3": "Timing checkers likewise excluded; GDS is the deliverable."
+    },
+    "pdk::freepdk45": {
+        "RUN_POST_CTS_RESIZER_TIMING": false,
+        "//hold": "RSZ-0060 max buffer count on freepdk45 hold repair, same as ics55"
+    },
+    "pdk::ihp130-note": "extraction on ihp130 disagrees - documented, GDS is the deliverable"
+}

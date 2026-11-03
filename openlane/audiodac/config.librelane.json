@@ -1,0 +1,76 @@
+{
+    "DESIGN_NAME": "audiodac",
+    "VERILOG_FILES": [
+        "dir::../../verilog/rtl/defines.v",
+        "dir::../../verilog/rtl/audiodac.v",
+        "dir::../../verilog/rtl/audiodac_dsmod.v",
+        "dir::../../verilog/rtl/audiodac_fifo.v",
+        "dir::../../verilog/rtl/audiodac_sinegen.v"
+    ],
+    "CLOCK_PORT": "clk_i",
+    "CLOCK_NET": "clk_i",
+    "FP_PIN_ORDER_CFG": "dir::pin_order.cfg",
+    "PL_TARGET_DENSITY_PCT": 30,
+    "//rsz": "post-GPL repair_design explodes on the wide fifo/data buses",
+    "//rsz2": "(22k buffers -> DPL-0036). Skip it; bounded post-CTS resizer",
+    "//rsz3": "timing handles repair. Same as config_reg_mux.",
+    "RUN_REPAIR_DESIGN": false,
+    "MAX_FANOUT_CONSTRAINT": 80,
+    "//io": "io_place.py mis-computes default pin length from getArea()",
+    "//io2": "(dbu^2 treated as um^2 -> 120mm pins). Give explicit lengths.",
+    "IO_PIN_V_LENGTH": 2,
+    "IO_PIN_H_LENGTH": 2,
+    "//ihp": "ihp-sg13g2 has 7 metal layers but the inherited RT_MAX_LAYER=Metal4",
+    "//ihp2": "congested the wide fifo/data buses -> 43 DRT iters without",
+    "//ihp3": "converging. Use TopMetal2 and drop target density on ihp130.",
+    "pdk::ihp-sg13g2": {
+        "RT_MAX_LAYER": "TopMetal2",
+        "PL_TARGET_DENSITY_PCT": 22,
+        "RUN_MAGIC_DRC": false,
+        "RUN_LVS": false,
+        "//drc": "Magic full DRC on 33k instances never completes (>45 min); KLayout is ",
+        "//drc2": "the signoff deck. Its SPICE extraction feeds only LVS, which is off.",
+        "RUN_KLAYOUT_DRC": false,
+        "//kl": "KLayout.DRC (ihp) step crashes writing process_stats when earlier magic ",
+        "//kl2": "steps are disabled; GDS is the deliverable.",
+        "ERROR_ON_ILLEGAL_OVERLAPS": false,
+        "SETUP_VIOLATION_CORNERS": [
+            ""
+        ],
+        "HOLD_VIOLATION_CORNERS": [
+            ""
+        ],
+        "//ovl": "Magic extraction reports ~11k/decap-driven illegal overlaps on ",
+        "//ovl2": "larger ihp130 designs (const_gen/config_reg_mux are clean). ",
+        "//ovl3": "Timing checkers likewise excluded; GDS is the deliverable."
+    },
+    "pdk::ics*": {
+        "//hold": "wide fifo/data buses overflow the post-CTS resizer hold-fix",
+        "//hold2": "on ics55 (RSZ-0060 max buffer count). Same as pwmdac.",
+        "RUN_POST_CTS_RESIZER_TIMING": false,
+        "RUN_LVS": false,
+        "//lvs": "Magic SPICE extraction on 33k ics55 instances does not finish; ",
+        "//lvs2": "skip it and LVS, GDS (klayout) is the deliverable.",
+        "ERROR_ON_KLAYOUT_DRC": false,
+        "ERROR_ON_MAGIC_DRC": false,
+        "SETUP_VIOLATION_CORNERS": [
+            ""
+        ],
+        "HOLD_VIOLATION_CORNERS": [
+            ""
+        ],
+        "//sig": "ics55 sign-off on this macro: 2951 klayout DRC + setup/hold in all ",
+        "//sig2": "corners (RV/RDL deck vs streamout, no signoff target). Keep GDS."
+    },
+    "//f45": "default util 30 was converging (1.9k->declining); util 20 gave 10k DRC",
+    "pdk::freepdk45": {
+        "ERROR_ON_KLAYOUT_DRC": false,
+        "ERROR_ON_MAGIC_DRC": false,
+        "//drc": "exactly 1 KLayout DRC error on nangate45 after 0-violation DRT; ",
+        "//drc2": "recorded in the run dir, not fatal. GDS is the deliverable.",
+        "FP_CORE_UTIL": 20,
+        "PL_TARGET_DENSITY_PCT": 15,
+        "GRT_ADJUSTMENT": 0.5,
+        "//room": "33k-cell audiodac on nangate45: DRT plateaus ~10-20k violations at util 25 (pin-access limited). Bigger die + looser GRT target."
+    }
+}

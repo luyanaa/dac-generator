@@ -1,0 +1,27 @@
+{
+    "DESIGN_NAME": "const_gen",
+    "VERILOG_FILES": "dir::../../verilog/rtl/const_gen.v",
+    "CLOCK_PORT": null,
+    "RUN_CTS": false,
+    "FP_SIZING": "absolute",
+    "DIE_AREA": "0 0 300 300",
+    "PL_TARGET_DENSITY_PCT": 20,
+    "FP_CORE_UTIL": 10,
+    "pdk::gf180mcu*": {
+        "FP_CORE_UTIL": 20,
+        "PL_TARGET_DENSITY_PCT": 20
+    },
+    "pdk::OR1": {
+        "//area": "OR1 is a 1um process; const_gen's inverter/buffer array",
+        "//area2": "needs ~4x the sky130 area (208% util on a 300um die).",
+        "DIE_AREA": "0 0 600 600",
+        "CORE_AREA": "20 60 580 540",
+        "PL_TARGET_DENSITY_PCT": 25,
+        "//gpl": "OR1's coarse 1um site grid destabilises RePlAce on a sparse",
+        "//gpl2": "die -> GPL-0305. Their counter uses FP_CORE_UTIL=30 w/ inset",
+        "//gpl3": "CORE_AREA + no post-GPL repair + no mirror-optimisation.",
+        "FP_CORE_UTIL": 30,
+        "RUN_POST_GPL_DESIGN_REPAIR": false,
+        "PL_OPTIMIZE_MIRRORING": false
+    }
+}

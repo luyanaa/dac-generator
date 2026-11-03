@@ -1,0 +1,92 @@
+VERSION 5.8 ;
+BUSBITCHARS "[]" ;
+DIVIDERCHAR "/" ;
+
+# OR1 (OpenRule1um) black-box stand-ins for the sky130 tri-state inverter used
+# by the tempsense VDAC. OR1 has no equivalent cell, so these are empty
+# interfaces sized to the 30um OR1 row (SITE unit, 0.5 x 30) with metal1 pins
+# in distinct bands. Power pins are VPWR/VGND to match the RTL's USE_POWER_PINS
+# connections; SCL_POWER_PINS/SCL_GROUND_PINS in config.or1.yaml include them
+# alongside OR1's VDD/VSS so set_global_connections wires both.
+# Sign-off (LVS/DRC) is disabled for tempsense on OR1, as on every foreign PDK.
+
+MACRO sky130_fd_sc_hd__einvp_1
+  CLASS CORE ;
+  FOREIGN sky130_fd_sc_hd__einvp_1 ;
+  ORIGIN 0 0 ;
+  SIZE 20 BY 30 ;
+  SYMMETRY X Y ;
+  SITE unit ;
+  PIN A
+    DIRECTION INPUT ; USE SIGNAL ;
+    PORT LAYER metal1 ; RECT 0.5 17 6 26 ; END
+  END A
+  PIN TE
+    DIRECTION INPUT ; USE SIGNAL ;
+    PORT LAYER metal1 ; RECT 0.5 4 6 13 ; END
+  END TE
+  PIN Z
+    DIRECTION OUTPUT ; USE SIGNAL ;
+    PORT LAYER metal1 ; RECT 8 4 18 26 ; END
+  END Z
+  PIN VPWR
+    DIRECTION INOUT ; USE POWER ; SHAPE ABUTMENT ;
+    PORT LAYER metal1 ; RECT 0 28 20 30 ; END
+  END VPWR
+  PIN VGND
+    DIRECTION INOUT ; USE GROUND ; SHAPE ABUTMENT ;
+    PORT LAYER metal1 ; RECT 0 -0.5 20 1.5 ; END
+  END VGND
+END sky130_fd_sc_hd__einvp_1
+
+MACRO sky130_fd_sc_hd__inv_4
+  CLASS CORE ;
+  FOREIGN sky130_fd_sc_hd__inv_4 ;
+  ORIGIN 0 0 ;
+  SIZE 10 BY 30 ;
+  SYMMETRY X Y ;
+  SITE unit ;
+  PIN A
+    DIRECTION INPUT ; USE SIGNAL ;
+    PORT LAYER metal1 ; RECT 0.5 17 5 26 ; END
+  END A
+  PIN Y
+    DIRECTION OUTPUT ; USE SIGNAL ;
+    PORT LAYER metal1 ; RECT 0.5 4 9 13 ; END
+  END Y
+  PIN VPWR
+    DIRECTION INOUT ; USE POWER ; SHAPE ABUTMENT ;
+    PORT LAYER metal1 ; RECT 0 28 10 30 ; END
+  END VPWR
+  PIN VGND
+    DIRECTION INOUT ; USE GROUND ; SHAPE ABUTMENT ;
+    PORT LAYER metal1 ; RECT 0 -0.5 10 1.5 ; END
+  END VGND
+END sky130_fd_sc_hd__inv_4
+
+MACRO sky130_fd_sc_hd__inv_12
+  CLASS CORE ;
+  FOREIGN sky130_fd_sc_hd__inv_12 ;
+  ORIGIN 0 0 ;
+  SIZE 40 BY 30 ;
+  SYMMETRY X Y ;
+  SITE unit ;
+  PIN A
+    DIRECTION INPUT ; USE SIGNAL ;
+    PORT LAYER metal1 ; RECT 0.5 17 5 26 ; END
+  END A
+  PIN Y
+    DIRECTION OUTPUT ; USE SIGNAL ;
+    PORT LAYER metal1 ; RECT 7 4 38 26 ; END
+  END Y
+  PIN VPWR
+    DIRECTION INOUT ; USE POWER ; SHAPE ABUTMENT ;
+    PORT LAYER metal1 ; RECT 0 28 40 30 ; END
+  END VPWR
+  PIN VGND
+    DIRECTION INOUT ; USE GROUND ; SHAPE ABUTMENT ;
+    PORT LAYER metal1 ; RECT 0 -0.5 40 1.5 ; END
+  END VGND
+END sky130_fd_sc_hd__inv_12
+
+END LIBRARY

@@ -4,6 +4,18 @@
 
 (c) 2022 **Harald Pretl, Manuel Moser, and Michael Herber**, Institute for Integrated Circuits, Johannes Kepler University, Linz
 
+## Digital hardening (LibreLane)
+
+The five synthesizable leaf macros (`const_gen`, `config_reg_mux`,
+`audiodac`, `pwmdac`, `tempsense`) are hardened with **LibreLane 3.0.14** on
+sky130, gf180mcuD, ihp-sg13g2, icsprout55, freepdk45 (nangate45) and OR1 —
+30 macro/PDK combinations with GDS under `results/<pdk>/<macro>/`.
+
+- Flow, PDK specs and caveats: [LIBRELANE.md](LIBRELANE.md)
+- Post-PnR characterization (f_max, PEX/SPEF, area, power, DRC/LVS):
+  [docs/characterization.md](docs/characterization.md)
+- Reusable PWM / ΔΣ DAC architectures: [DAC_ARCHITECTURES.md](DAC_ARCHITECTURES.md)
+
 ## TODO
 
 * [x] Add more temperature sensors (one in each corner)

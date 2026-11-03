@@ -1,0 +1,123 @@
+{
+    "//": "Shared LibreLane config for dac-generator leaf macros.",
+    "DESIGN_IS_CORE": 0,
+    "CLOCK_PERIOD": 50,
+    "FP_SIZING": "relative",
+    "DRT_THREADS": 8,
+    "PL_TARGET_DENSITY_PCT": 30,
+    "FP_CORE_UTIL": 25,
+    "VDD_NETS": [
+        "vccd1"
+    ],
+    "GND_NETS": [
+        "vssd1"
+    ],
+    "SYNTH_POWER_DEFINE": "USE_POWER_PINS",
+    "pdk::sky130*": {
+        "RT_MAX_LAYER": "met4",
+        "scl::sky130_fd_sc_ls": {
+            "SYNTH_MAX_FANOUT": 5
+        }
+    },
+    "pdk::ihp-sg13g2": {
+        "RT_MAX_LAYER": "Metal4"
+    },
+    "pdk::gf180mcu*": {
+        "CLOCK_PERIOD": 50,
+        "RT_MAX_LAYER": "Metal4",
+        "SYNTH_MAX_FANOUT": 4,
+        "PL_TARGET_DENSITY_PCT": 30,
+        "//gds": "magic streamout cannot write the einvp black-box cell used by",
+        "//gds2": "tempsense (no .mag view -> 'I/O error in writing'). KLayout",
+        "//gds3": "streamout reads DEF+cell GDS and is harmless for other macros.",
+        "PRIMARY_GDSII_STREAMOUT_TOOL": "klayout",
+        "RUN_MAGIC_STREAMOUT": false,
+        "scl::gf180mcu_fd_sc_mcu9t5v0": {},
+        "scl::gf180mcu_fd_sc_mcu7t5v0": {},
+        "scl::gf180mcu_as_sc_mcu7t3v3": {
+            "RT_MAX_LAYER": "Metal4"
+        },
+        "scl::gf180mcu_osu_sc_*": {
+            "RT_MAX_LAYER": "Metal4"
+        }
+    },
+    "pdk::freepdk45": {
+        "VDD_NETS": [
+            "VDD"
+        ],
+        "GND_NETS": [
+            "VSS"
+        ],
+        "RT_MAX_LAYER": "metal7",
+        "//xor": "Nangate45 GDS/magic streamouts differ on filler/tap cells,",
+        "//xor2": "so the KLayout XOR cross-check reports false diffs.",
+        "RUN_KLAYOUT_XOR": false,
+        "//gds": "magic streamout cannot write the einvp black-box cell (no .mag",
+        "//gds2": "view -> 'I/O error in writing'). KLayout reads DEF+cell GDS.",
+        "PRIMARY_GDSII_STREAMOUT_TOOL": "klayout",
+        "RUN_MAGIC_STREAMOUT": false
+    },
+    "pdk::OR1": {
+        "VDD_NETS": [
+            "vdd"
+        ],
+        "GND_NETS": [
+            "gnd"
+        ],
+        "//": "OR1 has no RCX rulesets, its pins carry no antenna attrs",
+        "//2": "(OpenROAD antenna checker crashes), and magic streamout",
+        "//3": "produces routing-less GDS -> use KLayout. Options taken from",
+        "//4": "OR1PDK/OR1/test/librelane/config.yaml.",
+        "RUN_ANTENNA_REPAIR": false,
+        "GRT_ANTENNA_REPAIR_ITERS": 0,
+        "DRT_ANTENNA_REPAIR_ITERS": 0,
+        "RUN_IRDROP_REPORT": false,
+        "RUN_KLAYOUT_XOR": false,
+        "ERROR_ON_DISCONNECTED_PINS": false,
+        "DEDUPLICATE_CORNERS": true,
+        "PRIMARY_GDSII_STREAMOUT_TOOL": "klayout",
+        "//bb": "PDK ships or1_fd_sc_bb.v black-box models incl. a valid DFFRX*",
+        "//bb2": "(posedge clk or posedge reset). Use them; drop the DFFRX",
+        "//bb3": "exclusion + local nodffrx stubs now that OR1 maps reset FFs.",
+        "CELL_VERILOG_MODELS": "pdk_dir::libs.ref/or1_fd_sc/verilog/or1_fd_sc_bb.v",
+        "//lib": "TT_5P0 header fixed to /* */ (yosys parses it) and is the",
+        "//lib2": "only lib with DFFRX1/DFFRX2 timing; TT_3P3 lacks reset FFs.",
+        "LIB": {
+            "*tt*": "pdk_dir::libs.ref/or1_fd_sc/lib/or1_fd_sc_TT_5P0_25C.lib"
+        },
+        "//lint": "OR1's cell verilog (DFFRX1) trips Verilator lint; the cell",
+        "//lint2": "models are PDK collateral, not our RTL, so skip the lint steps.",
+        "ERROR_ON_LINTER_ERRORS": false,
+        "ERROR_ON_LINTER_WARNINGS": false,
+        "ERROR_ON_LINTER_TIMING_CONSTRUCTS": false
+    },
+    "pdk::ics*": {
+        "VDD_NETS": [
+            "VDD"
+        ],
+        "GND_NETS": [
+            "VSS"
+        ],
+        "RT_MAX_LAYER": "MET4",
+        "CLOCK_PERIOD": 50,
+        "//": "RCX_RULESETS in the ics55 PDK maps both nom_tt_* and nom_* to",
+        "//2": "rcx_typ.rules, so the default corner yields two SPEFs and STA",
+        "//3": "aborts. Restrict to one ruleset per corner.",
+        "RCX_RULESETS": {
+            "nom_tt_*": "pdk_dir::libs.tech/librelane/rcx_nom_tt_025C_1v20.rules",
+            "nom_ss_*": "pdk_dir::libs.tech/librelane/rcx_nom_ss_125C_1v08.rules",
+            "nom_ff_*": "pdk_dir::libs.tech/librelane/rcx_nom_ff_n40C_1v32.rules"
+        },
+        "//irdrop": "ics55 via resistances are placeholders (PSM-0021 invalid",
+        "//irdrop2": "resistance map) \u2014 the IR-drop report cannot run on this PDK.",
+        "RUN_IRDROP_REPORT": false,
+        "//gds": "ics55 tech-LEF declares RV/RDL/T4M2 layers the magic techfile",
+        "//gds2": "(5-metal only) can't parse -> LEF read errors at streamout.",
+        "//gds3": "KLayout streamout reads DEF+cell GDS, bypasses magic LEF.",
+        "PRIMARY_GDSII_STREAMOUT_TOOL": "klayout",
+        "//gds4": "klayout-primary still runs Magic.StreamOut (it produces the",
+        "//gds5": ".magic.gds for the XOR check) and it fatals on the RV layer.",
+        "//gds6": "Disable the magic step; klayout alone writes the final GDS.",
+        "RUN_MAGIC_STREAMOUT": false
+    }
+}
