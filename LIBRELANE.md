@@ -129,7 +129,7 @@ Highlights (MHz, 50 ns clock unless a combo is timing-violated):
 | `config_reg_mux` | 41.5 | 35.8 | 44.7 | 39.4 | 48.6 | 46.2 |
 | `tempsense` | 78.0 | 59.1 | 91.1 | 91.2 | 97.2 | 90.0 |
 | `pwmdac` | 54.0 | 35.5 | 59.5 | 40.1 | 91.6 | 39.7 |
-| `audiodac` | 39.3 | 30.3 | 51.8 | 55.8 | 25.4 | 62.9 |
+| `audiodac` | 39.3 | 30.3 | 51.8 | 55.8 | 90.3 | 62.9 |
 
 `const_gen` is purely combinational (no timed path). All `audiodac`
 variants now meet the 20 MHz clock, including ics55/OR1 (see the timing
@@ -153,7 +153,7 @@ resizers optimize the remaining paths. Result:
 | f_max (MHz) | sky130 | gf180 | ihp130 | ics55 | freepdk45 | or1 |
 |---|---|---|---|---|---|---|
 | before | 16.7 | 18.6 | 15.3 | 2.3 | 25.4 | 4.8 |
-| after  | 39.3 | 30.3 | 51.8 | 55.8 | 25.4 | 62.9 |
+| after  | 39.3 | 30.3 | 51.8 | 55.8 | 90.3 | 62.9 |
 
 All decks close 20 MHz with positive hold slack (worst: ics55 +0.063 ns at
 the fast corner). `freepdk45` was already timing-clean before this change

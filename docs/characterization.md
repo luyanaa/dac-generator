@@ -30,7 +30,7 @@ Caveats: OR1 has a single `TT_5P0` corner only (no slow/fast corner; its liberty
 | pwmdac | ics55 | clk_i | 50.0 | met | 25.04 | nom_ss_125C_1v08 | 40.1 | 0.06 | 200x200 | 100 | 9898 | 0.281 | yes | 1345/46161 | - |
 | const_gen | freepdk45 | - | 50.0 | no timed path | - | - | - | - | 300x300 | 0.1 | 336 | 0.000 | yes | 0/0 | 0 |
 | config_reg_mux | freepdk45 | reg_wr_i | 50.0 | met | 29.40 | nom_typ_1p10V_25C | 48.6 | 0.10 | 360x360 | 0.6 | 694 | 0.034 | yes | 9/0 | 0 |
-| audiodac | freepdk45 | clk_i | 50.0 | met | 10.60 | nom_typ_1p10V_25C | 25.4 | 0.10 | 307x314 | 24.5 | 13076 | 1.079 | yes | 2/0 | 0 |
+| audiodac | freepdk45 | clk_i | 50.0 | met | 38.93 | nom_typ_1p10V_25C | 90.3 | 0.05 | 307x314 | 21.2 | 9034 | 0.927 | yes | 4/2 | 0 |
 | tempsense | freepdk45 | clk | 50.0 | met | 39.71 | nom_typ_1p10V_25C | 97.2 | 0.03 | 200x200 | 2.1 | 383 | 0.021 | yes | -/- | - |
 | pwmdac | freepdk45 | clk_i | 50.0 | met | 39.08 | nom_typ_1p10V_25C | 91.6 | 0.02 | 200x200 | 10.8 | 1853 | 0.171 | yes | 0/0 | 0 |
 | const_gen | or1 | - | 50.0 | no timed path | - | - | - | - | - | - | - | - | yes | -/- | - |
@@ -45,7 +45,7 @@ Caveats: OR1 has a single `TT_5P0` corner only (no slow/fast corner; its liberty
 |---|---|---|---|---|---|---|
 | const_gen | - | - | - | - | - | - |
 | config_reg_mux | 41.5 | 35.8 | 44.7 | 39.4 | 48.6 | 46.2 |
-| audiodac | 39.3 | 30.3 | 51.8 | 55.8 | 25.4 | 62.9 |
+| audiodac | 39.3 | 30.3 | 51.8 | 55.8 | 90.3 | 62.9 |
 | tempsense | 78.0 | 59.1 | 91.1 | 91.2 | 97.2 | 90.0 |
 | pwmdac | 54.0 | 35.5 | 59.5 | 40.1 | 91.6 | 39.7 |
 

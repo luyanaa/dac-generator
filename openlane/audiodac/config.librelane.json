@@ -81,7 +81,12 @@
         "FP_CORE_UTIL": 20,
         "PL_TARGET_DENSITY_PCT": 15,
         "GRT_ADJUSTMENT": 0.5,
-        "//room": "33k-cell audiodac on nangate45: DRT plateaus ~10-20k violations at util 25 (pin-access limited). Bigger die + looser GRT target."
+        "//room": "33k-cell audiodac on nangate45: DRT plateaus ~10-20k violations at util 25 (pin-access limited). Bigger die + looser GRT target.",
+        "PL_RESIZER_HOLD_SLACK_MARGIN": 0.05,
+        "PL_RESIZER_HOLD_MAX_BUFFER_PCT": 100,
+        "//hold": "The +0.3ns hold margin overfixes 4.5k hold endpoints and trips",
+        "//hold2": "RSZ-0060 on the 13k-cell design; +0.05ns with a 100% budget fixes",
+        "//hold3": "the real slack without the runaway."
     },
     "DESIGN_REPAIR_BUFFER_INPUT_PORTS": false,
     "DESIGN_REPAIR_BUFFER_OUTPUT_PORTS": false
