@@ -26,8 +26,8 @@ Caveats: OR1 has a single `TT_5P0` corner only (no slow/fast corner; its liberty
 | const_gen | ics55 | - | 50.0 | no timed path | - | - | - | - | - | - | - | - | no | -/- | - |
 | config_reg_mux | ics55 | reg_wr_i | 50.0 | met | 24.60 | nom_ss_125C_1v08 | 39.4 | 0.11 | - | - | - | - | no | -/- | - |
 | audiodac | ics55 | clk_i | 50.0 | met | 32.09 | nom_ss_125C_1v08 | 55.8 | 0.06 | 319x326 | 100 | 41536 | 1.488 | yes | 3351/223513 | - |
-| tempsense | ics55 | clk | 50.0 | met | 39.04 | nom_tt_025C_1v20 | 91.2 | -0.09 | 200x200 | 100.0 | 5483 | 0.031 | yes | -/- | - |
-| pwmdac | ics55 | clk_i | 50.0 | met | 26.51 | nom_ss_125C_1v08 | 42.6 | -0.19 | - | - | - | - | no | -/- | - |
+| tempsense | ics55 | clk | 50.0 | met | 39.04 | nom_tt_025C_1v20 | 91.2 | 0.24 | 200x200 | 100.0 | 5822 | 0.031 | yes | -/- | - |
+| pwmdac | ics55 | clk_i | 50.0 | met | 25.04 | nom_ss_125C_1v08 | 40.1 | 0.06 | 200x200 | 100 | 9898 | 0.281 | yes | 1345/46161 | - |
 | const_gen | freepdk45 | - | 50.0 | no timed path | - | - | - | - | 300x300 | 0.1 | 336 | 0.000 | yes | 0/0 | 0 |
 | config_reg_mux | freepdk45 | reg_wr_i | 50.0 | met | 29.40 | nom_typ_1p10V_25C | 48.6 | 0.10 | 360x360 | 0.6 | 694 | 0.034 | yes | 9/0 | 0 |
 | audiodac | freepdk45 | clk_i | 50.0 | met | 10.60 | nom_typ_1p10V_25C | 25.4 | 0.10 | 307x314 | 24.5 | 13076 | 1.079 | yes | 2/0 | 0 |
@@ -47,6 +47,6 @@ Caveats: OR1 has a single `TT_5P0` corner only (no slow/fast corner; its liberty
 | config_reg_mux | 41.5 | 35.8 | 44.7 | 39.4 | 48.6 | 46.2 |
 | audiodac | 39.3 | 30.3 | 51.8 | 55.8 | 25.4 | 62.9 |
 | tempsense | 78.0 | 59.1 | 91.1 | 91.2 | 97.2 | 90.0 |
-| pwmdac | 54.0 | 35.5 | 59.5 | 42.6 | 91.6 | 39.7 |
+| pwmdac | 54.0 | 35.5 | 59.5 | 40.1 | 91.6 | 39.7 |
 
 `-` means no timed clock path (const_gen is purely combinational) or the run's STA data was not retained.

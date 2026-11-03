@@ -84,7 +84,13 @@
         "//hold3": "disabled (RSZ-0060). Exclude hold from the checker.",
         "HOLD_VIOLATION_CORNERS": [
             ""
-        ]
+        ],
+        "RUN_POST_CTS_RESIZER_TIMING": true,
+        "PL_RESIZER_HOLD_SLACK_MARGIN": 0.05,
+        "PL_RESIZER_HOLD_MAX_BUFFER_PCT": 100,
+        "//rszen": "Re-enable the post-CTS resizer on ics55: with +0.05ns margin and",
+        "//rszen2": "a 100% buffer budget it fixes the -0.09ns tt hold without",
+        "//rszen3": "tripping RSZ-0060; the VDAC paths stay dont-touch."
     },
     "pdk::freepdk45": {
         "EXTRA_VERILOG_MODELS": "dir::../../verilog/models/analog_cells.v",

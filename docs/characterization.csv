@@ -17,8 +17,8 @@ pwmdac,ihp130,clk_i,50.0,met,33.18907909106927,nom_slow_1p08V_125C,59.4851409638
 const_gen,ics55,-,50.0,no timed path,,,,,,-,,,,False,,,,stapostpnr/summary.rpt (no timed path)
 config_reg_mux,ics55,reg_wr_i,50.0,met,24.6029,nom_ss_125C_1v08,39.37457426241579,0.1106,nom_ff_n40C_1v32,-,,,,False,,,,stapostpnr/summary.rpt
 audiodac,ics55,clk_i,50.0,met,32.094129151581974,nom_ss_125C_1v08,55.847604870240055,0.0628958014583668,nom_ff_n40C_1v32,319x326,100,41536,1.4878410147503018,True,3351,223513,,final/metrics.json
-tempsense,ics55,clk,50.0,met,39.0407,nom_tt_025C_1v20,91.24670371282838,-0.0923212,nom_tt_025C_1v20,200x200,99.97460000000001,5483,0.0306535,True,,,,"final/metrics.json (post-GRT, default corner)"
-pwmdac,ics55,clk_i,50.0,met,26.5142,nom_ss_125C_1v08,42.5789200282724,-0.1937,nom_ff_n40C_1v32,-,,,,False,,,,stapostpnr/summary.rpt
+tempsense,ics55,clk,50.0,met,39.0403,nom_tt_025C_1v20,91.2433734500032,0.244336,nom_tt_025C_1v20,200x200,99.97460000000001,5822,0.0310609,True,,,,"final/metrics.json (post-GRT, default corner)"
+pwmdac,ics55,clk_i,50.0,met,25.035316750523666,nom_ss_125C_1v08,40.05658673922795,0.061786216780599604,nom_ff_n40C_1v32,200x200,100,9898,0.28108415426686406,True,1345,46161,,final/metrics.json
 const_gen,freepdk45,-,50.0,no timed path,,,,,,300x300,0.144944,336,6.0944046254007844e-05,True,0,0,0,final/metrics.json (no timed path)
 config_reg_mux,freepdk45,reg_wr_i,50.0,met,29.40430560044249,nom_typ_1p10V_25C,48.55383754487465,0.10162319884350285,nom_typ_1p10V_25C,360x360,0.620235,694,0.034378164855297655,True,9,0,0,final/metrics.json
 audiodac,freepdk45,clk_i,50.0,met,10.59513040624505,nom_typ_1p10V_25C,25.377574150340145,0.10352979877540176,nom_typ_1p10V_25C,307x314,24.5249,13076,1.0786580387502909,True,2,0,0,final/metrics.json

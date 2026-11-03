@@ -93,11 +93,12 @@ Numbers per combo: `docs/characterization.md`.
 Some foreign-PDK combos do not have every view because the step that
 produces it does not converge on that deck; the GDS is still valid:
 
-- **ics55**: `RUN_MAGIC_WRITE_LEF=false` (Magic cannot parse the RV/RDL/T4M2
-  LEF) → no `lef` for any of the five macros, and no `def` for
-  `const_gen`, `config_reg_mux`, `pwmdac`. `RUN_MCSTA=false` (plus no SPEF
-  for the three smaller macros) → no `lib`/`spef` except on
-  `audiodac` (`lib`+`spef`) and `tempsense` (`spef`).
+- **ics55**: `Magic.WriteLEF`/`Magic.SpiceExtraction` are skipped (Magic
+  cannot parse the RV/RDL/T4M2 LEF and loops on the 41k-instance netlist) →
+  no `lef` for any of the five macros, and no `def` for
+  `const_gen`/`config_reg_mux`. Views present: `audiodac` and `pwmdac`
+  (`def`+`lib`+`spef`), `tempsense` (`def`+`spef`; no `lib`, MC-STA off),
+  `const_gen`/`config_reg_mux` (GDS only).
 - **`tempsense` on gf180 / ihp130 / ics55 / freepdk45 / or1**: the `einvp`
   VDAC cell is a black-box stub and the analog sign-off steps plus
   `RUN_MCSTA` are disabled → no `lib`; also no `lef` on ics55 / freepdk45 /
@@ -127,7 +128,7 @@ Highlights (MHz, 50 ns clock unless a combo is timing-violated):
 |---|---|---|---|---|---|---|
 | `config_reg_mux` | 41.5 | 35.8 | 44.7 | 39.4 | 48.6 | 46.2 |
 | `tempsense` | 78.0 | 59.1 | 91.1 | 91.2 | 97.2 | 90.0 |
-| `pwmdac` | 54.0 | 35.5 | 59.5 | 42.6 | 91.6 | 39.7 |
+| `pwmdac` | 54.0 | 35.5 | 59.5 | 40.1 | 91.6 | 39.7 |
 | `audiodac` | 39.3 | 30.3 | 51.8 | 55.8 | 25.4 | 62.9 |
 
 `const_gen` is purely combinational (no timed path). All `audiodac`
@@ -168,20 +169,23 @@ the external input delay). The PDK's own reference counter (31 cells,
 `docs/or1_characterization.md` for the I/O (62.9 MHz) vs register-to-register
 (72.7 MHz) split and the hold numbers.
 
-### Residual hold
+### Hold closure
 
-- `tempsense`/ics55: **-0.09 ns** at `nom_tt` on the post-GRT estimate (the
-  deck has `RUN_MCSTA=false`, so only the default corner is re-evaluated;
-  the ff/ss numbers in `metrics.json` are stale pre-PnR values and are not
-  reported).
-- `pwmdac`/ics55: **-0.19 ns** at `nom_ff` from the post-route STA.
+All 30 macro/PDK combinations now have **positive setup and hold** on the
+corner that is actually evaluated. The last two ics55 cases needed the
+post-CTS resizer re-enabled with a relaxed target:
 
-Both are small fast/typical-corner hold checks on analog-containing macros;
-setup closes with >26 ns margin and the GDS is unaffected. OpenROAD's
-`repair_timing` is single-corner, so the resizer only fixes the default
-corner; a per-corner resizer pass (or CTS skew tuning) would be needed to
-remove them completely. Every other macro/PDK combination has positive hold
-on the corner that is actually evaluated.
+- `tempsense`/ics55: +0.24 ns at `nom_tt` (post-GRT estimate; the deck has
+  `RUN_MCSTA=false`, so only the default corner is re-evaluated).
+- `pwmdac`/ics55: +0.06 ns at `nom_ff` (post-route STA). Fixing the -0.19 ns
+  fast-corner hold costs ~1.3k hold buffers; setup still closes with +25 ns
+  and DRT is clean, but the extra small cells trip ~1.3k ics55
+  min-area/implant deck rules, kept non-fatal like the other ics55 signoff
+  checks (no routing DRC).
+
+OpenROAD's `repair_timing` is single-corner, so the resizer fixes the
+default corner only; these two were the only cases where that corner was
+also the worst one.
 
 ### Reproducible skips
 

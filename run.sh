@@ -118,7 +118,7 @@ skips_for () {
         # Magic cannot parse the ics55 RV/RDL/T4M2 LEF and loops on the 41k
         # instances: no LEF is written, the antenna checker needs that LEF, and
         # SPICE extraction (LVS is off anyway) does not finish either.
-        echo "-S Magic.WriteLEF -S Magic.SpiceExtraction -S Odb.CheckDesignAntennaProperties" ;;
+        echo "-S Magic.WriteLEF -S Magic.SpiceExtraction -S Netgen.LVS -S Odb.CheckDesignAntennaProperties" ;;
     audiodac/ihp130)
         echo "-S Magic.WriteLEF -S Odb.CheckDesignAntennaProperties" ;;
     *)
