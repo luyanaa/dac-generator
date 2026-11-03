@@ -1,19 +1,23 @@
-# LibreLane standard-cell wrapper for gf180mcu_fd_sc_mcu9t5v0.
+# LibreLane standard-cell wrapper.
 #
-# The ciel SCL config only fills ::env(CELL_LIBS); LibreLane resolves corners
-# from ::env(LIB), so build that dict here from the liberty files that exist in
-# this PDK. The 3v3 corners are absent for the fd_sc flavours, hence the 5 V
-# set below (kept in sync with the STA corners used by the flow).
+# The ciel PDK config only fills ::env(CELL_LIBS); LibreLane resolves corners
+# from ::env(LIB), so this wrapper sources the upstream SCL config and then
+# builds LIB from the liberty files in libs.ref.
 #
-# The ciel install is located under ~/.ciel so the wrapper does not pin a
-# user or version hash.
-set _scl [file tail [file dirname [file normalize [info script]]]]
-set _bases [lsort -dictionary [glob -nocomplain \
-    "$::env(HOME)/.ciel/ciel/gf180mcu/versions/*/gf180mcuD"]]
-if {![llength $_bases]} {
-    error "gf180mcuD not found under ~/.ciel/ciel/gf180mcu/versions"
+# The upstream PDK is located without pinning a user or version hash: the
+# composed view under $PDK_ROOT/$PDK symlinks libs.tech/librelane/config.tcl
+# back into the ciel install, so its target gives the real PDK base. When the
+# PDK is used directly (ciel mode) that file is a regular file and the PDK
+# root itself is the base.
+
+set _scl gf180mcu_fd_sc_mcu9t5v0
+set _pdk "$::env(PDK_ROOT)/$::env(PDK)"
+set _probe "$_pdk/libs.tech/librelane/config.tcl"
+if {[file type $_probe] eq "link"} {
+    set _base [file dirname [file dirname [file dirname [file readlink $_probe]]]]
+} else {
+    set _base $_pdk
 }
-set _base [lindex $_bases end]
 
 source "$_base/libs.tech/librelane/$_scl/config.tcl"
 

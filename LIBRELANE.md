@@ -123,14 +123,52 @@ Highlights (MHz, 50 ns clock unless a combo is timing-violated):
 | `config_reg_mux` | 41.5 | 35.8 | 44.7 | 39.4 | 48.6 | 46.2 |
 | `tempsense` | 78.0 | 52.0 | 90.9 | 91.2 | 97.2 | 90.0 |
 | `pwmdac` | 54.0 | 35.5 | 59.5 | 42.6 | 91.6 | 39.7 |
-| `audiodac` | 16.7 | 18.6 | 15.3 | 2.3 | 25.4 | 4.8 |
+| `audiodac` | 39.3 | 30.3 | 51.8 | 55.8 | 25.4 | 62.9 |
 
-`const_gen` is purely combinational (no timed path). `audiodac` misses the
-20 MHz clock on sky130/gf180/ihp130/ics55/OR1 (it closes on freepdk45); the
-ics55/OR1 numbers are dominated by the very high-fanout select net
-(max-cap/max-slew violations), so the implied f_max there is pessimistic for
-the modulator datapath. ics55 `audiodac` and `tempsense` read ~100%
-utilization because that deck classifies filler cells as standard cells.
+`const_gen` is purely combinational (no timed path). All `audiodac`
+variants now meet the 20 MHz clock, including ics55/OR1 (see the timing
+closure section below); ics55 `audiodac`/`tempsense` still read ~100%
+utilization because that deck counts filler cells as standard cells.
+
+## Timing closure
+
+### audiodac
+
+`sinegen` reads a 128-entry LUT with a variable part-select, so each
+`read_ptr` bit fans out to ~600 mux selects. With the post-GPL repair pass
+disabled (it used to runaway to ~22k buffers) that single net was ~25 ns on
+sky130 and >430 ns on ics55, dominating the macro's f_max.
+
+The audiodac configs now run `OpenROAD.RepairDesignPostGPL` with
+`MAX_FANOUT_CONSTRAINT=80` and I/O buffering disabled. It inserts ~390
+buffers (sky130) to ~920 (OR1) in ~300 nets, then the post-CTS / post-GRT
+resizers optimize the remaining paths. Result:
+
+| f_max (MHz) | sky130 | gf180 | ihp130 | ics55 | freepdk45 | or1 |
+|---|---|---|---|---|---|---|
+| before | 16.7 | 18.6 | 15.3 | 2.3 | 25.4 | 4.8 |
+| after  | 39.3 | 30.3 | 51.8 | 55.8 | 25.4 | 62.9 |
+
+All decks close 20 MHz with positive hold slack (worst: ics55 +0.063 ns at
+the fast corner). `freepdk45` was already timing-clean before this change
+and was left as-is.
+
+### Residual fast-corner hold
+
+`tempsense` (ihp130, ics55) and `pwmdac` (ics55) still report a small
+fast-corner hold violation (-0.07 / -0.17 / -0.19 ns). OpenROAD's
+`repair_timing` is single-corner, so LibreLane's resizer only fixes the
+default corner and the fast-corner path stays invisible to it; setup closure
+and GDS are unaffected. A per-corner resizer pass (or a CTS skew tune) is
+needed to remove these.
+
+### Reproducible skips
+
+`run.sh` encodes the per-deck skips that cannot converge:
+`*/ics55` skips `Magic.WriteLEF` + `Magic.SpiceExtraction` +
+`Odb.CheckDesignAntennaProperties`; `*/or1` skips `Odb.SetPowerConnections` +
+the antenna checker; `audiodac/ihp130` and `tempsense/freepdk45` skip the
+missing-LEF antenna checker.
 
 ## Notes / caveats
 

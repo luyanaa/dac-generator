@@ -114,8 +114,11 @@ skips_for () {
         echo "-S Odb.SetPowerConnections -S Odb.CheckDesignAntennaProperties" ;;
     tempsense/freepdk45)
         echo "-S Odb.CheckDesignAntennaProperties" ;;
-    tempsense/ics55)
-        echo "-S Magic.SpiceExtraction -S Odb.CheckDesignAntennaProperties" ;;
+    */ics55)
+        # Magic cannot parse the ics55 RV/RDL/T4M2 LEF and loops on the 41k
+        # instances: no LEF is written, the antenna checker needs that LEF, and
+        # SPICE extraction (LVS is off anyway) does not finish either.
+        echo "-S Magic.WriteLEF -S Magic.SpiceExtraction -S Odb.CheckDesignAntennaProperties" ;;
     audiodac/ihp130)
         echo "-S Magic.WriteLEF -S Odb.CheckDesignAntennaProperties" ;;
     *)
@@ -126,7 +129,13 @@ skips_for () {
 run_one () {
     m=$1
     shift
-    cfg="openlane/common.json openlane/$m/config.librelane.json"
+    if [ "$SPEC" = "or1" ] && [ -f "openlane/$m/config.or1.yaml" ]; then
+        # OR1 needs a single self-contained file: step-scoped variables and
+        # MACROS/MACRO_PLACEMENT_CFG do not survive the multi-file merge.
+        cfg="openlane/$m/config.or1.yaml"
+    else
+        cfg="openlane/common.json openlane/$m/config.librelane.json"
+    fi
     SKIPS=$(skips_for "$m" "$SPEC")
     echo "=================================================================="
     echo " LibreLane  macro=$m  pdk=$PDK_NAME  scl=$SCL  root=$PDKROOT"

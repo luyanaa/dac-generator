@@ -9,12 +9,17 @@
     ],
     "CLOCK_PORT": "clk_i",
     "CLOCK_NET": "clk_i",
+    "//repair": "Post-GPL repair_design is required for timing closure: the",
+    "//repair2": "sinegen LUT address fans out to ~600 mux selects, and without",
+    "//repair3": "buffering that single net is ~25ns on sky130 (>430ns on ics55).",
+    "//repair4": "With MAX_FANOUT_CONSTRAINT=80 it inserts ~390 buffers and",
+    "//repair5": "closes audiodac (~+12ns setup at post-GRT STA on sky130).",
+    "RUN_POST_GPL_DESIGN_REPAIR": true,
+    "RUN_POST_GRT_RESIZER_TIMING": true,
+    "PL_RESIZER_HOLD_SLACK_MARGIN": 0.3,
+    "PL_RESIZER_SETUP_SLACK_MARGIN": 0.1,
     "FP_PIN_ORDER_CFG": "dir::pin_order.cfg",
     "PL_TARGET_DENSITY_PCT": 30,
-    "//rsz": "post-GPL repair_design explodes on the wide fifo/data buses",
-    "//rsz2": "(22k buffers -> DPL-0036). Skip it; bounded post-CTS resizer",
-    "//rsz3": "timing handles repair. Same as config_reg_mux.",
-    "RUN_REPAIR_DESIGN": false,
     "MAX_FANOUT_CONSTRAINT": 80,
     "//io": "io_place.py mis-computes default pin length from getArea()",
     "//io2": "(dbu^2 treated as um^2 -> 120mm pins). Give explicit lengths.",
@@ -45,9 +50,6 @@
         "//ovl3": "Timing checkers likewise excluded; GDS is the deliverable."
     },
     "pdk::ics*": {
-        "//hold": "wide fifo/data buses overflow the post-CTS resizer hold-fix",
-        "//hold2": "on ics55 (RSZ-0060 max buffer count). Same as pwmdac.",
-        "RUN_POST_CTS_RESIZER_TIMING": false,
         "RUN_LVS": false,
         "//lvs": "Magic SPICE extraction on 33k ics55 instances does not finish; ",
         "//lvs2": "skip it and LVS, GDS (klayout) is the deliverable.",
@@ -60,7 +62,15 @@
             ""
         ],
         "//sig": "ics55 sign-off on this macro: 2951 klayout DRC + setup/hold in all ",
-        "//sig2": "corners (RV/RDL deck vs streamout, no signoff target). Keep GDS."
+        "//sig2": "corners (RV/RDL deck vs streamout, no signoff target). Keep GDS.",
+        "//rsz": "Post-CTS resizer stays enabled so setup/hold are repaired;",
+        "//rsz2": "repair_design first removes the ~600-fanout sinegen nets that",
+        "//rsz3": "used to overflow the hold-fix buffer budget (RSZ-0060).",
+        "//holdfix": "ics55 CTS has ~1.5ns skew -> 2100 hold endpoints. Overfixing to",
+        "//holdfix2": "+0.3ns needs >6k buffers and trips RSZ-0060, so fix to +0.05ns",
+        "//holdfix3": "with a higher buffer budget instead.",
+        "PL_RESIZER_HOLD_SLACK_MARGIN": 0.05,
+        "PL_RESIZER_HOLD_MAX_BUFFER_PCT": 100
     },
     "//f45": "default util 30 was converging (1.9k->declining); util 20 gave 10k DRC",
     "pdk::freepdk45": {
@@ -72,5 +82,7 @@
         "PL_TARGET_DENSITY_PCT": 15,
         "GRT_ADJUSTMENT": 0.5,
         "//room": "33k-cell audiodac on nangate45: DRT plateaus ~10-20k violations at util 25 (pin-access limited). Bigger die + looser GRT target."
-    }
+    },
+    "DESIGN_REPAIR_BUFFER_INPUT_PORTS": false,
+    "DESIGN_REPAIR_BUFFER_OUTPUT_PORTS": false
 }
