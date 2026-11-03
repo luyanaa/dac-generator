@@ -276,11 +276,15 @@ def main():
                  "slack taken over all PVT corners. `PEX` = SPEF from "
                  "`OpenROAD.RCX` was available to the post-PnR STA. "
                  "`status` refers to setup; `hold WS` is reported separately.\n")
-    lines.append("Caveats: OR1 is evaluated on the `TT_5P0` corner only (the "
-                 "`TT_3P3` liberty omits the async-reset flop timing). "
-                 "`util %` and `cells` are LibreLane's stdcell metrics; on "
-                 "ics55 the deck classifies filler cells as `other`, so both "
-                 "read high.\n")
+    lines.append("Caveats: OR1 has a single `TT_5P0` corner only (no "
+                 "slow/fast corner; its liberty header states the DFF "
+                 "setup/hold tables are not characterised yet), so its f_max "
+                 "is an optimistic TT estimate, not signoff grade. OR1's "
+                 "worst path is also I/O-dominated (10 ns of external input "
+                 "delay in the audiodac path), so it is not a pure gate-speed "
+                 "measurement. `util %` and `cells` are LibreLane's stdcell "
+                 "metrics; on ics55 the deck classifies filler cells as "
+                 "`other`, so both read high.\n")
     lines.append("## Per-macro x PDK\n")
     lines.append("| macro | PDK | clk | T (ns) | setup | setup WS (ns) | corner | "
                  "f_max (MHz) | hold WS (ns) | die (um) | util % | cells | "

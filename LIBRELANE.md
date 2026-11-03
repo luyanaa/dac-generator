@@ -153,6 +153,14 @@ All decks close 20 MHz with positive hold slack (worst: ics55 +0.063 ns at
 the fast corner). `freepdk45` was already timing-clean before this change
 and was left as-is.
 
+**OR1 caveat.** The OR1 column is not signoff-grade: the deck exposes a
+single `TT_5.0 V / 25 °C` corner (no slow/fast corners or derates), its
+liberty header states the DFF setup/hold tables are *not characterised yet*,
+and the audiodac worst path is I/O-dominated (10 ns of the 15.9 ns path is
+the external input delay). The PDK's own reference counter (31 cells,
+20 ns clock) shows +15 ns slack, so the deck is simply fast at TT — the
+62.9 MHz is an optimistic TT estimate, not a silicon speed.
+
 ### Residual fast-corner hold
 
 `tempsense` (ihp130, ics55) and `pwmdac` (ics55) still report a small
