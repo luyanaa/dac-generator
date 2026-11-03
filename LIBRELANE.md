@@ -116,12 +116,17 @@ period, worst setup/hold slack over all PVT corners, the implied
 SPEF from `OpenROAD.RCX` (PEX-annotated), die area, utilization, cell count,
 total power and DRC/LVS counters.
 
+Rows whose source is `post-GRT, default corner` come from decks with
+`RUN_MCSTA=false` (the `tempsense` black-box VDAC): only `DEFAULT_CORNER`
+is re-evaluated after global routing, the other corners in `metrics.json`
+are stale pre-PnR values and are ignored.
+
 Highlights (MHz, 50 ns clock unless a combo is timing-violated):
 
 | macro | sky130 | gf180 | ihp130 | ics55 | freepdk45 | or1 |
 |---|---|---|---|---|---|---|
 | `config_reg_mux` | 41.5 | 35.8 | 44.7 | 39.4 | 48.6 | 46.2 |
-| `tempsense` | 78.0 | 52.0 | 90.9 | 91.2 | 97.2 | 90.0 |
+| `tempsense` | 78.0 | 59.1 | 91.1 | 91.2 | 97.2 | 90.0 |
 | `pwmdac` | 54.0 | 35.5 | 59.5 | 42.6 | 91.6 | 39.7 |
 | `audiodac` | 39.3 | 30.3 | 51.8 | 55.8 | 25.4 | 62.9 |
 
@@ -163,14 +168,20 @@ the external input delay). The PDK's own reference counter (31 cells,
 `docs/or1_characterization.md` for the I/O (62.9 MHz) vs register-to-register
 (72.7 MHz) split and the hold numbers.
 
-### Residual fast-corner hold
+### Residual hold
 
-`tempsense` (ihp130, ics55) and `pwmdac` (ics55) still report a small
-fast-corner hold violation (-0.07 / -0.17 / -0.19 ns). OpenROAD's
-`repair_timing` is single-corner, so LibreLane's resizer only fixes the
-default corner and the fast-corner path stays invisible to it; setup closure
-and GDS are unaffected. A per-corner resizer pass (or a CTS skew tune) is
-needed to remove these.
+- `tempsense`/ics55: **-0.09 ns** at `nom_tt` on the post-GRT estimate (the
+  deck has `RUN_MCSTA=false`, so only the default corner is re-evaluated;
+  the ff/ss numbers in `metrics.json` are stale pre-PnR values and are not
+  reported).
+- `pwmdac`/ics55: **-0.19 ns** at `nom_ff` from the post-route STA.
+
+Both are small fast/typical-corner hold checks on analog-containing macros;
+setup closes with >26 ns margin and the GDS is unaffected. OpenROAD's
+`repair_timing` is single-corner, so the resizer only fixes the default
+corner; a per-corner resizer pass (or CTS skew tuning) would be needed to
+remove them completely. Every other macro/PDK combination has positive hold
+on the corner that is actually evaluated.
 
 ### Reproducible skips
 

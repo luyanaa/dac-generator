@@ -55,7 +55,8 @@ def clock_info(rundir: Path):
     cfg = read_json(rundir / "resolved.json") or {}
     t = cfg.get("CLOCK_PERIOD")
     port = cfg.get("CLOCK_PORT") or cfg.get("CLOCK_NET")
-    return (float(t) if isinstance(t, (int, float)) else None), port
+    default_corner = cfg.get("DEFAULT_CORNER")
+    return (float(t) if isinstance(t, (int, float)) else None), port, default_corner
 
 
 def _bbox(v):
@@ -73,7 +74,7 @@ def _skip_corner(name: str, pdk: str) -> bool:
     return any(x in name for x in CORNER_EXCLUDE.get(pdk, ()))
 
 
-def from_final_metrics(rundir: Path, pdk: str):
+def from_final_metrics(rundir: Path, pdk: str, only_corner=None):
     m = read_json(rundir / "final" / "metrics.json")
     if not m:
         return None
@@ -91,6 +92,9 @@ def from_final_metrics(rundir: Path, pdk: str):
         and abs(v) < SENTINEL
         and not _skip_corner(k, pdk)
     }
+    if only_corner is not None:
+        setup = {k: v for k, v in setup.items() if k == only_corner}
+        hold = {k: v for k, v in hold.items() if k == only_corner}
     if not setup:
         # metrics exist but there is no timed register-to-register path
         return {
@@ -168,23 +172,25 @@ def from_summary_rpt(rundir: Path, pdk: str):
         rows.append(cells)
     if not rows:
         return _no_timing("stapostpnr/summary.rpt (no timed path)")
-    best = None
+    best_setup = None
+    best_hold = None
     for cells in rows:
         ws = _num(cells[6])          # Setup Worst Slack
         hws = _num(cells[1])         # Hold Worst Slack
-        if ws is None:
-            continue
-        if best is None or ws < best[1]:
-            best = (cells[0], ws, hws)
-    if best is None:
+        if ws is not None and (best_setup is None or ws < best_setup[1]):
+            best_setup = (cells[0], ws)
+        if hws is not None and (best_hold is None or hws < best_hold[1]):
+            best_hold = (cells[0], hws)
+    if best_setup is None and best_hold is None:
         return _no_timing("stapostpnr/summary.rpt (no timed path)")
-    corner, ws, hws = best
+    corner, ws = best_setup if best_setup else (None, None)
+    hcorner, hws = best_hold if best_hold else (None, None)
     return {
         "source": "stapostpnr/summary.rpt",
         "setup_ws": ws,
         "setup_corner": corner,
         "hold_ws": hws,
-        "hold_corner": corner,
+        "hold_corner": hcorner,
         "die": (None, None),
         "util": None,
         "stdcell": None,
@@ -208,14 +214,19 @@ def spef_exists(macro: str, pdk: str, rundir: Path) -> bool:
 
 def characterize(macro: str, pdk: str):
     rundir = resolve_dir(macro, pdk)
-    t, port = clock_info(rundir)
-    info = from_final_metrics(rundir, pdk) or from_summary_rpt(rundir, pdk)
-    if info is None:
-        info = _no_timing("missing")
+    t, port, default_corner = clock_info(rundir)
     # `final/metrics.json` may hold the post-GRT STA when the deck disables
     # MC-STA (RUN_MCSTA=false): there is no *stapostpnr* step in that run.
-    if info["source"].startswith("final/metrics.json") and not any(rundir.glob("*stapostpnr*")):
-        info["source"] = "final/metrics.json (post-GRT estimate)"
+    # Only the DEFAULT_CORNER is re-evaluated by that last STA step; the other
+    # corners are stale from the pre-PnR STA, so report only the default one.
+    post_route = any(rundir.glob("*stapostpnr*"))
+    info = from_final_metrics(
+        rundir, pdk, None if post_route else default_corner
+    ) or from_summary_rpt(rundir, pdk)
+    if info is None:
+        info = _no_timing("missing")
+    if info["source"].startswith("final/metrics.json") and not post_route:
+        info["source"] = "final/metrics.json (post-GRT, default corner)"
 
     ws = info["setup_ws"]
     fmax = None
