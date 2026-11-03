@@ -212,6 +212,11 @@ def characterize(macro: str, pdk: str):
     info = from_final_metrics(rundir, pdk) or from_summary_rpt(rundir, pdk)
     if info is None:
         info = _no_timing("missing")
+    # `final/metrics.json` may hold the post-GRT STA when the deck disables
+    # MC-STA (RUN_MCSTA=false): there is no *stapostpnr* step in that run.
+    if info["source"].startswith("final/metrics.json") and not any(rundir.glob("*stapostpnr*")):
+        info["source"] = "final/metrics.json (post-GRT estimate)"
+
     ws = info["setup_ws"]
     fmax = None
     if t and ws is not None and (t - ws) > 0:
@@ -282,7 +287,8 @@ def main():
                  "is an optimistic TT estimate, not signoff grade. OR1's "
                  "worst path is also I/O-dominated (10 ns of external input "
                  "delay in the audiodac path), so it is not a pure gate-speed "
-                 "measurement. `util %` and `cells` are LibreLane's stdcell "
+                 "measurement; see docs/or1_characterization.md for the "
+                 "I/O vs register-to-register split. `util %` and `cells` are LibreLane's stdcell "
                  "metrics; on ics55 the deck classifies filler cells as "
                  "`other`, so both read high.\n")
     lines.append("## Per-macro x PDK\n")

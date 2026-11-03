@@ -159,7 +159,9 @@ liberty header states the DFF setup/hold tables are *not characterised yet*,
 and the audiodac worst path is I/O-dominated (10 ns of the 15.9 ns path is
 the external input delay). The PDK's own reference counter (31 cells,
 20 ns clock) shows +15 ns slack, so the deck is simply fast at TT — the
-62.9 MHz is an optimistic TT estimate, not a silicon speed.
+62.9 MHz is an optimistic TT estimate, not a silicon speed. See
+`docs/or1_characterization.md` for the I/O (62.9 MHz) vs register-to-register
+(72.7 MHz) split and the hold numbers.
 
 ### Residual fast-corner hold
 
