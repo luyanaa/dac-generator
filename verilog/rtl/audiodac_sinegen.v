@@ -63,32 +63,22 @@ module audiodac_sinegen
 		end
 	endfunction
 	
-	/*
-	 *	Function to generate the LUT
-	 */
-	
-	/* verilator lint_off LITENDIAN */
-	function [0:(BW*(2**LUT_SIZE)-1)] calc_sine_values;
-		/* verilator lint_off UNUSED */
-		input dummy; //dummy input, since a function needs at least one input
-		/* verilator lint_on UNUSED */
-		integer i;
-		begin
-			for( i=0; i<2**LUT_SIZE; i=i+1)
-				calc_sine_values[i*BW+:BW] = calc_sine_value($rtoi(360.0/$itor(2**LUT_SIZE)*$itor(i)));
-		end
-	endfunction
-	/* verilator lint_on LITENDIAN */
 	
 	reg	[LUT_SIZE-1:0] read_ptr, next_read_ptr; //pointer for the LUT
 	
-	// Generate the LUT table as an flattend array
+	// Generate the LUT table as a 2-D array
 	/* verilator lint_off LITENDIAN */
-	wire [0:(BW*(2**LUT_SIZE)-1)] SINE_CONST = calc_sine_values(0);
+	wire signed [BW-1:0] SINE_CONST [0:(2**LUT_SIZE)-1];
+	genvar gi;
+	generate
+		for (gi = 0; gi < 2**LUT_SIZE; gi = gi + 1) begin : g_sine
+			assign SINE_CONST[gi] = calc_sine_value($rtoi(360.0/$itor(2**LUT_SIZE)*$itor(gi)));
+		end
+	endgenerate
 	/* verilator lint_on LITENDIAN */
 	
 	//Set the output data
-	assign data_o = tst_sinegen_en_i ? SINE_CONST[read_ptr*BW +:BW] : 0;
+	assign data_o = tst_sinegen_en_i ? SINE_CONST[read_ptr] : 0;
 
 	// Register process
 	always @(posedge clk_i) begin

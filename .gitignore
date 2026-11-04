@@ -17,3 +17,6 @@ mgmt_core_wrapper
 /openlane/*/runs/
 # local gf180mcu AS-SCL overlay (taken from /grid, see LIBRELANE.md)
 /overrides/gf180mcuD_full/
+
+# FPGA synthesis/place-and-route outputs
+/fpga/build/

@@ -225,6 +225,25 @@ missing-LEF antenna checker.
   `DESIGN_IS_CORE`→`PDN_MULTILAYER`, `PL_TARGET_DENSITY`→`PL_TARGET_DENSITY_PCT`,
   `MAGIC_WRITE_FULL_LEF`, `PL_OPENPHYSYN_OPTIMIZATIONS`.
 
+### audiodac sine LUT (found via FPGA synthesis)
+
+`audiodac_sinegen` used a flat `[0:BW*2**LUT_SIZE-1]` vector and a variable
+part-select (`SINE_CONST[read_ptr*BW +: BW]`). Icarus and Yosys disagree on
+the bit order of that construct, so the yosys/ASIC netlist evaluated a
+different table from RTL simulation (with `LUT_SIZE=7`/`SINE_AMPL=0.5` the
+netlist starts at -9152 instead of +571). It is now a 2-D array indexed by
+`read_ptr`, verified by comparing pre/post-synthesis simulation.
+
+Impact: the six delivered `audiodac` GDS were synthesized before this fix,
+so their `tst_sinegen_en_i=1` test-sine mode is wrong; the normal
+FIFO -> delta-sigma path is unaffected. Re-run `audiodac` on all PDKs when
+LibreLane is available. The fix does not change the mux structure or the
+`read_ptr` fanout that the timing closure was built around.
+
+An FPGA smoke-test flow (yosys + nextpnr, OSS CAD Suite) lives in `fpga/`
+(see `fpga/README.md`): `audiodac` fits an iCE40 UP5K (39/39 I/O, 18 MHz)
+and closes 52 MHz on an ECP5-25k.
+
 ### OR1 (`/grid/OpenRule1um/OR1PDK/OR1`)
 
 - The updated OR1 deck has async-reset FFs, so `const_gen`/`config_reg_mux`/
