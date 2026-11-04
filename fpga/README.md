@@ -64,6 +64,22 @@ wrong. The normal FIFO → delta-sigma audio path is unaffected. Re-run
 `audiodac` on all PDKs when LibreLane is available; the mux structure and
 the `read_ptr` fanout that the timing closure targets are unchanged.
 
+## Bitstreams (Project Trellis)
+
+The ECP5 `*-bit` targets pack the nextpnr config with Project Trellis
+(`ecppack` 1.4) and the result can be read back with `ecpunpack`:
+
+```sh
+make audiodac-ecp5-bit
+ecpunpack build/audiodac_ecp5.bit /tmp/audiodac.config
+```
+
+All three ECP5 bitstreams report `LFE5U-25F`, IDCODE `0x41111043`
+(`LFE5U-25F-6CABGA256`). Change `ECP5_DEV` in the Makefile for a different
+device/package. There are no pin constraints (LPF), so I/O placement is
+automatic; add an LPF before programming a real board. `ecppack --svf`
+can also emit an SVF for JTAG programming.
+
 ## Caveats
 
 - This is a bring-up/resource smoke test, not signoff. The ASIC flow remains
