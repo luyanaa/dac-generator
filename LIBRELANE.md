@@ -136,6 +136,16 @@ variants now meet the 20 MHz clock, including ics55/OR1 (see the timing
 closure section below); ics55 `audiodac`/`tempsense` still read ~100%
 utilization because that deck counts filler cells as standard cells.
 
+### PPA optimization
+
+`docs/ppa_optimization.md` records a dense-die pass on `audiodac`:
+sky130/gf180/ihp130 shrink the die by ~43% at `FP_CORE_UTIL=45` (DRT 0;
+sky130/gf180 DRC 0; timing still 2-3x the 20 MHz target), and OR1 goes
+6600² -> 6200² with a +0.05 ns hold margin, cutting 17.5% of the cells.
+freepdk45 is pin-access limited and ics55 is filler/deck limited; both are
+unchanged. The OR1 3-corner flow currently OOMs in
+`OpenROAD.FillInsertion`; see the caveat in that document.
+
 ## Timing closure
 
 ### audiodac

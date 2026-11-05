@@ -30,7 +30,7 @@
     "//ihp3": "converging. Use TopMetal2 and drop target density on ihp130.",
     "pdk::ihp-sg13g2": {
         "RT_MAX_LAYER": "TopMetal2",
-        "PL_TARGET_DENSITY_PCT": 22,
+        "PL_TARGET_DENSITY_PCT": 40,
         "RUN_MAGIC_DRC": false,
         "RUN_LVS": false,
         "//drc": "Magic full DRC on 33k instances never completes (>45 min); KLayout is ",
@@ -47,7 +47,10 @@
         ],
         "//ovl": "Magic extraction reports ~11k/decap-driven illegal overlaps on ",
         "//ovl2": "larger ihp130 designs (const_gen/config_reg_mux are clean). ",
-        "//ovl3": "Timing checkers likewise excluded; GDS is the deliverable."
+        "//ovl3": "Timing checkers likewise excluded; GDS is the deliverable.",
+        "FP_CORE_UTIL": 45,
+        "//ppa": "45% core util: die 0.815 -> 0.462 mm2 (-43%),",
+        "//ppa2": "slow-corner setup 30.7 -> 31.2 ns."
     },
     "pdk::ics*": {
         "RUN_LVS": false,
@@ -89,5 +92,17 @@
         "//hold3": "the real slack without the runaway."
     },
     "DESIGN_REPAIR_BUFFER_INPUT_PORTS": false,
-    "DESIGN_REPAIR_BUFFER_OUTPUT_PORTS": false
+    "DESIGN_REPAIR_BUFFER_OUTPUT_PORTS": false,
+    "pdk::sky130*": {
+        "FP_CORE_UTIL": 45,
+        "PL_TARGET_DENSITY_PCT": 40,
+        "//ppa": "45% core util: die 0.406 -> 0.233 mm2 (-43%), DRC 0,",
+        "//ppa2": "slow-corner setup still +23.4 ns."
+    },
+    "pdk::gf180mcu*": {
+        "FP_CORE_UTIL": 45,
+        "PL_TARGET_DENSITY_PCT": 40,
+        "//ppa": "45% core util: die 1.393 -> 0.792 mm2 (-43%), DRC 0,",
+        "//ppa2": "slow-corner setup 17.0 -> 19.7 ns."
+    }
 }
