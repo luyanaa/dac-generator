@@ -45,6 +45,12 @@ python3 tools/characterize.py     # -> docs/characterization.{md,csv}
 
 `gf180mcu` is run as the **D** flavour (`gf180mcuD`).
 
+`gf180` also has 7-track and 3.3 V flavours. `gf180-as-7t3v3`
+(`gf180mcu_as_sc_mcu7t3v3`) cuts audiodac power from 78.3 to 16.1 mW
+(-79%) and die from 1.393 to 0.600 mm2 while raising the slow-corner
+f_max from 30.3 to 51.9 MHz; `gf180-7t` is the 5 V 7-track drop-in
+(58.9 mW, 0.630 mm2, 24.9 MHz). See `docs/gf180_variants.md`.
+
 ### PDK "views"
 
 `/grid` standard-cell repos ship only `libs.ref/` + `libs.tech/` fragments
