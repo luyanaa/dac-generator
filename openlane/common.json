@@ -80,10 +80,14 @@
         "//bb2": "(posedge clk or posedge reset). Use them; drop the DFFRX",
         "//bb3": "exclusion + local nodffrx stubs now that OR1 maps reset FFs.",
         "CELL_VERILOG_MODELS": "pdk_dir::libs.ref/or1_fd_sc/verilog/or1_fd_sc_bb.v",
-        "//lib": "TT_5P0 header fixed to /* */ (yosys parses it) and is the",
-        "//lib2": "only lib with DFFRX1/DFFRX2 timing; TT_3P3 lacks reset FFs.",
+        "//lib": "Three timing corners exist. TT_5P0 is the characterised",
+        "//lib2": "corner (header /* */ so yosys parses it; only lib with",
+        "//lib3": "DFFRX1/DFFRX2 reset-FF timing). SS_4P5/FF_5P5 are estimated",
+        "//lib4": "voltage corners (same cells, degraded/boosted timing).",
         "LIB": {
-            "*tt*": "pdk_dir::libs.ref/or1_fd_sc/lib/or1_fd_sc_TT_5P0_25C.lib"
+            "*tt*": "pdk_dir::libs.ref/or1_fd_sc/lib/or1_fd_sc_TT_5P0_25C.lib",
+            "*ss*": "pdk_dir::libs.ref/or1_fd_sc/lib/or1_fd_sc_SS_4P5_85C.lib",
+            "*ff*": "pdk_dir::libs.ref/or1_fd_sc/lib/or1_fd_sc_FF_5P5_0C.lib"
         },
         "//lint": "OR1's cell verilog (DFFRX1) trips Verilator lint; the cell",
         "//lint2": "models are PDK collateral, not our RTL, so skip the lint steps.",

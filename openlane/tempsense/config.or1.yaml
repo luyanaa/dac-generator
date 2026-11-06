@@ -52,6 +52,8 @@ PRIMARY_GDSII_STREAMOUT_TOOL: klayout
 CELL_VERILOG_MODELS: pdk_dir::libs.ref/or1_fd_sc/verilog/or1_fd_sc_bb.v
 LIB:
   '*tt*': pdk_dir::libs.ref/or1_fd_sc/lib/or1_fd_sc_TT_5P0_25C.lib
+  '*ss*': pdk_dir::libs.ref/or1_fd_sc/lib/or1_fd_sc_SS_4P5_85C.lib
+  '*ff*': pdk_dir::libs.ref/or1_fd_sc/lib/or1_fd_sc_FF_5P5_0C.lib
 ERROR_ON_LINTER_ERRORS: false
 ERROR_ON_LINTER_WARNINGS: false
 ERROR_ON_LINTER_TIMING_CONSTRUCTS: false
@@ -79,6 +81,8 @@ KLAYOUT_CONFLICT_RESOLUTION: AddToCell
 MAGIC_DEF_LABELS: true
 STA_CORNERS:
 - nom_tt_5P0_25C
+- nom_ss_4P5_85C
+- nom_ff_5P5_0C
 CORE_AREA:
 - 20
 - 60
