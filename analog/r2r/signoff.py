@@ -29,8 +29,10 @@ gf180 has no KLayout DRC deck installed, so all three gates go through Magic:
        poly resistor's distributed R-C, so a post-layout ratio would need a
        model the deck does not have.
 
-What this file does NOT do: a post-layout DC/transient sweep of the ladder.
-The extracted netlist is kept for that pass; nothing here claims it ran.
+What this file does NOT do: a post-layout DC/transient sweep of the *whole*
+DAC.  `--stage postlayout` runs `postlayout.py`, which reconstructs the poly
+body R-C the Magic deck omits and compares a lumped against a segmented line;
+that covers the ladder macro only.
 """
 from __future__ import annotations
 
@@ -446,12 +448,38 @@ def pex(pdk: Path) -> dict:
             "instances": devs, "caps": caps, "net_cap_ff": net_cap}
 
 
+def postlayout() -> dict:
+    """Run the poly R-C post-layout bench (postlayout.py) as a signoff stage.
+
+    This is where the deck's missing resistor-body parasitics are put back:
+    postlayout.py rebuilds them from the extracted geometry and the PDK model
+    constants, then gates the result.  It is kept out of `all` because the
+    60 us transient is minutes, not seconds, and `all` is the fast layout gate.
+    """
+    pl = ROOT / "postlayout.py"
+    if not pl.is_file():
+        die(f"no {pl}")
+    proc = run([sys.executable, str(pl), "--stage", "all"], cwd=ROOT,
+               timeout=7200)
+    print(proc.stdout, end="")
+    if proc.returncode != 0:
+        print(proc.stderr, file=sys.stderr)
+        die("postlayout bench failed")
+    report = BUILD / "postlayout" / "postlayout.json"
+    if not report.is_file():
+        die("postlayout wrote no report")
+    rep = json.loads(report.read_text())
+    return {"ok": bool(rep.get("ok")), "report": str(report),
+            "models": sorted(rep.get("models", {}))}
+
+
 # --------------------------------------------------------------------------
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--stage", default="all",
-                    choices=["all", "build", "drc", "lvs", "pex"])
+                    choices=["all", "build", "drc", "lvs", "pex",
+                             "postlayout"])
     ap.add_argument("--brief", action="store_true")
     ap.add_argument("--selftest", action="store_true",
                     help="check the LVS graph gate against two mutations")
@@ -489,6 +517,13 @@ def main(argv=None) -> int:
         rep["steps"]["pex"] = r
         print(f"pex  PASS  {r['instances']} instances, {r['caps']} C entries, "
               f"{r['bytes'] / 1e6:.2f} MB")
+    if a.stage == "postlayout":
+        r = postlayout()
+        rep["steps"]["postlayout"] = r
+        if not r["ok"]:
+            failed.append("postlayout")
+        print(f"postlayout {'PASS' if r['ok'] else 'FAIL'}  "
+              f"models {', '.join(r['models'])}")
 
     rep["ok"] = not failed
     rep["failed"] = failed
