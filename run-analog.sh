@@ -60,10 +60,11 @@ if [ "$TOP" = video ] && [ "$PDK" != gf180 ]; then
 fi
 
 # GDS stage.  Only leaves with a device generator get here, and they route
-# every layout stage through their own signoff.py (see below).  The string's
-# switch tree/follower and the current-steering array are class C (hand
-# layout), so there is nothing to generate and pretending otherwise would be
-# worse than refusing.
+# every layout stage through their own signoff.py (see below).  The parts a
+# generator does not cover - the string's TG tree/follower, the current-
+# steering switch matrix/bias/I-V - are class C (hand layout), so for a leaf
+# with no generator at all there is nothing to emit and refusing beats
+# pretending otherwise.
 gds() {
     echo "error: no GDS generator for $TOP on $PDK" >&2
     echo "       $TOP is class C: hand layout, see" >&2

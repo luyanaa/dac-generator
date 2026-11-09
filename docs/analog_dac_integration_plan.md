@@ -389,7 +389,7 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   cj 8.85e-5 F/m2) and compares a lumped against a 20-section line. DC agrees
   to 0.006 mV (DNL -0.001/+0.041, INL -0.014/+0.036 LSB at tt/25). The
   full-DAC post-layout sweep is still not claimed.
-- **P2. DONE on gf180 (pre-layout + digital half), layout open.** 8-bit
+- **P2. DONE on gf180 (pre-layout + digital half + string macro).** 8-bit
   binary-tree Kelvin string, 255 units, 255-TG tree, ideal-follower bench:
   DNL 0.133 / INL ±0.13 LSB at tt/25, ideal-switch control shows the error is
   entirely MOS-tree, 5.0 us worst step settling. Higher INL than P1 as
@@ -398,7 +398,7 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   off (`analog/string/gen_gds.py`, DRC 0, LVS 255 units, PEX 255 instances);
   the TG tree and follower stay class C hand layout, so `run-analog.sh string
   gf180 gds` builds and checks the string macro, not the whole DAC.
-- **P3. DONE on gf180 (pre-layout + digital half), layout open.** 8-bit 4+4
+- **P3. DONE on gf180 (pre-layout + digital half + array macro).** 8-bit 4+4
   unit-current-steering 8-bit + standard-cell thermometer/DWA, following
   `2AMLogic/gf180-current-dac` for the array and `alinja/skydacmagic` for the
   cell. Device cell I 15.77 uA, ro 425 kOhm, Vth sensitivity 0.519 %/mV ->
