@@ -1,0 +1,20 @@
+{
+    "DESIGN_NAME": "dac_csteer_dig",
+    "VERILOG_FILES": [
+        "dir::../../verilog/rtl/dac_csteer_dig.v"
+    ],
+    "CLOCK_PORT": "clk",
+    "CLOCK_NET": "clk",
+    "CLOCK_PERIOD": 20,
+    "FP_SIZING": "absolute",
+    "DIE_AREA": "0 0 150 100",
+    "PL_TARGET_DENSITY_PCT": 30,
+    "RUN_CTS": false,
+    "//note": "Digital half of the unit-current-steering leaf: 4->15 thermometer",
+    "//note2": "decode plus the DWA pointer. The 15 unary cells and the binary",
+    "//note3": "current cells are a device-level analog macro abutting this one;",
+    "//note4": "no analog device is placed by this flow.",
+    "pdk::gf180mcu*": {
+        "DIE_AREA": "0 0 220 140"
+    }
+}

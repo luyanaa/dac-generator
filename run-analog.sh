@@ -23,8 +23,9 @@ STAGE=${3:-prelayout}
 case "$TOP" in
 r2r) DIR=analog/r2r ;;
 string) DIR=analog/string ;;
+csteer) DIR=analog/csteer ;;
 *)
-    echo "error: unknown topology '$TOP' (implemented: r2r, string)" >&2
+    echo "error: unknown topology '$TOP' (implemented: r2r, string, csteer)" >&2
     exit 2
     ;;
 esac

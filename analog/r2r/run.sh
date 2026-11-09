@@ -13,6 +13,7 @@
 # never calls LibreLane.  `run-analog.sh` at the repo root is the generic
 # entry point.
 set -e
+SELF=$(readlink -f "$0")
 cd "$(dirname "$0")"
 
 BENCH=${1:-all}
@@ -36,9 +37,9 @@ mismatch)
     python3 run_mismatch.py --pdk "$PDK"
     ;;
 all)
-    "$0" dc
-    "$0" tran
-    "$0" matrix
+    "$SELF" dc
+    "$SELF" tran
+    "$SELF" matrix
     ;;
 *)
     echo "usage: $0 [dc|tran|matrix|mismatch|all]" >&2

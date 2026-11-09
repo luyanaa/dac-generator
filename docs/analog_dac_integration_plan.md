@@ -249,6 +249,33 @@ with 32/64 um gates give 0.13 LSB; a 4 kOhm string halves the error to
 0.11 LSB but triples tap settling. Recording both, and the control run that
 isolates the tree, is the only honest way to size it.
 
+### 7.3 P3 (unit current steering + DEM) status
+
+| Gate | State | Evidence |
+|---|---|---|
+| Device cell | closed (gf180) | cascoded PMOS, 7 corner/temp points: I 15.63-15.87 uA, ro 275-549 kOhm |
+| Mismatch model | closed, deterministic | measured 0.519 %/mV x Pelgrom 3.5 mV = 1.8 %/cell |
+| DC linearity | closed (gf180, ideal cells) | sigma=0 control exact; 1.8 %/cell: DNL -0.89/+0.32, INL -0.48/+1.37 LSB |
+| DEM | closed (model) | 15-state DWA: mean INL +/-0.48, worst sample +/-1.37, 0.39 LSB rms |
+| Digital half | closed | `dac_csteer_dig` 3007/3007 checks, lint clean, hardened config added |
+| Output I-V | **closed by design rule** | passive 1 kOhm costs DNL +6.8 / INL +8.1 LSB; active I-V required |
+| Layout | **open, class C** | 15 unary + 4 binary cells and wide-swing cascode bias |
+| DRC / LVS / PEX | **open** | same KLayout/Magic blockers as P1 |
+
+The design point here is the DEM state count: 15 unary cells mean 15 pointer
+states, not 16. Over 15 samples every cell must see the average current, and
+the bench asserts that (`k`-of-15 for `k = 1..7`). Two other results size the
+leaf:
+
+* **The cell mismatch is the DNL limit, DEM only fixes the mean.** At
+  1.8 %/unit the fixed-pointer INL is 1.37 LSB for one seed (1.38 worst over
+  10 seeds); DEM averaging pulls the mean to 0.48 LSB but the instantaneous
+  worst sample stays at 1.37 (1.93 over 10 seeds) and adds 0.4-1.0 LSB of
+  shaped noise. The ten-seed sweep is in `analog/csteer/README.md`.
+* **A passive I-V is not usable at 8 bit.** 425 kOhm ro across 255 mV gives
+  +8 LSB INL, so the leaf contract requires a virtual-ground (opamp) I-V or a
+  regulated-cascode output; the regression reports both terminations.
+
 ## 8. Application fit
 
 | Target | Best fit | Note |
@@ -282,10 +309,14 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   uniform TG and the tap impedance choice. Layout is class C: the string is
   mechanical, the tree and follower are not, so `run-analog.sh string gf180
   gds` refuses instead of half-generating.
-- **P3.** Unit-current-steering 8-bit + standard-cell thermometer/DEM on
-  sky130/gf180, following `2AMLogic/gf180-current-dac` for the array and
-  `alinja/skydacmagic` for the cell. Add calibration only if measurements
-  justify it.
+- **P3. DONE on gf180 (pre-layout + digital half), layout open.** 8-bit 4+4
+  unit-current-steering 8-bit + standard-cell thermometer/DWA, following
+  `2AMLogic/gf180-current-dac` for the array and `alinja/skydacmagic` for the
+  cell. Device cell I 15.77 uA, ro 425 kOhm, Vth sensitivity 0.519 %/mV ->
+  1.8 %/cell. Fixed-pointer INL 1.37 LSB; DEM mean 0.48 LSB at 0.39 LSB rms.
+  Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. Layout is
+  class C (matched cell array + wide-swing cascode bias), so
+  `run-analog.sh csteer gf180 gds` refuses.
 - **P4.** CDAC only if an ADC/SAR target appears; reuse the Edwards switch
   sizing and the Saunders generator/PEX method. A CDAC alone is not an audio
   DAC without an output buffer.
