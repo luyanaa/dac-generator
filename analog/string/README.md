@@ -58,6 +58,8 @@ off-state load.
 | `run_matrix.py` | corner x temperature matrix |
 | `run_mismatch.py` | per-unit resistor mismatch sweep |
 | `run.sh` | one-command pre-layout regression |
+| `gen_gds.py` | reusable 255-unit string GDS generator (KLayout pya) |
+| `signoff.py` | fail-closed DRC / LVS / PEX for the string macro |
 
 ## Pre-layout results (gf180mcuA, tt/25 C)
 
@@ -121,17 +123,48 @@ follower's own settling.
 Verified: pre-layout linearity and settling at the typical corner, the
 ideal-switch control, and the digital half (1826/1826 checks, lint clean).
 
-Not verified:
+### Generated string macro (P2 layout, first half)
 
-* **No GDS yet.** `run-analog.sh string gf180 gds` exits 2 on purpose. The
-  string array is mechanical, but the 255-TG tree, the tap routing (255
-  taps into an 8-level tree without crossing the string) and the follower are
-  class C and need a human floorplan first. A generator for the string-only
-  block would be easy and would not close any gate on its own.
-* **Follower is a separate leaf.** Its offset and gain error are not included;
-  only its ideal 0.999 gain is modelled.
-* **DRC/LVS/PEX not applicable yet.** There is no device-level GDS to check,
-  so no layout gate is attempted. The tool path is no longer a blocker: the
-  R-2R leaf signs off through Magic (`../r2r/signoff.py`, DRC/LVS/PEX), so the
-  same three gates can run once a string macro exists. Building a string-only
-  generator would not close any gate on its own, which is why it is not done.
+`gen_gds.py` is the reusable device generator: it places one
+`ppolyf_u_resistor` PCell per unit and draws the series/tap/bulk straps on M1,
+parameterised by `bits` and `unit_l`. It does not draw resistor geometry.
+
+* 255 units at 5.714 um, pitch `unit_l + 2.6`; the 2.6 leaves 0.37 um between
+  the right M1 terminal of one unit and the p-tap tab of the next (the same
+  M1.2a margin that bit the R-2R at `X_RB`).
+* Every node has an M1 tap pad at y=-1, labelled `t1..t254`; the ends are
+  `vss` and `vref`. The series strap dives to y=-1 so it passes under the next
+  unit's p-tap (which spans y=0..2); a centreline strap would short to it.
+* Macro: 2120 x 4.6 um, 256 labelled terminals, self-check clean.
+
+`signoff.py` drives the three gates through Magic, exactly as
+`../r2r/signoff.py` does for P1:
+
+| gate | result |
+|---|---|
+| DRC | 0 items |
+| LVS | 255 unit resistors (5.714 um), 256 ports; the extracted netlist is a single chain `vss - t1 - ... - t254 - vref` |
+| PEX | 255 instances, 509 C entries (per-net geometric caps reported, not gated) |
+
+`./signoff.py --selftest` drops a unit and retargets a tap; both mutations must
+fail, and do.
+
+Run:
+
+```
+../../run-analog.sh string gf180 gds|drc|lvs|pex|all
+```
+
+What the generator does **not** contain, and still not verified:
+
+* **The 255-TG binary tree.** It is the routing problem, not a device array:
+  255 taps must enter an 8-level tree without crossing the string, and each
+  TG is a 32/64 um pass gate. That floorplan is class C and needs a human
+  layout; generating the string alone does not close the leaf.
+* **The output follower.** Offset and gain error are not included; the benches
+  use an ideal 0.999-gain buffer.
+* **Post-layout linearity of the complete DAC.** The string macro is signed
+  off on its own; the tree and follower are not in it.
+
+The pre-layout numbers in the tables above are schematic-level and still
+stand; the string macro changes none of them.
