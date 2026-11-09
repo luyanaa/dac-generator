@@ -387,8 +387,10 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   parasitics, so `postlayout.py` rebuilds them from the extracted geometry and
   the `ppolyf_u`/`fox_sub` constants (rsh 350, r_dl/r_dw, 1 um end resistors,
   cj 8.85e-5 F/m2) and compares a lumped against a 20-section line. DC agrees
-  to 0.006 mV (DNL -0.001/+0.041, INL -0.014/+0.036 LSB at tt/25). The
-  full-DAC post-layout sweep is still not claimed.
+  to 0.006 mV (DNL -0.001/+0.041, INL -0.014/+0.036 LSB at tt/25). Transient
+  (1 MOhm // 7 pF load, 60 us/step, 50 ns grid): worst step 255->0 = 1.139 us
+  lumped vs 1.140 us segmented, i.e. the reconstructed poly body R-C adds
+  ~1 ns to settling. The full-DAC post-layout sweep is still not claimed.
 - **P2. DONE on gf180 (pre-layout + digital half + string macro).** 8-bit
   binary-tree Kelvin string, 255 units, 255-TG tree, ideal-follower bench:
   DNL 0.133 / INL ±0.13 LSB at tt/25, ideal-switch control shows the error is
