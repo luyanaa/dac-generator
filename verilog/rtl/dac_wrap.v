@@ -66,7 +66,7 @@ module dac_wrap #(
 	input				clk_i,
 	// config (subset used per backend)
 	input				mode_i,		// ΔΣ: 0=1st,1=2nd order
-	input		[3:0]	volume_i,	// ΔΣ: 0=off .. 15=max
+	input		[3:0]	volume_i,	// ΔΣ: 0=mute .. 15=0 dB (6 dB steps)
 	input		[1:0]	osr_i,		// ΔΣ: 32/64/128/256
 	input				dith_i,		// PWM: +1 LSB dither
 	input				center_i,	// PWM: centre-aligned

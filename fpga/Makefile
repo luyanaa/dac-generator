@@ -19,9 +19,10 @@ ECPPACK       ?= $(OSS_CAD_SUITE)/bin/ecppack
 RTL   := ../verilog/rtl
 BUILD := build
 FREQ     ?= 20
-# The corrected sine LUT costs ~160 more LUTs on UP5K, so 20 MHz no longer
-# closes there; 18 MHz is the practical iCE40 target (ECP5 reaches ~52 MHz).
-FREQ_ICE ?= 18
+# The corrected 2nd-order CIFF loop is deeper than the old 2-bit stage, so
+# 18 MHz no longer closes on UP5K; ~14.7 MHz is the measured limit.  OSR=256
+# at 48 kHz needs 12.288 MHz, so 14 MHz still covers the intended use.
+FREQ_ICE ?= 14
 
 ICE_DEV  := --up5k --package sg48
 ECP5_DEV := --25k --package CABGA256

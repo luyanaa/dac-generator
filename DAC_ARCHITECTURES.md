@@ -50,9 +50,12 @@ backends) + `pwmdac_level.v` (static-level register feed).
 ## Architecture #2 — `audiodac` (ΔΣ → RC)
 
 `verilog/rtl/audiodac.v` (existing) — 1st/2nd-order ΔΣ, `ds_o`/`ds_n_o`,
-`osr_i` 32/64/128/256, `volume_i`, FIFO + sine testgen. The modulator core is
-`audiodac_dsmod` (reused directly by the generator when a ΔΣ backend is
-selected).
+`osr_i` 32/64/128/256, `volume_i` (0 = mute, 15 = 0 dB, 6 dB steps),
+FIFO + sine testgen. The modulator core is `audiodac_dsmod` (reused directly
+by the generator when a ΔΣ backend is selected). The 1st-order path is an
+exact full-scale accumulator; the 2nd-order path is a 1-bit CIFF loop that is
+stable to about -1 dBFS (use 1st order for 0 dBFS). See
+`docs/delta_sigma.md`.
 
 ## Generator integration
 

@@ -8,8 +8,8 @@
  *		BW 				... input data bitwidth
  *
  * Ports:
- *		data_i			... input data (must be UINT, default 16b)
- *		data_rd_o		... fetch next input data word (data feed-in driven 
+ *		data_i			... input data (UINT, 0..2^BW-1, midscale = silence)
+ *		data_rd_o		... fetch next input data word (data feed-in driven
  *							by DS-modulator)
  *		ds_o, ds_n_o	... output bitstream (complimentary outputs)
  *
@@ -18,9 +18,19 @@
  *							output bitstream rate = OSR * input_data_rate
  *
  *		mode_i			... select order of modulator (0 = 1st, 1 = 2nd)
- *		scale_i			... scaling (attenuation) of input data in -6dB steps
- *							(0 = 0dB, 1 = -6dB, 2 = -12dB, ..., 15 = off)
- *		osr_i			... oversampling ratio (OSR), 0=32/1=64/2=128/3=256 is supported
+ *		scale_i			... volume in 6 dB steps (0 = mute/off,
+ *							15 = 0 dB/max, 14 = -6 dB, ..., 1 = -84 dB).
+ *							Attenuation is done around midscale so the
+ *							unsigned sample keeps its DC offset.
+ *		osr_i			... oversampling ratio (OSR), 0=32/1=64/2=128/3=256
+ *
+ * Transfer function: for both orders the output 1-bit stream has an average
+ * duty of data_i / 2^BW (0..100%), i.e. midscale = 50%.  The 1st-order path
+ * is an exact unsigned accumulator.  The 2nd-order path is a CIFF
+ * (cascade-of-integrators feed-forward) 1-bit modulator clocked at the full
+ * output rate; its integrators are clamped so overload and DC-rail inputs
+ * stay bounded.  The 2nd-order loop is stable up to about -1 dBFS; the
+ * 1st-order path remains the full-scale (0 dBFS) mode.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -38,24 +48,27 @@ module audiodac_dsmod
 	output wire				data_rd_o,
 	output reg				ds_o,
 	output wire				ds_n_o,
-	
+
 	input					rst_n_i,
 	input					clk_i,
-	
+
 	input					mode_i,
-	input 		[3:0]		scale_i,		// 0 = off, 15 = max scale
-	input		[1:0]		osr_i			// 0 = 32; 1 = 64, 2 = 128, 3 = 256
+	input 		[3:0]		scale_i,
+	input		[1:0]		osr_i
 );
 
-	reg 		[BW-1:0]	accu1;
-	reg			[BW-1:0]	accu2;
-	reg			[1:0]		accu3;
-	wire 		[BW-1:0]	data_scaled;	// input data treated with scaling
-	wire signed [BW-1:0]	data_calc;		// 1b more is needed here
-	reg			[7:0]		fetch_ctr;		// clock divideid by osr
+	localparam	[BW-1:0]	DATA_MID	= {1'b1,{(BW-1){1'b0}}};
+	localparam	signed [20:0]	MID_EXT		= 21'sd32768;	// FS/2, state width
+	localparam	signed [20:0]	ISTATE_MAX	= 21'sd393216; // 6 * 2^BW
 
-	reg			[1:0]		mod2_ctr;		// clk divide by 4 for 1st stage of 2nd order mod
-	reg			[1:0]		mod2_out;		// output 1st stage
+	// 1st-order accumulator (unsigned; carry == output)
+	reg 		[BW-1:0]	accu1;
+
+	// 2nd-order CIFF integrators (signed, fixed point in input LSBs)
+	reg	signed	[20:0]	i1;
+	reg	signed	[20:0]	i2;
+
+	reg			[7:0]		fetch_ctr;		// clock divider by osr
 
 	localparam	[7:0]		CTR_OSR_32  	=  8'd31;
 	localparam	[7:0]		CTR_OSR_64  	=  8'd63;
@@ -67,38 +80,82 @@ module audiodac_dsmod
 	localparam	[1:0]		OSR_256 		= 2'd3;
 	localparam				MODE_ORD1 		= 1'd0;
 	localparam				MODE_ORD2 		= 1'd1;
-	localparam	[3:0]		SCALE_OFF		= 4'd15;
-	localparam	[3:0]		SCALE_MAX		= 4'd0;
-	localparam	[BW-1:0]	DATA_MID		= {1'b1,{(BW-1){1'b0}}};
 
-	// provide out and out_n
-  	assign ds_n_o = ~ds_o;
+	wire		[BW-1:0]	data_scaled;	// input data after volume control
+	/* verilator lint_off UNUSEDSIGNAL */
+	// Distances from midscale fit in BW bits; the MSB only exists because the
+	// subtraction is evaluated in BW+1 bits and is therefore always zero.
+	wire signed	[BW:0]		data_calc;		// signed attenuation around midscale
+	/* verilator lint_on UNUSEDSIGNAL */
+	wire signed	[BW:0]		x_s;			// centred 2nd-order input
+	wire signed	[20:0]		x_se;			// x_s sign-extended to state width
+	wire signed	[20:0]		s1;				// i1 + x
+	wire signed	[20:0]		u2;				// 2nd-order quantizer input
+	wire						y2;				// 2nd-order quantizer output
+	wire signed	[20:0]		i1_pos, i1_neg;	// next i1 for +FS/2 / -FS/2 feedback
+	wire signed	[20:0]		i2_acc;			// i2 + i1
+	wire signed	[20:0]		i2_pos, i2_neg;	// next i2 for +FS/2 / -FS/2 feedback
+	wire signed	[20:0]		i1_nxt, i2_nxt;
 
-	// we provide scaling in 6dB steps, 0=min (off), 15=max (unchanged)
-	// scaling is a bit tricky as we have UINT coming in, so we do the scaling in signed INT
-	// so that we stay around the midscale at 0x8000 when the amplitude is reduced
-	assign data_calc = (($signed(data_i) - $signed(DATA_MID)) >>> scale_i)
-						+ $signed(DATA_MID);
+	// provide out and out_n to make levelshifter easier
+	assign ds_n_o = ~ds_o;
 
-	assign data_scaled = (scale_i == SCALE_OFF) ? DATA_MID : 
-							(scale_i == SCALE_MAX) ? data_i : 
-								$unsigned(data_calc[BW-1:0]);
+	// Volume in 6 dB steps: 0 = mute, 15 = 0 dB, 14 = -6 dB, ..., 1 = -84 dB.
+	// Attenuate the signed distance from midscale so an unsigned sample does
+	// not move its DC operating point when the volume changes.
+	assign data_calc = (($signed({1'b0,data_i}) - $signed({1'b0,DATA_MID}))
+						>>> (4'd15 - scale_i)) + $signed({1'b0,DATA_MID});
+	assign data_scaled = (scale_i == 4'd0)  ? DATA_MID :
+						 (scale_i == 4'd15) ? data_i   :
+						 $unsigned(data_calc[BW-1:0]);
+
+	// ---------------- 2nd-order CIFF modulator ----------------
+	// x_s = data_scaled - FS/2;  u2 = x_s + i1 + i2;  y2 = (u2 >= 0)
+	// i1 += x_s - fb;  i2 += i1 - fb;  fb = (y2 ? +FS/2 : -FS/2)
+	// The input appears directly at the quantizer (feed-forward), so the
+	// integrators only process the quantization error and stay small.
+	//
+	// The +FS/2 and -FS/2 possibilities are summed in parallel and only the
+	// final mux depends on y2.  This keeps the combinational loop short
+	// (two adders + compare + mux) so the design still closes timing.
+	assign x_s  = $signed({1'b0,data_scaled}) - $signed({1'b0,DATA_MID});
+	assign x_se = {{(21-BW-1){x_s[BW]}}, x_s};
+	assign s1   = i1 + x_se;
+	assign u2   = s1 + i2;
+	assign y2   = (u2 >= 0);
+	assign i1_pos = s1 - MID_EXT;
+	assign i1_neg = s1 + MID_EXT;
+	assign i2_acc = i2 + i1;
+	assign i2_pos = i2_acc - MID_EXT;
+	assign i2_neg = i2_acc + MID_EXT;
+	assign i1_nxt = y2 ? i1_pos : i1_neg;
+	assign i2_nxt = y2 ? i2_pos : i2_neg;
 
 	// the fetch counter controls the read of the next sample from the FIFO
 	// the counter runs down so decoding is easier for different counter
 	// cycles (reloads at 0)
 	assign data_rd_o = (fetch_ctr == 8'd0);
 
+	function signed [20:0] sat_state;
+		input signed [20:0] v;
+		begin
+			if (v > ISTATE_MAX)
+				sat_state = ISTATE_MAX;
+			else if (v < -ISTATE_MAX)
+				sat_state = -ISTATE_MAX;
+			else
+				sat_state = v;
+		end
+	endfunction
+
   	always @(posedge clk_i) begin
 		if (!rst_n_i) begin
 			// reset all registers
 			accu1 <= {BW{1'b0}};
-			accu2 <= {BW{1'b0}};
-			accu3 <=  2'b0;
+			i1 <= 21'sd0;
+			i2 <= 21'sd0;
 			ds_o <= 1'b0;
 			fetch_ctr <= 8'b0;
-			mod2_ctr <= 2'b0;
-			mod2_out <= 2'b0;
 		end else begin
 			// sd-modulator is running
 
@@ -115,37 +172,24 @@ module audiodac_dsmod
 			end else
 				//just keep counting down
 				fetch_ctr <= fetch_ctr - 1'b1;
-		
+
 			if (mode_i == MODE_ORD1) begin
-				// delta-sigma modulator 1st order
-				// this simple structure works if everything
-				// is UINT
+				// delta-sigma modulator 1st order: exact unsigned accumulator.
+				// The carry is the 1-bit output, so the average duty is
+				// data_scaled / 2^BW.
 				{ds_o,accu1} <= data_scaled + accu1;
-			
+
 			end else if (mode_i == MODE_ORD2) begin
-				// delta-sigma modulator 2nd order
-				// the first stage runs on clk/4, the second
-				// stage runs on clk
-
-				if (mod2_ctr == 2'b0) begin
-					// this only happens every 4th clk
-					// cycle
-					{mod2_out,accu1} <= {2'b00,data_scaled} 
-								+ {1'b0,accu1,1'b0} 
-								+ {2'b01,{BW{1'b0}}}
-								- {2'b0,accu2};
-					accu2 <= accu1;
-				end
-
-				// this is the clk divider for the 1st stage
-				mod2_ctr <= mod2_ctr + 1'b1;
-				
-				// this simple structure is the 2nd stage
-				// running on clk
-				{ds_o,accu3} <= mod2_out + accu3;
+				// delta-sigma modulator 2nd order (CIFF, 1-bit, full rate).
+				// The state clamp is a safety net for overload/DC-rail
+				// inputs; it is inactive for normal audio levels.
+				i1 <= sat_state(i1_nxt);
+				i2 <= sat_state(i2_nxt);
+				ds_o <= y2;
 			end
 		end
 	end
+
 endmodule // audiodac_dsmod
 
 `endif

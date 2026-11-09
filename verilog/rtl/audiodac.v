@@ -63,7 +63,7 @@ module audiodac (
 	input				clk_i,
 	// configuration bits
 	input				mode_i, 	// 0 = 1st, 1 = 2nd order SD-mod
-	input 		[3:0]	volume_i,	// 0 = off, 1 = min volume, 15 = max volume
+	input 		[3:0]	volume_i,	// 0 = mute, 15 = 0 dB, 6 dB steps
 	input		[1:0]	osr_i, 		// 0 = 32; 1 = 64, 2 = 128, 3 = 256
 	// DS-modulator outputs
 	output wire			ds_o,		// single-bit SD-modulator output
