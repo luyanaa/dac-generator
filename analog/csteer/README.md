@@ -1,7 +1,9 @@
 # Unit-current-steering DAC leaf
 
-Third analog leaf (roadmap P3). Class **C**: the 15 unary cells, the binary
-cells and the cascode bias need matched, common-centroid hand layout; only the
+Third analog leaf (roadmap P3). Mixed: the 30-cell current-source array (the
+15 unary cells plus the 1/2/4/8 binary cells) is generated and signed off
+(`gen_gds.py`, `signoff.py`); the switch matrix, the wide-swing cascode bias,
+the I-V resistor and the differential wrapper are class **C** hand layout. The
 digital half (`verilog/rtl/dac_csteer_dig.v`) is a generated standard-cell
 macro. No OpenROAD P&R near the analog core.
 
@@ -145,6 +147,8 @@ and the `k`-of-15 fairness property for `k = 1..7`. Verilator lint clean.
 ./run_cell.py                 # device cell matrix and sensitivity
 ./run_mismatch.py --seeds 10  # seed sweep
 ../../run-analog.sh csteer gf180 prelayout
+../../run-analog.sh csteer gf180 all      # array macro: DRC/LVS/PEX
+../../run-analog.sh csteer gf180 gds
 make -C ../../verilog/tb dac_csteer_dig
 ```
 
@@ -156,13 +160,15 @@ the passive-I-V penalty, and the digital half.
 
 Not verified / not done:
 
-* **No GDS.** `run-analog.sh csteer gf180 gds` exits 2 on purpose: the cell
-  array, the binary cells and the wide-swing cascode bias are class C and need
-  a matched common-centroid floorplan first.
-* **No PEX / post-layout, and no layout gate attempted.** Class C: there is
-  no device-level GDS, so DRC/LVS/PEX do not apply yet. The tool path exists
-  (the R-2R leaf signs off through Magic in `../r2r/signoff.py`); what is
-  missing is the hand layout, not a checker.
+* **Array macro generated; the rest is class C.** `run-analog.sh csteer gf180
+  gds|drc|lvs|pex|all` builds the 30-cell array through `signoff.py`: Magic DRC
+  0 items, LVS 60 devices / 30 cells / 52 nets / fan-out 1-2-4-8, PEX 60
+  instances / 268 C entries; `--selftest` fails drop-unit, swap-gate and
+  short-out. Still hand layout: the switch matrix, the wide-swing cascode bias,
+  the I-V and the differential wrapper.
+* **No full-DAC post-layout.** The array macro is extracted and checked, but
+  there is no switch/bias layout, so post-layout linearity of the leaf is not
+  claimed.
 * **No output switch drivers / de-glitch.** The code is applied as a current
   step; the digital macro registers `th`/`b`, but the cell drain switches and
   their timing (make-before-break, clock feedthrough) are not modelled.
