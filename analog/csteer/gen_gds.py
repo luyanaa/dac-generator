@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+r"""Generate the unit-current-source array for the current-steering DAC (P3).
+
+This is the reusable *device* generator for P3: 30 identical cascoded-PMOS unit
+cells, placed in one row with the bias and supply rails that the array shares.
+It does not draw transistor geometry: every device is the PDK `pfet` PCell, and
+the script only adds the M1/poly straps and the terminal pads.
+
+What it does not contain (class C, hand layout, see README):
+
+  * the switch matrix (30 cells -> 255 codes, DEM rotation wires),
+  * the cascode bias generator (vbp/vcp are brought out as rails),
+  * the I-V output resistor and the differential wrapper.
+
+Cell (all dimensions um).  Two devices side by side, mirror on the left and
+cascode on the right, sharing one M1 node in the middle:
+
+      vdd rail (y=-1.25)
+        |          |          |
+      [mir]------[cas]        |
+        |          |           |
+       vbp        vcp       out pad (y=9.0..9.4)
+      poly rail  poly rail
+
+  * the mirror drain and the cascode source are joined by an M1 bridge *above*
+    the devices (y=8.25..8.55): the cascode's own n-well tie sits between them
+    and cannot be crossed at device level, so the bridge goes over the top.
+  * both n-well ties are the vdd net and are stubbed down to the vdd rail.
+  * mirror gates go to the lower poly rail (vbp, y=8.5..8.85), cascode gates to
+    the upper one (vcp, y=9.45..9.85).  The lower rail is notched around each
+    cascode gate extension: a poly rail that crossed one would short vbp to vcp.
+  * every unary cell gets its own output pad `oU<n>`; the four binary cells are
+    built from 1/2/4/8 parallel unit cells and their pads are strapped into
+    `oB1`, `oB2`, `oB4`, `oB8`.
+
+Usage (KLayout's interpreter, not system python3):
+    klayout -b -r gen_gds.py [-rd out=build/csteer.gds] [-rd check=true]
+"""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+import pya
+
+HERE = Path(__file__).resolve().parent
+
+# --- pfet PCell geometry at ld=0.44 (probed from the PDK PCell, um) ---------
+LD = 0.44
+MIR_L = 1.0
+CAS_L = 0.5
+W = 8.0
+CAS_DX = 2.98            # cascode origin; comp gap 0.34 (DF.3a wants 0.28)
+PITCH = 5.5              # cell pitch; 0.72 clear of the next cell's tie
+
+M1 = (34, 0)
+M1_LABEL = (34, 10)
+VIA1 = (35, 0)
+M2 = (36, 0)
+M2_LABEL = (36, 10)
+POLY = (30, 0)
+POLY_LABEL = (30, 10)
+CONTACT = (33, 0)
+
+# rails
+Y_VDD = (-1.40, -1.10)
+Y_RB_A = (8.45, 8.85)    # vbp
+Y_RB_B = (9.45, 9.85)    # vcp
+Y_PAD = (9.00, 9.40)
+Y_STRAP = (9.05, 9.35)
+
+
+def left_term():
+    return (-0.01, 0.37)
+
+
+def right_term(l):
+    return (0.51 + l, 0.89 + l)
+
+
+def gate_span(l):
+    return (0.44, 0.44 + l)
+
+
+def tie_span():
+    return (-0.76, -0.32)
+
+
+def load_cfg():
+    try:
+        import yaml
+    except ImportError:  # pragma: no cover
+        sys.exit("PyYAML is required: pip install pyyaml")
+    with open(HERE / "csteer.yaml") as f:
+        return yaml.safe_load(f)
+
+
+def pdk_root() -> Path:
+    base = Path(os.path.expanduser("~/.ciel/ciel/gf180mcu/versions"))
+    if not base.is_dir():
+        sys.exit(f"{base} not found; pass -rd pdkroot=<dir>")
+    return base / sorted(p.name for p in base.iterdir() if p.is_dir())[-1] / "gf180mcuA"
+
+
+def main() -> int:
+    g = globals()
+
+    def opt(name, default=None):
+        v = g.get(name, default)
+        return v if isinstance(v, (str, int, float)) else default
+
+    out_path = opt("out", str(HERE / "build" / "csteer.gds"))
+    do_check = str(opt("check", "false")).lower() in ("1", "true", "yes")
+    cfg = load_cfg()
+    n_unary = 2 ** int(cfg["unary_bits"]) - 1
+    unary_w = 2 ** int(cfg["binary_bits"]) - 1          # 15 unit cells in binary
+    bins = [2 ** i for i in range(int(cfg["binary_bits"]))]  # 1,2,4,8
+
+    root = Path(opt("pdkroot") or pdk_root())
+    libdir = root / "libs.tech" / "klayout" / "tech" / "pymacros"
+    if str(libdir) not in sys.path:
+        sys.path.insert(0, str(libdir))
+    from klayout_api_cells import gf180mcu_klayoutapi  # noqa: E402
+
+    lib = gf180mcu_klayoutapi()
+    ly = pya.Layout()
+    ly.dbu = 0.001
+    top = ly.create_cell("dac_csteer_ana")
+    m1 = ly.layer(*M1)
+    m1_lbl = ly.layer(*M1_LABEL)
+    via1 = ly.layer(*VIA1)
+    m2 = ly.layer(*M2)
+    m2_lbl = ly.layer(*M2_LABEL)
+    poly = ly.layer(*POLY)
+    poly_lbl = ly.layer(*POLY_LABEL)
+    cont = ly.layer(*CONTACT)
+
+    def box(x1, y1, x2, y2):
+        return pya.Box(int(round(x1 * 1000)), int(round(y1 * 1000)),
+                       int(round(x2 * 1000)), int(round(y2 * 1000)))
+
+    # keyed by (layer, net): the same net on poly and on M1 may overlap freely
+    regions: dict[tuple[int, str], pya.Region] = {}
+
+    def add(layer, x1, y1, x2, y2, net):
+        b = box(x1, y1, x2, y2)
+        top.shapes(layer).insert(b)
+        regions.setdefault((layer, net), pya.Region()).insert(b)
+        return b
+
+    def add_reg(layer, region, net):
+        # Shapes.insert does not take a Region: insert each merged polygon.
+        for poly in region.each_merged():
+            top.shapes(layer).insert(poly)
+        regions.setdefault((layer, net), pya.Region()).insert(region)
+
+    def label(x, y, name, layer=m1_lbl):
+        top.shapes(layer).insert(
+            pya.Text(name, pya.Trans(int(round(x * 1000)), int(round(y * 1000)))))
+
+    # ---------- cells -----------------------------------------------------
+    cells = [("U%d" % i, 1) for i in range(n_unary)]
+    idx = n_unary
+    bin_blocks = []
+    for w in bins:
+        start = idx
+        for k in range(w):
+            cells.append(("B%d_%d" % (w, k), w))
+            idx += 1
+        bin_blocks.append((w, start, idx - 1))
+
+    dbg = int(opt("dbg_cells", 0))
+    if dbg:
+        cells = cells[:dbg]
+        bin_blocks = [b for b in bin_blocks if b[2] < dbg]
+
+    pcell_mir = ly.create_cell("pfet", lib.name(),
+                               {"l": MIR_L, "w": W, "ld": LD, "nf": 1,
+                                "bulk": "Bulk Tie", "volt": "3.3V"})
+    pcell_cas = ly.create_cell("pfet", lib.name(),
+                               {"l": CAS_L, "w": W, "ld": LD, "nf": 1,
+                                "bulk": "Bulk Tie", "volt": "3.3V"})
+
+    gate_ext_cas = []
+    out_pads = {}
+
+    for k, (name, wgt) in enumerate(cells):
+        x = k * PITCH
+        out_net = ("oU%d" % k) if k < n_unary else ("oB%d" % wgt)
+        top.insert(pya.CellInstArray(pcell_mir.cell_index(),
+                                     pya.Trans(int(x * 1000), 0)))
+        top.insert(pya.CellInstArray(pcell_cas.cell_index(),
+                                     pya.Trans(int((x + CAS_DX) * 1000), 0)))
+        # PCell terminal geometry, for the self-check only.
+        lt = left_term()
+        rt_m = right_term(MIR_L)
+        rt_c = right_term(CAS_L)
+        tie = tie_span()
+        regions.setdefault((m1, "vdd"), pya.Region()).insert(
+            box(x + lt[0], -0.01, x + lt[1], W + 0.01))       # mirror source
+        regions.setdefault((m1, "vdd"), pya.Region()).insert(
+            box(x + tie[0], 0.0, x + tie[1], W))              # mirror tie
+        regions.setdefault((m1, "vdd"), pya.Region()).insert(
+            box(x + CAS_DX + tie[0], 0.0, x + CAS_DX + tie[1], W))
+        node = "N%d" % k
+        regions.setdefault((m1, node), pya.Region()).insert(
+            box(x + rt_m[0], -0.01, x + rt_m[1], W + 0.01))   # mirror drain
+        regions.setdefault((m1, node), pya.Region()).insert(
+            box(x + CAS_DX + lt[0], -0.01, x + CAS_DX + lt[1], W + 0.01))
+        g = gate_span(MIR_L)
+        regions.setdefault((poly, "vbp"), pya.Region()).insert(
+            box(x + g[0], -0.22, x + g[1], W + 0.22))
+        g = gate_span(CAS_L)
+        regions.setdefault((poly, "vcp"), pya.Region()).insert(
+            box(x + CAS_DX + g[0], -0.22, x + CAS_DX + g[1], W + 0.22))
+
+        # --- straps -------------------------------------------------------
+        add(m1, x - 0.01, Y_VDD[0], x + 0.37, -0.01, "vdd")          # source
+        add(m1, x - 0.76, Y_VDD[0], x - 0.32, 0.0, "vdd")            # tie
+        add(m1, x + CAS_DX - 0.76, Y_VDD[0], x + CAS_DX - 0.32, 0.0, "vdd")
+
+        add(m1, x + rt_m[0], W + 0.01, x + rt_m[1], 8.55, node)      # riser
+        add(m1, x + CAS_DX + lt[0], W + 0.01,
+            x + CAS_DX + lt[1], 8.55, node)                           # cas riser
+        add(m1, x + rt_m[0], 8.25, x + CAS_DX + 0.33, 8.55, node)    # bridge
+        add(m1, x + CAS_DX + rt_c[0], W + 0.01,
+            x + CAS_DX + rt_c[1], Y_PAD[0], out_net)                 # out riser
+        add(m1, x + CAS_DX + rt_c[0], Y_PAD[0],
+            x + CAS_DX + rt_c[1], Y_PAD[1], out_net)                 # out pad
+        out_pads[name] = (x + CAS_DX + rt_c[0], x + CAS_DX + rt_c[1])
+
+        g = gate_span(MIR_L)
+        add(poly, x + g[0], W + 0.22, x + g[1], Y_RB_A[1], "vbp")
+        # vbp pickup, mirror gate -> poly contact -> M1 pad -> via1 -> M2 rail.
+        # Both bias rails cannot live on poly: the cascode gate extension has
+        # to cross the mirror-gate rail band, so vbp is carried on metal2 and
+        # only lands on the gate poly per cell.
+        add(m1, x + 0.50, 8.44, x + 1.24, 8.80, "vbp")
+        top.shapes(cont).insert(box(x + 0.58, 8.52, x + 0.80, 8.74))
+        top.shapes(via1).insert(box(x + 0.90, 8.50, x + 1.16, 8.76))
+        g = gate_span(CAS_L)
+        add(poly, x + CAS_DX + g[0], W + 0.22,
+            x + CAS_DX + g[1], Y_RB_B[1], "vcp")
+        gate_ext_cas.append((x + CAS_DX + g[0], x + CAS_DX + g[1]))
+
+    x_last = (len(cells) - 1) * PITCH
+
+    # ---------- shared rails ---------------------------------------------
+    add(m1, -0.76, Y_VDD[0], x_last + 1.0, Y_VDD[1], "vdd")
+    label(0.0, (Y_VDD[0] + Y_VDD[1]) / 2, "vdd")
+
+    # vbp rail on metal2.  It crosses the cascode gate extensions and the
+    # output risers (both on M1) without a via, so it is one net end to end;
+    # each cell reaches it through its own contact/via1 stack.
+    add(m2, -1.36, 8.44, x_last + 1.24, 8.80, "vbp")
+    label(x_last / 2, 8.62, "vbp", m2_lbl)
+
+    # vcp rail: straight bar, nothing else rises through its band.
+    add_reg(poly, pya.Region(box(gate_ext_cas[0][0], Y_RB_B[0],
+                                 gate_ext_cas[-1][1], Y_RB_B[1])), "vcp")
+    # The vcp pad goes to the right of the last output pad, not above it:
+    # overhead would break M1.2a against the pad (0.05 um).
+    xc = x_last + CAS_DX + 1.39 + 0.30
+    add(poly, gate_ext_cas[-1][1], Y_RB_B[0], xc + 0.5, Y_RB_B[1], "vcp")
+    top.shapes(cont).insert(box(xc + 0.09, 9.53, xc + 0.31, 9.75))
+    add(m1, xc, 9.45, xc + 0.6, 10.05, "vcp")
+    label(xc + 0.3, 9.75, "vcp")
+
+    # ---------- binary output straps -------------------------------------
+    off = n_unary
+    for w, start, end in bin_blocks:
+        lo = out_pads[cells[start][0]][0]
+        hi = out_pads[cells[end][0]][1]
+        net = "oB%d" % w
+        add(m1, lo, Y_STRAP[0], hi, Y_STRAP[1], net)
+        label((lo + hi) / 2, (Y_STRAP[0] + Y_STRAP[1]) / 2, net)
+    for k, (name, _w) in enumerate(cells[:n_unary]):
+        lo, hi = out_pads[name]
+        label((lo + hi) / 2, (Y_PAD[0] + Y_PAD[1]) / 2, "oU%d" % k)
+
+    # ---------- self-check ------------------------------------------------
+    problems = []
+    if do_check:
+        want_dev = 2 * len(cells)
+        want_cells = dbg if dbg else n_unary + unary_w
+        if len(cells) != want_cells:
+            problems.append(f"{len(cells)} unit cells, want {n_unary + unary_w}")
+        # different nets must not touch on the same layer
+        keys = sorted(regions, key=lambda k: (k[0], k[1]))
+        for i in range(len(keys)):
+            for j in range(i + 1, len(keys)):
+                if keys[i][0] != keys[j][0]:
+                    continue
+                inter = regions[keys[i]] & regions[keys[j]]
+                if not inter.is_empty():
+                    bb = inter.bbox()
+                    problems.append(
+                        f"SHORT {keys[i][1]} <-> {keys[j][1]} at "
+                        f"({bb.left / 1000:.2f},{bb.bottom / 1000:.2f})")
+        print(f"devices    : {want_dev} pfet ({len(cells)} cascode pairs)")
+        print(f"terminals  : {sum(1 for b in bin_blocks)} binary groups + "
+              f"{min(n_unary, len(cells))} unary pads, 3 rails")
+        for p in problems:
+            print("  " + p)
+    if problems:
+        sys.exit(1)
+
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    ly.write(out_path)
+    b = top.bbox()
+    print(f"wrote {out_path}  (bbox {b.left / 1000:.1f},{b.bottom / 1000:.1f};"
+          f"{b.right / 1000:.1f},{b.top / 1000:.1f})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
