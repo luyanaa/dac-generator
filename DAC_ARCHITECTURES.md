@@ -68,3 +68,13 @@ updated OR1 deck has async-reset FFs). Both use `IO_PIN_V_LENGTH=2`/`IO_PIN_H_LE
 To swap backends in `user_project_wrapper`: the `ds_o`→`io_out[k]` assignment
 is the single switch point; `pwmdac` and `audiodac` expose the same `ds_o`/
 `ds_n_o` contract so either modulator can drive the pad.
+
+## Analog topologies (research)
+
+The generator currently emits digital backends only. A survey of 16
+open-silicon analog DAC references and an integration plan are in
+`docs/dac_topology_survey.md` and `docs/analog_dac_integration_plan.md`.
+Summary: R-2R and resistor-string are generator-friendly (class B); CDAC and
+current-steering need constrained device generation or manual layout;
+binary-weighted resistor DACs do not scale past ~6 bit; PDKs without MIM or
+precision resistors (`freepdk45`) stay digital-only.

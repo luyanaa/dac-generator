@@ -1,0 +1,254 @@
+# Analog DAC integration plan
+
+Status: research / proposal. No analog leaf is implemented yet.
+
+The generator currently emits **digital-only** DAC macros: `pwmdac` and
+`audiodac` are pure RTL, hardened with LibreLane standard cells, and drive a
+1-bit pin into an off-chip RC filter. This document defines how to add real
+analog DAC topologies without breaking that seam, and which topologies can be
+automated at all.
+
+See `docs/dac_topology_survey.md` for the per-repository evidence.
+
+## 1. Classes of automation
+
+Every topology is assigned one of three classes. The class decides the flow,
+the staffing and the sign-off bar.
+
+### (A) Digital / digitally assisted
+
+The conversion is performed by switching digital signals; accuracy is set by
+timing, filtering or averaging, not by device matching. Everything can be RTL,
+synthesised and hardened by LibreLane; the only PDK-dependent parts are driver
+strength and the pad.
+
+Examples: PWM + RC, ΔΣ + RC, unit-inverter / thermometer-finger DAC,
+PWM-with-dither, digital resistor-matrix DAC driven by standard-cell drivers.
+
+### (B) Device-generated with constrained routing
+
+The conversion depends on matched passive or active devices, but the array is
+regular. It can be emitted from a parameterised device list with a fixed
+floorplan, a fixed track/strap plan, dummy ring and symmetry rules. It is not
+free P&R: no OpenROAD auto-placement for the analog core. The generator owns
+placement and routing templates; DRC/LVS/PEX are run on the result.
+
+Examples: R-2R ladder, resistor string / Kelvin divider, binary-weighted
+resistor array, unit-current-steering matrix, MIM capacitor array (CDAC).
+
+### (C) Must be manually laid out
+
+Matching, coupling, EM/IR, parasitics or custom devices exceed what a template
+can guarantee. Needs an expert layout, iterative extraction, and often custom
+shields/guard rings/dummies. A generator can still provide a skeleton and the
+device sizes, but a human signs off the geometry.
+
+Examples: high-resolution CDAC with a sized bridge capacitor, current-steering
+with DEM/calibration and tight SFDR, CML/HBT DACs, any topology needing
+common-centroid + custom supply/ground + EM closure.
+
+A single chip normally mixes classes: a **(B)** analog array plus an **(A)**
+standard-cell decoder/DEM/calibration engine.
+
+## 2. Topology classification
+
+| Topology | Class | Why | Reusable reference |
+|---|---|---|---|
+| PWM + RC (`pwmdac`) | A | pure RTL; RC off-chip | this repo |
+| ΔΣ + RC (`audiodac`) | A | pure RTL; 1-bit + RC | this repo |
+| Unit-inverter / finger DAC | A | digital drive strength; monotonic by construction | ttsky/tt08 (digital half) |
+| R-2R ladder | B | ratio is one unit device, 2R = two in series; switch Ron sets INL | `ihsan-sa/ece298a-r2r-dac` |
+| Resistor string / Kelvin | B/C | binary-tree Kelvin: 2^N unit resistors + TG tree; switch Ron sets DNL; buffered output is hard analog | `sky130_ef_ip__rdac3v_8bit`, `dineshannayya/8bit_dac` |
+| Binary-weighted resistor | B/C (≤6 bit) | weights 1,2,4,... need ratio control; impractical above ~6 bit; use R-2R or string | none implemented |
+| Unit-current-steering matrix | B | matched current cells + thermometer; needs dummies/centroid and EM/IR | `2AMLogic/gf180-current-dac`, `alinja/skydacmagic` |
+| Current-steering + DEM/cal | B + A | array is B, DEM/cal engine is A | `alinja/skydacmagic` (offline DEM) |
+| Binary-weighted current-steering | C | W/L-weighted cells; matching and glitch are hand-tuned | `tt08-vga-fun` red/green |
+| Switched-capacitor / CDAC | B/C | matched MIM array; bridge cap and switches need hand tuning | `sky130_ef_ip__cdac3v_12bit` (C), `SiliclusterV3_2_cap_DAC` (B) |
+| Serial two-cap charge-sharing DAC | B | 2 equal MIM banks + op-amp; generated + PEX proven | `SiliclusterV3_2_cap_DAC` |
+| CML / HBT DAC | C | custom HBT cells, 50 Ω environment, EM | `MacAnalog/dn-002-...-ihp130` |
+
+### Key finding
+
+Only two of the surveyed analog references have credible **extracted
+post-layout** linearity data:
+
+- `ihsan-sa/ece298a-r2r-dac`: generated GDS, DRC/LVS, Magic PEX, 9 corners,
+  INL 0.355 LSB / DNL 0.141 LSB, 1.2 µs settling.
+- `jonahsaunders/SiliclusterV3_2_cap_DAC`: script-generated GDS, shields,
+  full-RC PEX, 9 corners × 256 codes, worst INL 0.553 LSB / DNL 0.538 LSB,
+  32 mismatch seeds, buffer stability 120 cases.
+
+The rest are schematic-only, LVS-only, or have no linearity numbers. Do not
+treat a clean DRC/LVS or a behavioral Monte Carlo as analog sign-off.
+
+## 3. PDK capability gate
+
+Analog topologies are only offered on PDKs that provide the required devices.
+The generator must select the allowed topology set per PDK instead of failing
+at DRC time.
+
+| Device | sky130 | gf180 | ihp130 | ics55 | freepdk45 | OR1 |
+|---|---|---|---|---|---|---|
+| Precision poly resistor | `res_xhigh_po` | `ppolyf_u` / `_2k` | `rhigh` | `res_poly` | — | limited |
+| MIM capacitor | `cap_mim_m3_1/2` | `cap_mim_1f0fF/1f5fF` | `mim` / `rfmim` | unconfirmed | — | poly/pwell caps only |
+| NPN HBT | — | — | `npn13G2` | — | — | — |
+| Thick-oxide / 3.3–5 V MOS | `g5v0` | `_03v3` | `sg13g2` 3.3 V | I/O devices | — | — |
+
+Implications:
+
+- `freepdk45` stays **digital-only** (PWM/ΔΣ). No MIM, no precision resistor.
+- `ics55`/`OR1` need a device audit before R/C topologies are exposed; only
+  the digital backends are safe today.
+- `ihp130` is the only candidate for CML/HBT.
+- `sky130`/`gf180`/`ihp130` can host R-2R, resistor-string, current-steering
+  and CDAC leaves.
+
+## 4. Interface contract for analog leaves
+
+Keep the existing rule: **a leaf macro is a hard block with a plain digital
+interface**. The decoder/DEM/calibration engine lives outside the analog core
+(or in a separate standard-cell macro), so it can be synthesised and retargeted
+per PDK.
+
+```
+module dac_<top>_ana #(parameter N = 8) (
+    input  [N-1:0] code_i,       // binary or thermometer, per macro
+    input          clk_i,        // optional retiming in the analog macro
+    input          rst_n_i,
+    input  [15:0]  cal_i,        // optional trim/cal word
+    input          en_i,
+    output         vout_p,       // or iout_p
+    output         vout_n,       // differential optional
+    inout          vref_p, vref_n,
+    inout          ibias,        // current-steering / CML
+    inout          vcm,          // CDAC / resistor-string mid
+    inout          vdd, vss
+);
+```
+
+Rules:
+
+- Pin order and side are fixed by a `pin_order.cfg`-style file; the wrapper
+  uses abutment, not a router, between the digital and analog macros.
+- Power domains (1.8 V core / 3.3 V I/O / 5 V switch) are explicit; level
+  shifters are part of the digital macro, not the analog core.
+- No bidirectional analog bus at the digital boundary; the code bus is
+  unidirectional and registered before the pad.
+- The analog macro does not contain a standard-cell P&R region. If it needs
+  logic, that logic is a separate `_dig` macro.
+
+## 5. Composition options
+
+1. **Two macros abutted (preferred).** `dac_<top>_dig` (LibreLane, stdcells)
+   + `dac_<top>_ana` (generated analog). Abut in `user_project_wrapper` or a
+   small top wrapper. Preserves the digital flow and lets each macro be
+   verified independently.
+2. **Analog leaf with embedded decoder.** Only for very small decoders and
+   only if the PDK flow can mix stdcells with analog devices in one GDS. Not
+   recommended: the decoder then inherits the analog DRC/LVS flow.
+3. **Digital-only seat.** Extend `dac_wrap` with additional `DAC_KIND` values
+   for PWM/ΔΣ variants; no analog macro involved. This is the fallback for
+   `freepdk45`/`ics55`/`OR1`.
+
+## 6. Directory and flow changes
+
+```
+analog/<topology>/
+    <topology>.yaml          # N, unit R/C/I, PDK overrides, pin plan
+    gen_<topology>.py        # device list, placement, track/strap router
+    tb/                      # ngspice pre-layout benches
+    pex/                     # extraction, corners, Monte Carlo
+verilog/rtl/dac_<top>_dig.v  # decoder / DEM / calibration / sequencer
+openlane/dac_<top>_dig/      # LibreLane config (stdcell only)
+```
+
+- Digital: unchanged `./run.sh dac_<top>_dig <pdk>`.
+- Analog: new `./run-analog.sh <topology> <pdk>` that runs the device
+  generator, KLayout/Magic DRC, netgen LVS, Magic PEX, then ngspice corners
+  and Monte Carlo. It must fail on missing PEX or missing corners, unlike the
+  current digital flow which may skip views.
+- Co-simulation: Verilator/Icarus for the digital macro, ngspice for the
+  extracted analog macro; a chip-level top bench drives the code bus and
+  measures INL/DNL/SFDR/settling.
+- CI: add a per-topology regression matrix. Class A runs RTL + FPGA. Class B
+  additionally requires DRC/LVS + PEX + corners. Class C requires a manual
+  review checklist and EM/IR.
+
+## 7. Verification gates
+
+| Gate | A | B | C |
+|---|---|---|---|
+| RTL / functional | required | required | required |
+| DRC / LVS | — | required | required |
+| PEX + corner sim | — | required | required |
+| Monte Carlo (mismatch) | — | required if the PDK supports per-instance mismatch | required |
+| INL/DNL | — | required over corners | required over corners + silicon correlation |
+| Settling / output impedance | — | required | required |
+| EM / IR / coupling | — | spot checks | full sign-off |
+| Manual layout review | — | spot checks | required |
+
+Known PDK gotcha: GF180 poly resistors have `mis_r = 0` in the current
+model, so Monte Carlo cannot move a resistor ratio. Use a deterministic
+per-unit sensitivity (e.g. ±1 % → INL) until per-instance mismatch exists.
+Sky130 Pelgrom parameters are available in the model but reference repos often
+use a Python model instead of SPICE MC.
+
+## 8. Application fit
+
+| Target | Best fit | Note |
+|---|---|---|
+| Audio, 16 bit, 48 kHz | existing ΔΣ + RC (A) | no analog leaf needed; 0 dBFS via 1st order |
+| Video, 8 bit, 25 MHz | current-steering matrix (B) or resistor string (B) | external I-to-V / 75 Ω |
+| General 8–12 bit, low speed | R-2R (B) | smallest area at 8–10 bit |
+| Mid-speed monotonic, 8 bit | resistor string (B, buffered) | 2^N resistors, switch Ron sets DNL; Edwards 8-bit fails its own INL with a follower |
+| High-speed / RF | CML/HBT (C) | ihp130 only |
+| SAR/ADC reuse | CDAC (B/C) | needs sample-and-hold + comparator, not just a DAC |
+
+Do not chase 16-bit R-2R or resistor-string DACs on an open PDK without
+trimming/calibration: switch Ron and resistor mismatch dominate well before
+16 bit.
+
+## 9. Phased roadmap
+
+- **P0 (no analog).** Keep `pwmdac`/`audiodac` as the portable default. Add
+  the PDK capability table and the `DAC_KIND` enum to `dac_wrap`; document
+  that `freepdk45`/`ics55`/`OR1` are digital-only until audited.
+- **P1 (first analog leaf).** R-2R 8-bit on gf180 + sky130, following
+  `ihsan-sa/ece298a-r2r-dac`: generated device array, fixed M1/M2 track plan,
+  digital code register macro, DRC/LVS/PEX, 9-corner + deterministic mismatch.
+  This is the lowest-risk class-B leaf and proves the analog flow.
+- **P2.** Resistor-string 8-bit on sky130/gf180 (binary-tree Kelvin, 255–320
+  units, TG tree) with a buffered output. Reuse the P1 generator and
+  verification harness. Expect worse INL than R-2R: the Edwards 8-bit macro
+  is LVS-clean yet fails its own schematic INL (±2 LSB) because switch Ron and
+  the follower dominate. Compare area/settling/INL against P1.
+- **P3.** Unit-current-steering 8-bit + standard-cell thermometer/DEM on
+  sky130/gf180, following `2AMLogic/gf180-current-dac` for the array and
+  `alinja/skydacmagic` for the cell. Add calibration only if measurements
+  justify it.
+- **P4.** CDAC only if an ADC/SAR target appears; reuse the Edwards switch
+  sizing and the Saunders generator/PEX method. A CDAC alone is not an audio
+  DAC without an output buffer.
+- **P5.** Binary-weighted current-steering (C) and CML/HBT (C) only with a
+  named high-speed target and a layout owner.
+
+## 10. Risks / non-goals
+
+- **Matching is not a digital problem.** A clean decoder does not buy INL.
+- **Binary-weighted resistor DACs do not scale.** No surveyed repo implements
+  one above ~6 bit; ratio spread and switch Ron force R-2R or a string.
+- **A buffered string DAC is not automatically linear.** The Edwards 8-bit is
+  LVS-clean and still fails its own INL spec; budget output-follower and
+  switch-Ron work.
+- **Open PDK mismatch models are incomplete** (GF180 `mis_r=0`), so
+  post-layout MC can understate resistor ratio error.
+- **Analog extraction is the long pole.** Budget PEX runtime and corner
+  explosion; reference repos spend most of their effort there.
+- **Do not route the analog core through OpenROAD.** The reference where this
+  was attempted (`dineshannayya/8bit_dac`) hardened only a digital stub.
+- **Licenses vary.** `ihsan-sa` has no license; `MacAnalog` is
+  non-commercial; `GREAHeaviside` is GPL-3.0. Only `sky130_ef_ip__*`,
+  `2AMLogic`, `Silicluster`-adjacent, `ttsky`/`tt08` are Apache/MIT-ish;
+  verify before copying layout or netlists.
+- **No silicon correlation** in any surveyed repo. All linearity numbers are
+  extracted-layout simulation.
