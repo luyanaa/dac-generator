@@ -49,14 +49,6 @@ esac
 gds() {
     case "$TOP:$PDK" in
     r2r:gf180) ;;
-    cdac:sky130)
-        [ -f "$DIR/gen_gds.py" ] || {
-            echo "error: cdac has no device generator yet (array pass open)" >&2
-            exit 2
-        }
-        klayout -b -r "$DIR/gen_gds.py" -rd "out=$DIR/build/cdac.gds"
-        return 0
-        ;;
     *)
         echo "error: no GDS generator for $TOP on $PDK" >&2
         exit 2
@@ -73,6 +65,27 @@ gds() {
         ;;
     esac
 }
+
+# The CDAC's layout evidence is signoff.py: it builds the array, then gates
+# DRC (KLayout 0.30.12 with feol+beol), LVS (per-bit weight counts from the
+# extracted netlist) and PEX.  Routing the stages here keeps one fail-closed
+# entry point instead of a second, weaker path.
+if [ "$TOP:$PDK" = "cdac:sky130" ]; then
+    case "$STAGE" in
+    prelayout) PDK="$PDK" "$DIR/run.sh" all ;;
+    gds) "$DIR/signoff.py" --stage build ;;
+    drc) "$DIR/signoff.py" --stage drc ;;
+    all)
+        PDK="$PDK" "$DIR/run.sh" all
+        "$DIR/signoff.py"
+        ;;
+    *)
+        echo "error: unknown stage '$STAGE'" >&2
+        exit 2
+        ;;
+    esac
+    exit 0
+fi
 
 case "$STAGE" in
 prelayout)

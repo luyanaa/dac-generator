@@ -290,8 +290,12 @@ Target is the SAR reference spec `../saradc_auto/gen/spec/examples/sar8_sky130.j
 | DC linearity, flat cap | closed (MIM assumption) | DNL -0.043/+0.057, INL 0.037 LSB; C_unit 8 fF is an assumption, not measured |
 | Digital half | closed | `dac_cdac_dig` 2082/2082 checks, 258 break cycles, lint clean, hardened config added |
 | Sampling/settling | closed (model) | 1.66 ns/bit, 20.7 ns convert -> 48 MS/s moscap, 17 MS/s MIM |
-| Layout | **open, class B/C** | 2x256-unit common-centroid array + 16 TGs + comparator |
-| DRC / LVS / PEX | **open** | sky130 deck chain in `../saradc_auto/gen/analog/layout_check.py` |
+| Array layout | closed (class B) | 90.23 x 90.26 um, 16x16 fully populated: 255 switched units + 1 VCM dummy; every bit block is a mirror pair about the centre row/column |
+| DRC | closed | `sky130A_mr.drc` (KLayout 0.30.12, `feol=true beol=true`): 0 items |
+| LVS | closed | extracted netlist: 256 unit caps, bit weights 1/2/4/.../128 and VCM 1, all ten ports present |
+| PEX | closed (netlist) | hierarchical `cthresh 0`: `.subckt CDAC_ARRAY` + 256 `CDAC_CAP` instances, 13910 C entries, 0.95 MB; per-net geometric caps reported (B0..B7 12-67 fF), not gated (Magic does not extract MOS channel capacitance) |
+| Differential wrapper + comparator | **open, class C** | two mirrored arrays with complementary codes; StrongArm and TG bias are hand work |
+| Post-layout transient sweep | **open, not claimed** | 256-code `alter`/`op` loop on the extracted netlist is the remaining pass |
 
 The result that sizes the leaf is a negative one: **at 8 bit and 1.8 V full
 scale, a bottom-plate moscap array is limited by the capacitor's bias
@@ -350,15 +354,20 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. Layout is
   class C (matched cell array + wide-swing cascode bias), so
   `run-analog.sh csteer gf180 gds` refuses.
-- **P4. DONE on sky130 (model + digital half), layout open.** 8-bit
+- **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs
   0.04-0.06 LSB; the moscap's 2.67 -> 5.02 fF bias dependence costs 11.9 LSB
   INL, so the 8-bit design point is a flat cap (MIM, 0.037 LSB) and the
   moscap array is recorded as a study. `dac_cdac_dig` 2082/2082 checks, lint
-  clean. Layout is class B/C: the array is generated with a common-centroid
-  plan, the comparator/TG bias is hand work; `run-analog.sh cdac sky130 gds`
-  refuses until the array generator lands.
+  clean. The array macro is generated and signed off: `gen_gds.py` lays out
+  255 switched + 1 VCM-dummy units in a fully populated 16x16 grid (mirror
+  pairs about the centre, so every bit's centroid is the array centre), and
+  `signoff.py` gates DRC 0 items, LVS weight counts 1..128 + VCM 1 on the
+  extracted netlist, and PEX (256 instances, 0.95 MB). `run-analog.sh cdac sky130
+  gds|drc|all` drives it. Still open, and explicitly not claimed: the
+  differential wrapper (two mirrored arrays), the comparator/TG bias (class
+  C) and the 256-code post-layout transient sweep.
 - **P5.** Binary-weighted current-steering (C) and CML/HBT (C) only with a
   named high-speed target and a layout owner.
 

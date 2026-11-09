@@ -112,6 +112,62 @@ tree; sky130 1.8 V devices are subcircuits, so they are instantiated with
 `X`, not `M`. The deck's undefined `*_diff` mismatch parameters are declared
 zero once, which is what makes the corner tree usable from ngspice.
 
-`gen_gds.py` (array layout), `signoff.py` (DRC/LVS/PEX) and a post-layout
-bench are the next pass; until then `run-analog.sh cdac sky130 gds` refuses
-with exit 2 instead of reporting a clean run that did not happen.
+## Array layout and signoff
+
+`gen_gds.py` builds one side of the DAC: 255 switched unit capacitors plus one
+VCM-referenced dummy, i.e. exactly 2^8 units in a fully populated 16x16 grid
+(90.23 x 90.26 um). The grid is the common-centroid plan, not decoration:
+
+```
+row  0..3  bit 7     row  8  bit3 | bit2 | bit1 | bit0 | dummy
+row  4..5  bit 6     row  9  bit 5
+row  6     bit 5     row 10..11 bit 6
+row  7     bit 4     row 12..15 bit 7
+```
+
+Every bit block is a mirror pair of rows about the centre, so its capacitor
+centroid is the array centre in both axes. Bottom plates use met1 row straps
+plus one met2 bus per bit in the left margin; row 8 holds four bits on one
+row, so it leaves on met3 channels in the bottom margin (met2 already carries
+the top-plate bars across every row). The top plate is a met2 bar per row
+joined by a right-margin bus; the dummy's bottom plate goes to a separate
+met1 VCM bus.
+
+`signoff.py` is the fail-closed gate and `run-analog.sh cdac sky130
+gds|drc|all` drives it:
+
+| gate | result |
+|---|---|
+| DRC (`sky130A_mr.drc`, 0.30.12, feol+beol) | 0 items |
+| LVS (weights from the extracted netlist) | 256 units: B0..B7 = 1/2/4/8/16/32/64/128, VCM = 1; all ten ports |
+| PEX (hierarchical, `cthresh 0`) | `.subckt CDAC_ARRAY` + 256 `CDAC_CAP` instances, 13910 C entries, 0.95 MB |
+
+LVS is a count of unit-cap instances per bit net, not a netgen device compare:
+a 256-instance capacitor array has no unique device-level answer, so the
+netlist's own weights are the contract, and `WANT` in `signoff.py` is written
+independently of the `ROW_BIT`/`ROW8` tables in `gen_gds.py`.
+
+Two sky130/Magic details that silently broke the first extraction:
+
+* the magic tech declares `squares-grid 40 200 200` for via2, so a 150 nm via2
+  is **dropped by the reader**; via2 must be 200 nm and met3 must enclose it by
+  >= 65 nm (m3.4), with met3 >= 360 nm wide (m3.1) and >= 300 nm spaced
+  (m3.2). All of those are DRC rules, so the geometry uses them directly.
+* `sky130A.magicrc` falls back to a hardcoded `~/.ciel/.../build/<hash>` path
+  when `PDK_ROOT` is unset in the environment; magic then loads no technology
+  and exits 0 with no netlist. `signoff.py` sets `PDK_ROOT` explicitly.
+
+PEX is evidence, not a ratio claim: Magic extracts geometric capacitance and
+does not model the MOS channel, so per-bit capacitance against the nominal
+2.673 fF/unit would have a made-up denominator. It is run with
+`ext2spice hierarchy on` because the flat form has no `.subckt` at all and
+keeps each capacitor's port nets under hierarchical alias names; the
+hierarchical deck states the array's ten ports and its 256 instances
+outright. Each bit net's geometric capacitance is reported under
+`steps.pex.net_cap_ff` in `build/signoff.json` (B0..B7 12-67 fF, VSH 89 fF);
+cross-cell coupling is attributed to alias names, so those are a floor.
+
+Still open, and not claimed: the differential wrapper (two mirrored arrays
+driven with complementary codes), the comparator and TG bias (class C hand
+work), and the 256-code post-layout transient sweep. The next pass is a
+`.control` loop of `alter`/`op` over the extracted netlist.

@@ -25,3 +25,4 @@ mgmt_core_wrapper
 /analog/*/build/
 
 .slim/deepwork/
+__pycache__/
