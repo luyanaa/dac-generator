@@ -235,8 +235,9 @@ instead of emitting a deck full of untrustworthy numbers.
 | Gate | State | Evidence |
 |---|---|---|
 | String linearity | closed by construction | ideal-switch control run: DNL < 1e-6 LSB |
-| Tree linearity | closed (gf180, tt) | 255 TGs: DNL 0.133 / INL ±0.13 LSB |
+| Tree linearity | closed (gf180) | 255 TGs, 7 corner/temp points: worst DNL 0.133 / INL 0.132 LSB, monotonic |
 | Settling | closed (gf180, tt) | 5.0 us worst step, 7 pF + 60 fF tap |
+| Mismatch bound | closed, deterministic | 0.2 %/unit, 8 seeds: worst DNL 0.126 / INL 0.134 LSB |
 | Digital half | closed | `dac_string_dig` break-before-make, 1826/1826, lint clean |
 | Layout | **open, class C** | string is mechanical; tree + follower are not |
 | DRC / LVS / PEX | **open** | same KLayout/Magic blockers as P1 |

@@ -74,6 +74,36 @@ error, which confirms that the tree, not the buffer, sets linearity here.
 Control run with ideal switches (`--rtg 100`) gives DNL/INL < 1e-6 LSB, which
 is the check that the measurement path does not invent the error.
 
+Corner/temperature matrix (`run_matrix.py`, tap node; the buffered output
+follows it within the follower gain error):
+
+| corner | temp | DNL (LSB) | INL (LSB) |
+|---|---|---|---|
+| tt | 25 C | -0.133 .. +0.133 | -0.072 .. +0.132 |
+| ff | 25 C | -0.057 .. +0.057 | -0.057 .. +0.043 |
+| ss | 25 C | -0.100 .. +0.061 | -0.101 .. +0.005 |
+| fs | 25 C | -0.070 .. +0.070 | -0.071 .. +0.008 |
+| sf | 25 C | -0.016 .. +0.016 | -0.017 .. +0.008 |
+| tt | -40 C | -0.047 .. +0.047 | -0.048 .. +0.001 |
+| tt | 125 C | -0.092 .. +0.092 | -0.020 .. +0.091 |
+
+Worst over the matrix: **DNL 0.133 LSB, INL 0.132 LSB**, monotonic in every
+point. The error is not monotonic in corner, which is expected: it is a
+difference of MOS conductances, not a resistor ratio.
+
+Per-unit resistor mismatch, 0.2 %/unit, 8 seeds, tt/25 C (explicit length
+perturbation, since gf180 reports `mis_r = 0`):
+
+| seed | \|DNL\|max | \|INL\|max |
+|---|---|---|---|
+| worst | 0.126 | 0.134 |
+| mean | 0.063 | 0.074 |
+
+Mismatch does not stack on top of the tree error in the worst case - some
+seeds pull the two in opposite directions (seed 8 gives 0.017). Estimating
+them in quadrature is therefore more honest than adding them: at 0.2 %/unit
+the leaf stays inside 0.2 LSB.
+
 Settling (7 pF load, 60 fF tap cap, 10 us per step): 5.0 us for 3 -> 127,
 2.7 us for the 127 -> 128 major carry, 0.85 us for 129 -> 254, plus the
 follower's own settling.
