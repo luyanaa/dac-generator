@@ -23,3 +23,5 @@ mgmt_core_wrapper
 
 # analog leaf build products (generated SPICE, GDS, reports)
 /analog/*/build/
+
+.slim/deepwork/

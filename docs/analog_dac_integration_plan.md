@@ -276,6 +276,39 @@ leaf:
   +8 LSB INL, so the leaf contract requires a virtual-ground (opamp) I-V or a
   regulated-cascode output; the regression reports both terminations.
 
+### 7.4 P4 (binary CDAC) status
+
+Target is the SAR reference spec `../saradc_auto/gen/spec/examples/sar8_sky130.json`:
+8 bit, differential, 1.8 V, 1 MS/s, bottom-plate sampling, moscap backend.
+
+| Gate | State | Evidence |
+|---|---|---|
+| Device unit cap | closed (sky130, measured) | C(V) 19 points -0.9..+0.9 V: 5.022 / 2.673 / 3.964 fF; unit bench reproduces `cdac.yaml` to 0.002 % |
+| Charge model | closed | floating top plate, C(V) fixed point per code; constant-C control is exact (0.000 LSB) |
+| Mismatch model | closed, deterministic | measured Pelgrom A_C 0.234 %*um at 0.63 um^2 -> 0.295 %/unit |
+| DC linearity, moscap | **fails the 8-bit target** | DNL -0.227/+0.684, INL +/-11.9 LSB over 10 seeds; even-symmetric bow, not mismatch |
+| DC linearity, flat cap | closed (MIM assumption) | DNL -0.043/+0.057, INL 0.037 LSB; C_unit 8 fF is an assumption, not measured |
+| Digital half | closed | `dac_cdac_dig` 2082/2082 checks, 258 break cycles, lint clean, hardened config added |
+| Sampling/settling | closed (model) | 1.66 ns/bit, 20.7 ns convert -> 48 MS/s moscap, 17 MS/s MIM |
+| Layout | **open, class B/C** | 2x256-unit common-centroid array + 16 TGs + comparator |
+| DRC / LVS / PEX | **open** | sky130 deck chain in `../saradc_auto/gen/analog/layout_check.py` |
+
+The result that sizes the leaf is a negative one: **at 8 bit and 1.8 V full
+scale, a bottom-plate moscap array is limited by the capacitor's bias
+dependence, not by matching.** Mismatch is 0.04-0.06 LSB; the C(V) curve is
+worth 11.9 LSB of code-dependent bow that no averaging removes, because it is
+a deterministic function of the code. Consequences, in order of preference:
+
+* build the array from a flat cap (MIM/poly-poly) - the MIM design passes;
+* restrict the array's voltage excursion (a smaller internal VREF window) at
+  the cost of SNR;
+* add capacitor calibration, which the reference spec explicitly disables
+  (`calibration.weights: false`).
+
+The leaf therefore ships both backends: the flat-cap design is the gated one,
+the moscap array is a recorded study (`./measure.py --cap moscap --expect
+study`), so the physics stays visible instead of being tuned away.
+
 ## 8. Application fit
 
 | Target | Best fit | Note |
@@ -317,9 +350,15 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. Layout is
   class C (matched cell array + wide-swing cascode bias), so
   `run-analog.sh csteer gf180 gds` refuses.
-- **P4.** CDAC only if an ADC/SAR target appears; reuse the Edwards switch
-  sizing and the Saunders generator/PEX method. A CDAC alone is not an audio
-  DAC without an output buffer.
+- **P4. DONE on sky130 (model + digital half), layout open.** 8-bit
+  differential binary bottom-plate CDAC against the SAR reference spec.
+  Charge-based C(V) model on the measured sky130 moscap. Mismatch costs
+  0.04-0.06 LSB; the moscap's 2.67 -> 5.02 fF bias dependence costs 11.9 LSB
+  INL, so the 8-bit design point is a flat cap (MIM, 0.037 LSB) and the
+  moscap array is recorded as a study. `dac_cdac_dig` 2082/2082 checks, lint
+  clean. Layout is class B/C: the array is generated with a common-centroid
+  plan, the comparator/TG bias is hand work; `run-analog.sh cdac sky130 gds`
+  refuses until the array generator lands.
 - **P5.** Binary-weighted current-steering (C) and CML/HBT (C) only with a
   named high-speed target and a layout owner.
 

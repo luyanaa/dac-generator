@@ -87,6 +87,7 @@ digital half (`_dig`) abutted in the wrapper:
 | 8-bit R-2R | `analog/r2r/` | `dac_r2r_dig` | pre-layout + generator GDS; DRC/PEX blocked |
 | 8-bit resistor string | `analog/string/` | `dac_string_dig` | pre-layout; layout class C |
 | 8-bit unit current steering (4+4 + DWA) | `analog/csteer/` | `dac_csteer_dig` | pre-layout + DEM model; layout class C, active I-V required |
+| 8-bit differential binary CDAC (SAR target) | `analog/cdac/` | `dac_cdac_dig` | model + digital half; layout class B/C, array pass open |
 
 `./run-analog.sh <topology> <pdk> [prelayout\|gds\|drc\|all]` is the analog
 entry point and fails closed: it refuses a stage it cannot actually run

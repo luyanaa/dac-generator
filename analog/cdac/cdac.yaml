@@ -1,0 +1,108 @@
+# Binary bottom-plate CDAC leaf (roadmap P4), SAR ADC target.
+#
+# Target: saradc_auto/gen/spec/examples/sar8_sky130.json - 8 bit,
+# differential bottom-plate sampling, VDD 1.8 V, 1 MS/s, moscap backend.
+# Reference design and measured leaves: ../saradc_auto (gen/analog).
+#
+# One side is 2^N unit capacitors: bit i owns 2^i of them, plus one fixed
+# dummy so the top-plate total is 2^N units.  Each bit's bottom plate is
+# switched between VREFH and VREFL by a transmission gate; the top plate is
+# the comparator input / DAC output and is never switched.  Differential is
+# two such arrays driven with complementary codes.
+#
+# The unit capacitor is a sky130 MOSCAP (NMOS+PMOS, d=s=b on the bottom
+# plate, gate on the top plate).  Its value is strongly bias dependent, so
+# the model uses the measured C(V) curve, not a single number.
+
+name: cdac
+bits: 8
+differential: true
+
+# Unit capacitor: measured sky130A moscap, Wn 1.4 / Wp 2.8 / L 0.15 um,
+# area 0.63 um^2.  Flat-band minimum is the sizing value; the model evaluates
+# the full curve at each code's actual capacitor bias.
+#
+# The moscap C(V) is measured from -0.9 to +0.9 V here (this repo extends the
+# reference's +-0.6 V sweep): that is exactly the range a 1.8 V bottom-plate
+# array applies, and the curve is NOT symmetric - 5.022 fF at -0.9 V against
+# 3.964 fF at +0.9 V, with the flat-band minimum at 0 V.
+cu_ff: 2.67309
+cu_area_um2: 0.63
+cu_wn_um: 1.4
+cu_wp_um: 2.8
+cu_l_um: 0.15
+c_ff_vs_vdiff:   # vdiff = V(top) - V(bottom); measured on the flattened deck
+  "-0.9": 5.0224
+  "-0.8": 4.9801
+  "-0.7": 4.9258
+  "-0.6": 4.8212
+  "-0.5": 4.5299
+  "-0.4": 3.8288
+  "-0.3": 3.0653
+  "-0.2": 2.7496
+  "-0.1": 2.6805
+  "0.0": 2.6729
+  "0.1": 2.6813
+  "0.2": 2.7297
+  "0.3": 2.9586
+  "0.4": 3.4273
+  "0.5": 3.6997
+  "0.6": 3.8022
+  "0.7": 3.8620
+  "0.8": 3.9133
+  "0.9": 3.9641
+
+# Pelgrom, measured on sky130 (40 MC runs each at 0.63 and 2.52 um^2).
+a_c_pct_um: 0.234
+mismatch_mode: a_c
+
+# Flat-cap alternative, for the control that separates cap physics from
+# array/mismatch design.  Values are the reference profile's *assumption*
+# (sky130 MIM 2 fF/um^2, min area 4 um^2), not a measurement.
+mim_cu_ff: 8.0
+mim_area_um2: 4.0
+mim_ac_pct_um: 0.3
+
+vdd: 1.8
+vref: 1.8
+vcm: 0.9
+vrefh: 1.8
+vrefl: 0.0
+# Dummy unit bottom plate: held at VCM, which is the flat-band minimum of
+# the moscap curve (dC/dV = 0 there), so the dummy is a first-order constant
+# reference instead of a bias-dependent one.  `vrefl` is the alternative.
+dummy_mode: vcm
+
+# Transmission gate, measured sky130 4x (Wn 5.6 / Wp 11.2 / L 0.15).
+tg_wn_um: 5.6
+tg_wp_um: 11.2
+tg_l_um: 0.15
+tg_ron_ohm: 1551.7
+tg_coff_ff: 4.63
+tg_coff_pex_ff: 7.708
+
+# Top-plate parasitic floor and comparator (measured sky130 StrongArm).
+c_top_ff: 20.0
+cmp_sigma_uv: 500.4
+cmp_offset_uv: 546.9
+cmp_delay_ns: 0.101
+
+fs_target_hz: 1000000.0
+temp_c: 27.0
+
+pdk:
+  sky130:
+    version: 8afc8346a57fe1ab7934ba5a6056ea8b43078e71
+    corner: tt
+    corner_index: libs.tech/ngspice/corners/tt.spice
+    wanted: [nfet_01v8__tt, nfet_01v8__mismatch, pfet_01v8__tt, pfet_01v8__mismatch]
+    nfet: sky130_fd_pr__nfet_01v8
+    pfet: sky130_fd_pr__pfet_01v8
+    magicrc: libs.tech/magic/sky130A.magicrc
+    drc: libs.tech/klayout/drc/sky130A_mr.drc
+    netgen: libs.tech/netgen/sky130A_setup.tcl
+  gf180:
+    models_ok: false
+    models_blocker: >-
+      the CDAC leaf is moscap/sky130-specific and the measured unit/tg/PEX
+      numbers do not transfer; gf180 would need its own moscap measurement.

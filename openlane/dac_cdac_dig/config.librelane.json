@@ -1,0 +1,22 @@
+{
+    "DESIGN_NAME": "dac_cdac_dig",
+    "VERILOG_FILES": [
+        "dir::../../verilog/rtl/dac_cdac_dig.v"
+    ],
+    "CLOCK_PORT": "clk",
+    "CLOCK_NET": "clk",
+    "CLOCK_PERIOD": 20,
+    "FP_SIZING": "absolute",
+    "DIE_AREA": "0 0 90 80",
+    "PL_TARGET_DENSITY_PCT": 30,
+    "RUN_CTS": false,
+    "//note": "Digital half of the binary CDAC leaf: sample/break/drive FSM,",
+    "//note2": "code latch and the break-before-make gate drive for 8 bits.",
+    "//note3": "The 2x256 moscap array, the 16 transmission gates and the",
+    "//note4": "comparator are a device-level analog macro abutting this one;",
+    "//note5": "no analog device is placed by this flow.",
+    "//note6": "20 ns: 8 trials x (break + drive + compare) fits 1 MS/s with room",
+    "pdk::sky130*": {
+        "DIE_AREA": "0 0 90 80"
+    }
+}

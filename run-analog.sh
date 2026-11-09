@@ -24,8 +24,9 @@ case "$TOP" in
 r2r) DIR=analog/r2r ;;
 string) DIR=analog/string ;;
 csteer) DIR=analog/csteer ;;
+cdac) DIR=analog/cdac ;;
 *)
-    echo "error: unknown topology '$TOP' (implemented: r2r, string, csteer)" >&2
+    echo "error: unknown topology '$TOP' (implemented: r2r, string, csteer, cdac)" >&2
     exit 2
     ;;
 esac
@@ -41,14 +42,26 @@ esac
 
 [ -d "$DIR" ] || { echo "error: $DIR missing" >&2; exit 2; }
 
-# GDS stage.  Only the R-2R leaf has a device generator today: the string's
-# switch tree and follower are class C (hand layout), so there is nothing to
-# generate yet and pretending otherwise would be worse than refusing.
+# GDS stage.  Two leaves have device generators: R-2R (gf180) and the CDAC
+# array (sky130).  The string's switch tree/follower and the current-steering
+# array are class C (hand layout), so there is nothing to generate and
+# pretending otherwise would be worse than refusing.
 gds() {
-    [ "$PDK" = gf180 ] || {
-        echo "error: no GDS generator for $PDK (gf180 only)" >&2
+    case "$TOP:$PDK" in
+    r2r:gf180) ;;
+    cdac:sky130)
+        [ -f "$DIR/gen_gds.py" ] || {
+            echo "error: cdac has no device generator yet (array pass open)" >&2
+            exit 2
+        }
+        klayout -b -r "$DIR/gen_gds.py" -rd "out=$DIR/build/cdac.gds"
+        return 0
+        ;;
+    *)
+        echo "error: no GDS generator for $TOP on $PDK" >&2
         exit 2
-    }
+        ;;
+    esac
     case "$TOP" in
     r2r)
         klayout -b -r "$DIR/gen_gds.py" -rd "out=$DIR/build/r2r.gds" -rd check=true
