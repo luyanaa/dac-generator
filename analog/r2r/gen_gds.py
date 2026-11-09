@@ -61,7 +61,11 @@ TAB_X = (-1.73, -1.37)   # p-tap (bulk) tab, local x
 
 # --- floorplan --------------------------------------------------------------
 PITCH = 155.0            # row pitch; a 150 um unit + routing channel
-X_RB = 152.4             # rb origin (clears ra's poly end + rb's tab)
+# rb origin.  This is set by metal, not by poly: ra's right M1 terminal ends
+# at x = unit_l + TERM_IN + TERM_HW + 0.2 = 150.53 and rb's p-tap M1 tab starts
+# at X_RB - 1.73, so X_RB = 152.4 left only a 0.14 um gap and tripped M1.2a
+# (0.23 um).  152.7 gives a 0.44 um gap; the poly gap is 2.19.
+X_RB = 152.7             # rb origin (clears ra's M1 terminal + rb's tab)
 X_BUS = 306.0            # node bus centreline
 BUS_W = 2.0
 X_SER = 316.0            # vertical 1R column (body x = X_SER-2 .. X_SER)
@@ -163,6 +167,10 @@ def main() -> int:
     nbits = int(cfg["bits"])
     terminals = []          # (net, x, y) for --check
 
+    def nname(i):
+        """Route key for ladder node i; node nbits-1 is the external output."""
+        return "vout" if i == nbits - 1 else f"n{i}"
+
     def yrow(i):
         return i * PITCH
 
@@ -180,7 +188,7 @@ def main() -> int:
         # mid node: U-route through the channel below the row (the tab of rb
         # sits between the two devices at the device y band).
         net_mid = f"mid{i}"
-        net_node = "n0" if i == -1 else f"n{i}"
+        net_node = "n0" if i == -1 else nname(i)
         cy = y - 6.0
         wire([b0, (b0[0], cy), (a1[0], cy), a1], net_mid)
         terminals += [(net_mid, *b0), (net_mid, *a1)]
@@ -214,7 +222,9 @@ def main() -> int:
     y_hi = yrow(nbits - 1) + 2.5
     for i in range(nbits):
         y_lo = yrow(-1) + 1.0 if i == 0 else yrow(i) - 10.0
-        wire([(X_BUS, y_lo), (X_BUS, yrow(i) + 2.5)], f"n{i}", width=BUS_W)
+        # The top node is the external output; keep one route key for it so
+        # the self-check does not see "n7" and "vout" as two nets in a short.
+        wire([(X_BUS, y_lo), (X_BUS, yrow(i) + 2.5)], nname(i), width=BUS_W)
 
     # --- series 1R units (vertical, R90) ------------------------------------
     for i in range(1, nbits):
@@ -223,24 +233,26 @@ def main() -> int:
         # R90: local (x, y) -> (-y, x)
         bot = apply(tr, term_a(cfg["unit_l"]))
         topp = apply(tr, term_b(cfg["unit_l"]))
-        wire([bot, (X_BUS, bot[1])], f"n{i-1}")
-        wire([topp, (X_BUS, topp[1])], f"n{i}")
+        wire([bot, (X_BUS, bot[1])], nname(i - 1))
+        wire([topp, (X_BUS, topp[1])], nname(i))
         terminals.append((f"n{i-1}", *bot))
         terminals.append((f"n{i}", *topp))
-        label(bot[0] + 3.0, bot[1], f"n{i-1}")
+        # On the strap, not beside it: a label that misses the metal becomes a
+        # dangling port in the extracted netlist (n*_uq0 in the first LVS run).
+        label(bot[0] - 1.0, bot[1], f"n{i-1}")
         a = apply(tr, (TAB_X[0], -0.3))
         b = apply(tr, (TAB_X[1], 2.3))
         tabs.append((min(a[0], b[0]), min(a[1], b[1]),
                      max(a[0], b[0]), max(a[1], b[1])))
 
     # --- labels + vout pad --------------------------------------------------
-    for i in range(nbits):
-        label(X_BUS + 4.0, yrow(i) - 4.0, f"n{i}")
+    # n7 is the output; label the pad with the external name instead of adding
+    # a second, floating text beside it.  One label per external net, on metal.
+    for i in range(nbits - 1):
+        label(X_BUS, yrow(i) - 4.0, f"n{i}")
     vout_y = y_hi + 12.0
-    wire([(X_BUS, y_hi), (X_BUS, vout_y)], "n7")
-    pad(X_BUS, vout_y, "n7")
-    top.shapes(m1_lbl).insert(pya.Text("vout", pya.Trans(int(X_BUS * 1000),
-                                                       int((vout_y + 6) * 1000))))
+    wire([(X_BUS, y_hi), (X_BUS, vout_y)], "vout")
+    pad(X_BUS, vout_y, "vout")
 
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)

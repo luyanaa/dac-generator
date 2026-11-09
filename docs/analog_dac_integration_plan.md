@@ -201,28 +201,40 @@ use a Python model instead of SPICE MC.
 | Pre-layout settling | closed (gf180) | 125 ns LSB step, 1.15 us full scale, 1 MOhm + 7 pF |
 | Mismatch bound | closed, deterministic | 0.2 %/unit, 10 seeds, DNL 0.427 / INL 0.225 LSB |
 | Digital half | closed | `dac_r2r_dig` lint clean, TB 16/16, hardened config added |
-| Device-array GDS | generator only | `gen_gds.py`, 25 PCell units, three self-checks clean |
-| DRC | **open** | see below |
-| LVS / PEX / post-layout | **open** | needs DRC/LVS first |
+| Device-array GDS | closed | `gen_gds.py`, 25 `ppolyf_u_resistor` PCells, 462 x 1466 um; self-checks 50/50 terminals, 0 net shorts, 0 tab clashes |
+| DRC | closed | Magic `drc check` / `drc catchup` / `drc count total`: 0 items |
+| LVS | closed | extracted netlist: 17 unit (150.0 um) + 8 trim (148.36 um) = 25 resistors; 9-row ladder, 7-unit 1R chain, termination 2R, ports `vss b0..b7 n0..n6 vout` |
+| PEX | closed (netlist) | hierarchical, `cthresh`/`rthresh` 0: 25 instances, 37 C entries; per-net geometric caps reported, not gated |
+| Post-layout linearity | **open, not claimed** | Magic does not model the poly resistor's distributed R-C; the netlist is kept for that pass |
 
-Two environment blockers, both verified, neither worked around by faking a
-result:
+gf180 ships no KLayout DRC deck in this install, so the leaf signs off through
+Magic, which does work headless here: `-dnull -noconsole` is fine, and the
+earlier "needs a display" failure was really the magicrc falling back to a
+stale hardcoded `~/work/open-pdks` build when `PDK_ROOT` was unset. The same
+bug was fixed in `analog/cdac/signoff.py`. `analog/r2r/signoff.py` sets both
+`PDK_ROOT` and `MAGIC_TECH_PATH` explicitly and is fail-closed on a missing
+tool, deck, netlist or result line.
 
-1. **KLayout 0.30.0 cannot run the gf180 deck.** The deck calls
-   `evaluate_nets()` and `nets()`; those need KLayout >= 0.30.9. Earlier the
-   same bug appeared as `Heap lost: the DeepShapeStore container no longer
-   exists` under the parallel workers. Removing the connectivity decks
-   (`-rd decks=all,-antenna,-dnwell,...`) just moves the failure to the next
-   deck (ldnmos, lpw, ...), so there is no honest partial run.
-2. **Magic needs a display here.** This build initialises Tk even with
-   `-d null -noconsole`, failing with `no display name and no $DISPLAY`
-   before the PDK tech file is read.
+The first real DRC found one mistake the generator's own self-checks cannot
+see: 18 `M1.2a` errors (M1 spacing < 0.23 um), two per row, at the same x.
+`rb` sat at `X_RB = 152.4`, leaving 0.14 um between ra's right M1 terminal and
+rb's p-tap M1 tab. `X_RB = 152.7` gives 0.44 um. The poly gap was always fine,
+which is why a structural check on drawn straps missed it. A second bug was in
+the labels: `n0..n7` sat 4 um off the bus and the `vout` text sat above the
+pad, so Magic produced eight `n*_uq0` dangling ports plus a dangling `vout`
+while the real output was the pad's `n7`. Labels now sit on metal and the pad
+carries `vout`.
 
-`analog/r2r/drc.sh` therefore (a) always runs the generator's own structural
-checks, (b) refuses to claim a DRC run when the tool cannot perform one, exit
-code 3, and (c) runs the real deck unchanged once KLayout is new enough.
-Signing off P1 needs a KLayout >= 0.30.9 build (or a CI image that has one);
-nothing in the generator needs to change for that.
+The DRC claim is scoped to Magic's gf180 rule set (spacing, width,
+enclosure, overlap, via). Density/coverage rules (DCF.1a/b, PL.8,
+M1.4-M5.4, MT.3) are not in the tech's `drc` section, so no fill or
+density waiver is claimed for this macro.
+
+LVS is a graph check on the extracted netlist, not a netgen device compare:
+there is no schematic netlist for this macro and the contract is topological.
+The expected ladder is written in `signoff.py` independently of `gen_gds.py`'s
+placement tables, and `./signoff.py --selftest` proves the gate is not a no-op
+by dropping a unit resistor and by retargeting a trim (both must fail, and do).
 
 sky130 is documented but not simulated: this ngspice 44.2 cannot select bins
 from the 180-block binned BSIM4 models (`could not find a valid modelname`),
@@ -240,7 +252,7 @@ instead of emitting a deck full of untrustworthy numbers.
 | Mismatch bound | closed, deterministic | 0.2 %/unit, 8 seeds: worst DNL 0.126 / INL 0.134 LSB |
 | Digital half | closed | `dac_string_dig` break-before-make, 1826/1826, lint clean |
 | Layout | **open, class C** | string is mechanical; tree + follower are not |
-| DRC / LVS / PEX | **open** | same KLayout/Magic blockers as P1 |
+| DRC / LVS / PEX | **not applicable yet** | class C: no device-level GDS exists to check; `run-analog.sh <leaf> gf180 gds` refuses (exit 2) |
 
 The design point that decides DNL is not the resistor ratio (255 identical
 units are more than accurate enough at 8 bit) but the transmission gate: its
@@ -260,7 +272,7 @@ isolates the tree, is the only honest way to size it.
 | Digital half | closed | `dac_csteer_dig` 3007/3007 checks, lint clean, hardened config added |
 | Output I-V | **closed by design rule** | passive 1 kOhm costs DNL +6.8 / INL +8.1 LSB; active I-V required |
 | Layout | **open, class C** | 15 unary + 4 binary cells and wide-swing cascode bias |
-| DRC / LVS / PEX | **open** | same KLayout/Magic blockers as P1 |
+| DRC / LVS / PEX | **not applicable yet** | class C: no device-level GDS exists to check; `run-analog.sh <leaf> gf180 gds` refuses (exit 2) |
 
 The design point here is the DEM state count: 15 unary cells mean 15 pointer
 states, not 16. Over 15 samples every cell must see the average current, and
@@ -366,10 +378,13 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   the PDK capability table and the `DAC_KIND` enum to `dac_wrap`; document
   that `freepdk45`/`ics55`/`OR1` are digital-only until audited.
 - **P1 (first analog leaf). DONE on gf180** (sky130 geometry documented, not
-  simulated). R-2R 8-bit following `ihsan-sa/ece298a-r2r-dac`: generated
-  device array, fixed M1 track plan, digital code register macro, DRC/LVS/PEX
-  blocked by the toolchain (see 7.1), 15-corner + deterministic mismatch.
-  DNL 0.145 / INL 0.092 LSB, 1.15 us full-scale settling.
+  simulated): pre-layout + GDS + DRC + LVS + PEX. R-2R 8-bit following
+  `ihsan-sa/ece298a-r2r-dac`: generated 25-PCell array, fixed M1 track plan,
+  digital code register macro, 15-corner + deterministic mismatch.
+  DNL 0.145 / INL 0.092 LSB, 1.15 us full-scale settling. Magic signoff:
+  DRC 0 items, LVS 17 unit + 8 trim, PEX 25 instances / 37 C entries.
+  Post-layout linearity is not claimed: Magic does not model the poly
+  resistor's distributed R-C.
 - **P2. DONE on gf180 (pre-layout + digital half), layout open.** 8-bit
   binary-tree Kelvin string, 255 units, 255-TG tree, ideal-follower bench:
   DNL 0.133 / INL ±0.13 LSB at tt/25, ideal-switch control shows the error is

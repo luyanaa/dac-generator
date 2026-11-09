@@ -84,7 +84,7 @@ digital half (`_dig`) abutted in the wrapper:
 
 | leaf | dir | digital half | state |
 |---|---|---|---|
-| 8-bit R-2R | `analog/r2r/` | `dac_r2r_dig` | pre-layout + generator GDS; DRC/PEX blocked |
+| 8-bit R-2R | `analog/r2r/` | `dac_r2r_dig` | pre-layout + GDS; Magic DRC 0, LVS 25 resistors, PEX netlist |
 | 8-bit resistor string | `analog/string/` | `dac_string_dig` | pre-layout; layout class C |
 | 8-bit unit current steering (4+4 + DWA) | `analog/csteer/` | `dac_csteer_dig` | pre-layout + DEM model; layout class C, active I-V required |
 | 8-bit differential binary CDAC (SAR target) | `analog/cdac/` | `dac_cdac_dig` | model + digital half + 256-unit array macro; DRC 0, LVS/PEX clean; wrapper/comparator open |

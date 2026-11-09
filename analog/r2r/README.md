@@ -49,7 +49,7 @@ linearity).
 | `run_mismatch.py` | per-unit resistor mismatch sweep |
 | `run.sh` | one-command pre-layout regression |
 | `gen_gds.py` | device-array GDS generator (KLayout pya) |
-| `drc.sh` | gf180 KLayout DRC wrapper (fail-closed) |
+| `signoff.py` | fail-closed DRC / LVS / PEX (Magic, gf180) |
 
 ## Pre-layout results (gf180mcuA, `ppolyf_u`)
 
@@ -92,8 +92,12 @@ resistor statistics.
 ./run.sh                       # dc + transient + corner matrix
 ./run_mismatch.py              # mismatch sweep
 ./gen_r2r.py --help
-../../run-analog.sh r2r gf180 gds    # write + self-check the GDS
-../../run-analog.sh r2r gf180 drc    # GDS + gf180 DRC (see blocker below)
+../../run-analog.sh r2r gf180 prelayout  # DC + tran + corner matrix
+../../run-analog.sh r2r gf180 gds        # build + self-check the GDS
+../../run-analog.sh r2r gf180 drc        # build + Magic DRC
+../../run-analog.sh r2r gf180 lvs        # build + extracted-netlist LVS
+../../run-analog.sh r2r gf180 pex        # build + hierarchical PEX
+../../run-analog.sh r2r gf180 all        # prelayout + all three signoff gates
 ```
 
 Everything is written under `build/` (git-ignored).
@@ -113,24 +117,48 @@ y = -340 with 12 um pitch. The array is **not** single-orientation: the series
 resistance but does cost matching. That is a known layout trade-off, not an
 oversight.
 
-## Status / next steps
+## Signoff (gf180mcuA)
 
-Verified: pre-layout DC linearity over 5 corners x 3 temperatures, settling,
-a deterministic mismatch bound, and the digital half (lint clean, 16/16).
+The array is signed off through Magic, because gf180 ships no KLayout DRC deck
+in this install. `signoff.py` is the single fail-closed entry point and
+`run-analog.sh r2r gf180 {gds,drc,lvs,pex,all}` drives it.
 
-The generator GDS passes its own structural checks (50/50 terminals, 0 net
-shorts, 0 p-tap clashes) but **DRC, LVS, PEX and post-layout linearity are
-open**:
+| gate | result |
+|---|---|
+| DRC (`drc check` / `drc catchup` / `drc count total`) | 0 items |
+| LVS (Magic-extracted netlist, graph check) | 25 resistors: 17 unit at 150.0 um + 8 trim at 148.36 um; 9-row ladder, 7-unit 1R chain, termination 2R, ports `vss b0..b7 n0..n6 vout` |
+| PEX (hierarchical, `cthresh`/`rthresh` 0) | 25 instances, 37 C entries; per-net geometric caps reported (e.g. `vss` 35.8 fF, `b7` 140.6 fF, `vout` 5.7 fF) |
 
-* KLayout 0.30.0 cannot run the gf180 deck — it calls
-  `evaluate_nets()`/`nets()`, which need KLayout >= 0.30.9. Excluding the
-  connectivity decks only moves the failure onward.
-* Magic initialises Tk even under `-d null -noconsole` in this build, so it
-  dies on `no display name` before reading the PDK tech file.
+Two things the first signoff caught, both in `gen_gds.py`:
 
-`drc.sh` runs the structural checks, then exits 3 with that explanation rather
-than reporting a clean run. It runs the real deck unchanged on a newer
-KLayout.
+* **M1.2a at every row.** `rb` sat at `X_RB = 152.4`, which put ra's right M1
+  terminal (ending at 150.53 um) only 0.14 um from rb's p-tap M1 tab (starting
+  at 150.67 um) — under the 0.23 um rule. `X_RB = 152.7` gives a 0.44 um gap.
+  The poly gap was fine; the metal was not, which is why the self-check did not
+  see it.
+* **Floating labels.** The `n0..n7` labels sat at `X_BUS + 4` and the `vout`
+  text above the pad, both off metal. Magic turned them into eight `n*_uq0`
+  dangling ports plus a dangling `vout`, while the real output was the pad's
+  `n7`. The labels are now on the straps and the pad carries `vout`.
+
+The DRC claim is scoped to Magic's gf180 rule set: spacing, width, enclosure,
+overlap and via rules. Density/coverage checks (DCF.1a/b, PL.8, M1.4-M5.4,
+MT.3) are not in the tech's `drc` section, so no fill or density waiver is
+claimed for this macro.
+
+LVS is a graph check, not a netgen compare: there is no schematic netlist for
+this macro and the contract is topological. The expected ladder is written in
+`signoff.py` independently of `gen_gds.py`'s placement, and
+`./signoff.py --selftest` mutates the extracted netlist (drop a unit, retarget
+a trim) to prove the gate actually rejects wrong connectivity.
+
+Still open, and **not claimed**:
+
+* post-layout DC/transient sweep of the extracted ladder (the netlist is kept
+  for it — Magic does not model the poly resistor's distributed R-C, so a
+  post-layout linearity number needs a device model the deck does not provide);
+* the per-bit CMOS drivers, the vdd/vss ring and the wrapper around the
+  digital half: hand work, class C.
 
 sky130 geometry (unit L = 27 um, trim 26.7 um at 2000 ohm/sq) is documented
 in `r2r.yaml` but **not simulated**: ngspice 44.2 cannot select a bin from the

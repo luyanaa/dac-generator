@@ -130,5 +130,8 @@ Not verified:
   block would be easy and would not close any gate on its own.
 * **Follower is a separate leaf.** Its offset and gain error are not included;
   only its ideal 0.999 gain is modelled.
-* DRC/LVS/PEX blocked by the KLayout 0.30.0 limitation documented in
-  `../r2r/README.md` and `docs/analog_dac_integration_plan.md` section 7.1.
+* **DRC/LVS/PEX not applicable yet.** There is no device-level GDS to check,
+  so no layout gate is attempted. The tool path is no longer a blocker: the
+  R-2R leaf signs off through Magic (`../r2r/signoff.py`, DRC/LVS/PEX), so the
+  same three gates can run once a string macro exists. Building a string-only
+  generator would not close any gate on its own, which is why it is not done.

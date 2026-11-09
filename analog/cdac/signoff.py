@@ -305,7 +305,8 @@ def main(argv=None) -> int:
     rep["failed"] = failed
     BUILD.mkdir(parents=True, exist_ok=True)
     (BUILD / "signoff.json").write_text(json.dumps(rep, indent=1) + "\n")
-    print(f"signoff {'PASS' if rep['ok'] else 'FAIL'}  "
+    label = "signoff" if a.stage == "all" else a.stage
+    print(f"{label} {'PASS' if rep['ok'] else 'FAIL'}  "
           f"report {BUILD / 'signoff.json'}")
     if a.brief:
         print("VERDICT " + ("PASS" if rep["ok"] else "FAIL"))

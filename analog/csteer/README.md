@@ -159,8 +159,10 @@ Not verified / not done:
 * **No GDS.** `run-analog.sh csteer gf180 gds` exits 2 on purpose: the cell
   array, the binary cells and the wide-swing cascode bias are class C and need
   a matched common-centroid floorplan first.
-* **No PEX / post-layout.** Blocked by the same KLayout 0.30.0 limitation as
-  the other leaves (`docs/analog_dac_integration_plan.md` section 7.1).
+* **No PEX / post-layout, and no layout gate attempted.** Class C: there is
+  no device-level GDS, so DRC/LVS/PEX do not apply yet. The tool path exists
+  (the R-2R leaf signs off through Magic in `../r2r/signoff.py`); what is
+  missing is the hand layout, not a checker.
 * **No output switch drivers / de-glitch.** The code is applied as a current
   step; the digital macro registers `th`/`b`, but the cell drain switches and
   their timing (make-before-break, clock feedthrough) are not modelled.

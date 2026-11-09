@@ -7,7 +7,11 @@
 #
 #   topology   r2r | string | csteer | cdac | video
 #   pdk        gf180 | sky130
-#   stage      prelayout (default) | gds | drc | all
+#   stage      prelayout (default) | gds | drc | lvs | pex | all
+#
+# gds/drc/lvs/pex are implemented for the two leaves that have a device-level
+# macro (r2r on gf180, cdac on sky130); every other leaf is class C and the
+# stage exits 2 instead of reporting a run that did not happen.
 #
 # Unlike the digital `run.sh`, this flow is fail-closed: a missing PEX,
 # corner, or DRC result is an error rather than a skipped view.  Class A/B/C
@@ -51,42 +55,35 @@ if [ "$TOP" = video ] && [ "$PDK" != gf180 ]; then
     exit 2
 fi
 
-# GDS stage.  Two leaves have device generators: R-2R (gf180) and the CDAC
-# array (sky130).  The string's switch tree/follower and the current-steering
-# array are class C (hand layout), so there is nothing to generate and
-# pretending otherwise would be worse than refusing.
+# GDS stage.  Only leaves with a device generator get here, and they route
+# every layout stage through their own signoff.py (see below).  The string's
+# switch tree/follower and the current-steering array are class C (hand
+# layout), so there is nothing to generate and pretending otherwise would be
+# worse than refusing.
 gds() {
-    case "$TOP:$PDK" in
-    r2r:gf180) ;;
-    *)
-        echo "error: no GDS generator for $TOP on $PDK" >&2
-        exit 2
-        ;;
-    esac
-    case "$TOP" in
-    r2r)
-        klayout -b -r "$DIR/gen_gds.py" -rd "out=$DIR/build/r2r.gds" -rd check=true
-        ;;
-    *)
-        echo "error: $TOP has no GDS generator (class C: hand layout)" >&2
-        echo "       see docs/analog_dac_integration_plan.md section 2" >&2
-        exit 2
-        ;;
-    esac
+    echo "error: no GDS generator for $TOP on $PDK" >&2
+    echo "       $TOP is class C: hand layout, see" >&2
+    echo "       docs/analog_dac_integration_plan.md section 2" >&2
+    exit 2
 }
 
-# The CDAC's layout evidence is signoff.py: it builds the array, then gates
-# DRC (KLayout 0.30.12 with feol+beol), LVS (per-bit weight counts from the
-# extracted netlist) and PEX.  Routing the stages here keeps one fail-closed
-# entry point instead of a second, weaker path.
-if [ "$TOP:$PDK" = "cdac:sky130" ]; then
+# Leaves with a device-level layout have one fail-closed entry point: their
+# signoff.py builds the macro, then gates DRC, LVS and PEX.  Routing the stages
+# here instead of a second script means `gds` cannot succeed while `drc` checks
+# a different file.
+case "$TOP:$PDK" in
+cdac:sky130 | r2r:gf180)
+    SIGN="$DIR/signoff.py"
+    [ -x "$SIGN" ] || { echo "error: $SIGN missing" >&2; exit 2; }
     case "$STAGE" in
     prelayout) PDK="$PDK" "$DIR/run.sh" all ;;
-    gds) "$DIR/signoff.py" --stage build ;;
-    drc) "$DIR/signoff.py" --stage drc ;;
+    gds) "$SIGN" --stage build ;;
+    drc) "$SIGN" --stage drc ;;
+    lvs) "$SIGN" --stage lvs ;;
+    pex) "$SIGN" --stage pex ;;
     all)
         PDK="$PDK" "$DIR/run.sh" all
-        "$DIR/signoff.py"
+        "$SIGN"
         ;;
     *)
         echo "error: unknown stage '$STAGE'" >&2
@@ -94,23 +91,17 @@ if [ "$TOP:$PDK" = "cdac:sky130" ]; then
         ;;
     esac
     exit 0
-fi
+    ;;
+esac
 
 case "$STAGE" in
 prelayout)
     PDK="$PDK" "$DIR/run.sh" all
     ;;
-gds)
+gds | drc | lvs | pex | all)
+    # Class C leaves have no generator, so every layout stage refuses rather
+    # than reporting a run that did not happen.
     gds
-    ;;
-drc)
-    gds
-    "$DIR/drc.sh" "$PDK"
-    ;;
-all)
-    PDK="$PDK" "$DIR/run.sh" all
-    gds
-    "$DIR/drc.sh" "$PDK"
     ;;
 *)
     echo "error: unknown stage '$STAGE'" >&2
