@@ -413,7 +413,7 @@ def measure_tran(path: Path) -> dict:
 
 SEGMENTS = 20
 MODEL_DIR = Path(".")
-TRAN_STEP = "5n"   # settling is us-scale; 100 ps just burns CPU
+TRAN_STEP = "50n"  # tau = 1 MOhm x 7 pF; 50 ns is 0.07 % of it
 STEP_US = 60.0     # 1 MOhm // 7 pF needs ~7 tau = 49 us to reach 0.5 LSB
 
 
