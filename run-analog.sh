@@ -8,10 +8,14 @@
 #   topology   r2r | string | csteer | cdac | video
 #   pdk        gf180 | sky130
 #   stage      prelayout (default) | gds | drc | lvs | pex | all
+#              postlayout (r2r only: poly R-C reconstruction + DC/transient)
 #
-# gds/drc/lvs/pex are implemented for the two leaves that have a device-level
-# macro (r2r on gf180, cdac on sky130); every other leaf is class C and the
-# stage exits 2 instead of reporting a run that did not happen.
+# gds/drc/lvs/pex are implemented for the leaves that have a device-level
+# macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
+# its TG tree is class C), csteer (gf180, the 30-cell current-source array
+# only; switches/bias/output stay class C) and cdac (sky130).  Every other
+# leaf is class C and the stage exits 2 instead of reporting a run that did
+# not happen.
 #
 # Unlike the digital `run.sh`, this flow is fail-closed: a missing PEX,
 # corner, or DRC result is an error rather than a skipped view.  Class A/B/C
@@ -72,7 +76,7 @@ gds() {
 # here instead of a second script means `gds` cannot succeed while `drc` checks
 # a different file.
 case "$TOP:$PDK" in
-cdac:sky130 | r2r:gf180)
+cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180)
     SIGN="$DIR/signoff.py"
     [ -x "$SIGN" ] || { echo "error: $SIGN missing" >&2; exit 2; }
     case "$STAGE" in
@@ -81,6 +85,14 @@ cdac:sky130 | r2r:gf180)
     drc) "$SIGN" --stage drc ;;
     lvs) "$SIGN" --stage lvs ;;
     pex) "$SIGN" --stage pex ;;
+    postlayout)
+        if [ "$TOP" = r2r ]; then
+            "$SIGN" --stage postlayout
+        else
+            echo "error: postlayout bench exists for r2r only" >&2
+            exit 2
+        fi
+        ;;
     all)
         PDK="$PDK" "$DIR/run.sh" all
         "$SIGN"

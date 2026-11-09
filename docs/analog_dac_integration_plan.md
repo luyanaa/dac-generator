@@ -251,8 +251,8 @@ instead of emitting a deck full of untrustworthy numbers.
 | Settling | closed (gf180, tt) | 5.0 us worst step, 7 pF + 60 fF tap |
 | Mismatch bound | closed, deterministic | 0.2 %/unit, 8 seeds: worst DNL 0.126 / INL 0.134 LSB |
 | Digital half | closed | `dac_string_dig` break-before-make, 1826/1826, lint clean |
-| Layout | **open, class C** | string is mechanical; tree + follower are not |
-| DRC / LVS / PEX | **not applicable yet** | class C: no device-level GDS exists to check; `run-analog.sh <leaf> gf180 gds` refuses (exit 2) |
+| Layout | **string generator closed; tree + follower class C** | `analog/string/gen_gds.py` lays out the 255-unit string (PCell units, 256 taps); the 255-TG tree and follower stay hand layout |
+| DRC / LVS / PEX | **closed for the string macro** | `signoff.py`: DRC 0 items, LVS 255 units / 256 ports / one `vss-t1-...-t254-vref` chain, PEX 255 instances / 509 C entries; `--selftest` fails drop-unit and swap-tap |
 
 The design point that decides DNL is not the resistor ratio (255 identical
 units are more than accurate enough at 8 bit) but the transmission gate: its
@@ -271,8 +271,8 @@ isolates the tree, is the only honest way to size it.
 | DEM | closed (model) | 15-state DWA: mean INL +/-0.48, worst sample +/-1.37, 0.39 LSB rms |
 | Digital half | closed | `dac_csteer_dig` 3007/3007 checks, lint clean, hardened config added |
 | Output I-V | **closed by design rule** | passive 1 kOhm costs DNL +6.8 / INL +8.1 LSB; active I-V required |
-| Layout | **open, class C** | 15 unary + 4 binary cells and wide-swing cascode bias |
-| DRC / LVS / PEX | **not applicable yet** | class C: no device-level GDS exists to check; `run-analog.sh <leaf> gf180 gds` refuses (exit 2) |
+| Layout | **array generator closed; switches/bias/I-V class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS unit cells in one row with shared vdd/vbp/vcp rails and `oU0..oU14`/`oB1..oB8` pads; the switch matrix, cascode bias, I-V resistor and differential wrapper stay hand layout |
+| DRC / LVS / PEX | **closed for the current-source array** | `signoff.py`: DRC 0 items, LVS 60 devices / 30 cells / 52 nets / segmentation fan-out 1-2-4-8, PEX 60 instances / 268 C entries; `--selftest` fails drop-unit, swap-gate, short-out |
 
 The design point here is the DEM state count: 15 unary cells mean 15 pointer
 states, not 16. Over 15 samples every cell must see the average current, and
@@ -383,24 +383,31 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   digital code register macro, 15-corner + deterministic mismatch.
   DNL 0.145 / INL 0.092 LSB, 1.15 us full-scale settling. Magic signoff:
   DRC 0 items, LVS 17 unit + 8 trim, PEX 25 instances / 37 C entries.
-  Post-layout linearity is not claimed: Magic does not model the poly
-  resistor's distributed R-C.
+  Post-layout poly R-C: Magic deliberately does not extract resistor-body
+  parasitics, so `postlayout.py` rebuilds them from the extracted geometry and
+  the `ppolyf_u`/`fox_sub` constants (rsh 350, r_dl/r_dw, 1 um end resistors,
+  cj 8.85e-5 F/m2) and compares a lumped against a 20-section line. DC agrees
+  to 0.006 mV (DNL -0.001/+0.041, INL -0.014/+0.036 LSB at tt/25). The
+  full-DAC post-layout sweep is still not claimed.
 - **P2. DONE on gf180 (pre-layout + digital half), layout open.** 8-bit
   binary-tree Kelvin string, 255 units, 255-TG tree, ideal-follower bench:
   DNL 0.133 / INL ±0.13 LSB at tt/25, ideal-switch control shows the error is
   entirely MOS-tree, 5.0 us worst step settling. Higher INL than P1 as
   predicted, but not the Edwards ±2 LSB failure - the difference is the wide
-  uniform TG and the tap impedance choice. Layout is class C: the string is
-  mechanical, the tree and follower are not, so `run-analog.sh string gf180
-  gds` refuses instead of half-generating.
+  uniform TG and the tap impedance choice. The string is generated and signed
+  off (`analog/string/gen_gds.py`, DRC 0, LVS 255 units, PEX 255 instances);
+  the TG tree and follower stay class C hand layout, so `run-analog.sh string
+  gf180 gds` builds and checks the string macro, not the whole DAC.
 - **P3. DONE on gf180 (pre-layout + digital half), layout open.** 8-bit 4+4
   unit-current-steering 8-bit + standard-cell thermometer/DWA, following
   `2AMLogic/gf180-current-dac` for the array and `alinja/skydacmagic` for the
   cell. Device cell I 15.77 uA, ro 425 kOhm, Vth sensitivity 0.519 %/mV ->
   1.8 %/cell. Fixed-pointer INL 1.37 LSB; DEM mean 0.48 LSB at 0.39 LSB rms.
-  Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. Layout is
-  class C (matched cell array + wide-swing cascode bias), so
-  `run-analog.sh csteer gf180 gds` refuses.
+  Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. The 30-cell
+  current-source array is generated and signed off (`analog/csteer/gen_gds.py`,
+  DRC 0, LVS 60 devices / 30 cells, PEX 60 instances); the switch matrix,
+  wide-swing cascode bias, I-V and differential wrapper stay class C hand
+  layout, so `run-analog.sh csteer gf180 gds` builds the array macro only.
 - **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs
