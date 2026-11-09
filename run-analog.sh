@@ -5,7 +5,7 @@
 #
 #   ./run-analog.sh <topology> <pdk> [stage]
 #
-#   topology   r2r | string | csteer | cdac        (only `r2r` exists today)
+#   topology   r2r | string | csteer | cdac
 #   pdk        gf180 | sky130
 #   stage      prelayout (default) | gds | drc | all
 #
@@ -22,8 +22,9 @@ STAGE=${3:-prelayout}
 
 case "$TOP" in
 r2r) DIR=analog/r2r ;;
+string) DIR=analog/string ;;
 *)
-    echo "error: unknown topology '$TOP' (implemented: r2r)" >&2
+    echo "error: unknown topology '$TOP' (implemented: r2r, string)" >&2
     exit 2
     ;;
 esac
@@ -39,13 +40,24 @@ esac
 
 [ -d "$DIR" ] || { echo "error: $DIR missing" >&2; exit 2; }
 
-# gen_gds.py is a KLayout pya script: it needs `klayout -b`, never python3.
+# GDS stage.  Only the R-2R leaf has a device generator today: the string's
+# switch tree and follower are class C (hand layout), so there is nothing to
+# generate yet and pretending otherwise would be worse than refusing.
 gds() {
     [ "$PDK" = gf180 ] || {
         echo "error: no GDS generator for $PDK (gf180 only)" >&2
         exit 2
     }
-    klayout -b -r "$DIR/gen_gds.py" -rd "out=$DIR/build/r2r.gds" -rd check=true
+    case "$TOP" in
+    r2r)
+        klayout -b -r "$DIR/gen_gds.py" -rd "out=$DIR/build/r2r.gds" -rd check=true
+        ;;
+    *)
+        echo "error: $TOP has no GDS generator (class C: hand layout)" >&2
+        echo "       see docs/analog_dac_integration_plan.md section 2" >&2
+        exit 2
+        ;;
+    esac
 }
 
 case "$STAGE" in

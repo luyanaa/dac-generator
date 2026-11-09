@@ -78,3 +78,15 @@ Summary: R-2R and resistor-string are generator-friendly (class B); CDAC and
 current-steering need constrained device generation or manual layout;
 binary-weighted resistor DACs do not scale past ~6 bit; PDKs without MIM or
 precision resistors (`freepdk45`) stay digital-only.
+
+Implemented so far, each as a device-level leaf with a separate standard-cell
+digital half (`_dig`) abutted in the wrapper:
+
+| leaf | dir | digital half | state |
+|---|---|---|---|
+| 8-bit R-2R | `analog/r2r/` | `dac_r2r_dig` | pre-layout + generator GDS; DRC/PEX blocked |
+| 8-bit resistor string | `analog/string/` | `dac_string_dig` | pre-layout; layout class C |
+
+`./run-analog.sh <topology> <pdk> [prelayout\|gds\|drc\|all]` is the analog
+entry point and fails closed: it refuses a stage it cannot actually run
+instead of reporting a skipped view as a pass.

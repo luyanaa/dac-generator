@@ -230,6 +230,24 @@ because the bin expressions reference `*_slope` params that the PDK defines in
 a file included later. `gen_r2r.py --pdk sky130` now fails with that reason
 instead of emitting a deck full of untrustworthy numbers.
 
+### 7.2 P2 (resistor string) status
+
+| Gate | State | Evidence |
+|---|---|---|
+| String linearity | closed by construction | ideal-switch control run: DNL < 1e-6 LSB |
+| Tree linearity | closed (gf180, tt) | 255 TGs: DNL 0.133 / INL ±0.13 LSB |
+| Settling | closed (gf180, tt) | 5.0 us worst step, 7 pF + 60 fF tap |
+| Digital half | closed | `dac_string_dig` break-before-make, 1826/1826, lint clean |
+| Layout | **open, class C** | string is mechanical; tree + follower are not |
+| DRC / LVS / PEX | **open** | same KLayout/Magic blockers as P1 |
+
+The design point that decides DNL is not the resistor ratio (255 identical
+units are more than accurate enough at 8 bit) but the transmission gate: its
+on-resistance variation with tap voltage and its off-state load. 1 kOhm units
+with 32/64 um gates give 0.13 LSB; a 4 kOhm string halves the error to
+0.11 LSB but triples tap settling. Recording both, and the control run that
+isolates the tree, is the only honest way to size it.
+
 ## 8. Application fit
 
 | Target | Best fit | Note |
@@ -250,15 +268,19 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
 - **P0 (no analog).** Keep `pwmdac`/`audiodac` as the portable default. Add
   the PDK capability table and the `DAC_KIND` enum to `dac_wrap`; document
   that `freepdk45`/`ics55`/`OR1` are digital-only until audited.
-- **P1 (first analog leaf).** R-2R 8-bit on gf180 + sky130, following
-  `ihsan-sa/ece298a-r2r-dac`: generated device array, fixed M1/M2 track plan,
-  digital code register macro, DRC/LVS/PEX, 9-corner + deterministic mismatch.
-  This is the lowest-risk class-B leaf and proves the analog flow.
-- **P2.** Resistor-string 8-bit on sky130/gf180 (binary-tree Kelvin, 255–320
-  units, TG tree) with a buffered output. Reuse the P1 generator and
-  verification harness. Expect worse INL than R-2R: the Edwards 8-bit macro
-  is LVS-clean yet fails its own schematic INL (±2 LSB) because switch Ron and
-  the follower dominate. Compare area/settling/INL against P1.
+- **P1 (first analog leaf). DONE on gf180** (sky130 geometry documented, not
+  simulated). R-2R 8-bit following `ihsan-sa/ece298a-r2r-dac`: generated
+  device array, fixed M1 track plan, digital code register macro, DRC/LVS/PEX
+  blocked by the toolchain (see 7.1), 15-corner + deterministic mismatch.
+  DNL 0.145 / INL 0.092 LSB, 1.15 us full-scale settling.
+- **P2. DONE on gf180 (pre-layout + digital half), layout open.** 8-bit
+  binary-tree Kelvin string, 255 units, 255-TG tree, ideal-follower bench:
+  DNL 0.133 / INL ±0.13 LSB at tt/25, ideal-switch control shows the error is
+  entirely MOS-tree, 5.0 us worst step settling. Higher INL than P1 as
+  predicted, but not the Edwards ±2 LSB failure - the difference is the wide
+  uniform TG and the tap impedance choice. Layout is class C: the string is
+  mechanical, the tree and follower are not, so `run-analog.sh string gf180
+  gds` refuses instead of half-generating.
 - **P3.** Unit-current-steering 8-bit + standard-cell thermometer/DEM on
   sky130/gf180, following `2AMLogic/gf180-current-dac` for the array and
   `alinja/skydacmagic` for the cell. Add calibration only if measurements

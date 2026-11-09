@@ -1,0 +1,20 @@
+{
+    "DESIGN_NAME": "dac_string_dig",
+    "VERILOG_FILES": [
+        "dir::../../verilog/rtl/dac_string_dig.v"
+    ],
+    "CLOCK_PORT": "clk",
+    "CLOCK_NET": "clk",
+    "CLOCK_PERIOD": 20,
+    "FP_SIZING": "absolute",
+    "DIE_AREA": "0 0 120 80",
+    "PL_TARGET_DENSITY_PCT": 30,
+    "RUN_CTS": false,
+    "//note": "Digital half of the resistor-string leaf: code register plus the",
+    "//note2": "break-before-make gate drive for the binary TG tree. The tree",
+    "//note3": "and the 255-unit string are a device-level macro; no analog",
+    "//note4": "device is placed by this flow.",
+    "pdk::gf180mcu*": {
+        "DIE_AREA": "0 0 220 140"
+    }
+}

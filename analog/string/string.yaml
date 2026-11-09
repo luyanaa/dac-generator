@@ -1,0 +1,87 @@
+# Resistor-string / Kelvin-divider DAC leaf (roadmap P2).
+#
+# Topology: 255 equal poly units in series from vss to vref (= vdd), tapped by
+# an 8-level binary transmission-gate tree.  Every code takes exactly one TG
+# per level, so the switch resistance in series with the tap is nominally
+# constant and only its *variation* with code and signal level shows up as DNL.
+#
+# The tap node is high impedance (up to ~128 * Ru), so the leaf has no output
+# drive of its own.  The benches close the loop with an ideal unity-gain
+# follower so that string linearity and buffer linearity can be separated; the
+# real follower is a separate leaf (see Status).
+#
+# Values follow the reference designs in docs/dac_topology_survey.md
+# (`sky130_ef_ip__rdac3v_8bit`, `vyges-ip/sky130-potentiometric-dac`): a
+# binary-tree string, not a 1-of-256 switch matrix.
+
+name: string
+bits: 8
+
+# Resistor unit (drawn geometry, micrometres).  Ru = rsh * L / W.
+# Ru = 1 kOhm at W = 2 um and 350 ohm/sq -> L = 5.714 um.
+# Total string = 255 * 1 kOhm = 255 kOhm, 12.9 uA at 3.3 V (42.6 uW).
+#
+# Ru is a three-way trade-off, measured (see README):
+#   * DNL comes from the code/level dependence of the TG on-resistance; the
+#     ratio Rtg/Ru should stay small, which argues for large Ru.
+#   * the tap node sees up to 128 * Ru against the follower input cap, and
+#     settling grows with Ru (this argues for small Ru).
+#   * unit area (= Ru * W / rsh * W) sets matching, which is not the limit
+#     here: 255 units of 11.4 um^2 are already far better than the tree.
+# 1 kOhm with a wide TG is the sweet spot: DNL 0.13 LSB and ~8 us tap
+# settling.  4 kOhm with the small TG gives DNL 0.11 LSB but ~30 us settling.
+unit_w: 2.0
+unit_l: 5.714
+ru: 1000.0
+
+vdd: 3.3
+vref: 3.3
+vss: 0.0
+
+# Transmission gate, 3.3 V devices, uniformly sized at every tree level.
+# Widened to keep Rtg well under Ru; every tree level uses the same size so
+# the series switch count (8) and the nominal Rtg are code-independent.
+tg_wn: 32.0
+tg_wp: 64.0
+tg_l: 0.28
+
+# Ideal output follower used only by the benches (gain, output resistance).
+buf_gain: 0.999
+buf_rout: 50.0
+
+# Output load for the settling bench, and the tap node's own capacitance
+# (follower input + the 8 selected TG drains; ~60 fF with the wide TG).
+load_r: 1000000.0
+load_c_pf: 7.0
+tap_c_pf: 0.06
+
+pdk:
+  gf180:
+    model_lib: sm141064.ngspice
+    design_file: design.spice
+    libs: [typical, res_typical]
+    res_subckt: ppolyf_u
+    res_ports: [p, n, b]
+    nfet: nfet_03v3
+    pfet: pfet_03v3
+    res_w_param: r_width
+    res_l_param: r_length
+    res_rsh: 350.0
+    vmax: 3.3
+  sky130:
+    # Geometry only.  The same 4 kOhm unit at 2000 ohm/sq needs L = 4 um at
+    # W = 2 um.  Pre-layout simulation is impossible here; see r2r.yaml for
+    # the binned-BSIM4 blocker (identical reason).
+    models_ok: false
+    models_blocker: >-
+      sky130 binned BSIM4 models cannot be selected by ngspice 44.2 in this
+      environment; transmit-gate on-resistance is therefore unverified.
+    unit_l: 4.0
+    res_subckt: sky130_fd_pr__res_xhigh_po_1p41
+    res_ports: [p, n, b]
+    nfet: sky130_fd_pr__nfet_01v8
+    pfet: sky130_fd_pr__pfet_01v8
+    res_w_param: w
+    res_l_param: l
+    res_rsh: 2000.0
+    vmax: 3.3
