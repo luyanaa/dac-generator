@@ -20,3 +20,6 @@ mgmt_core_wrapper
 
 # FPGA synthesis/place-and-route outputs
 /fpga/build/
+
+# analog leaf build products (generated SPICE, GDS, reports)
+/analog/*/build/

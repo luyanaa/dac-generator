@@ -193,6 +193,43 @@ per-unit sensitivity (e.g. ±1 % → INL) until per-instance mismatch exists.
 Sky130 Pelgrom parameters are available in the model but reference repos often
 use a Python model instead of SPICE MC.
 
+### 7.1 P1 (R-2R) status: which gates are actually closed
+
+| Gate | State | Evidence |
+|---|---|---|
+| Pre-layout DC linearity | closed (gf180) | 15 corner x temp, DNL 0.145 / INL 0.092 LSB, monotonic |
+| Pre-layout settling | closed (gf180) | 125 ns LSB step, 1.15 us full scale, 1 MOhm + 7 pF |
+| Mismatch bound | closed, deterministic | 0.2 %/unit, 10 seeds, DNL 0.427 / INL 0.225 LSB |
+| Digital half | closed | `dac_r2r_dig` lint clean, TB 16/16, hardened config added |
+| Device-array GDS | generator only | `gen_gds.py`, 25 PCell units, three self-checks clean |
+| DRC | **open** | see below |
+| LVS / PEX / post-layout | **open** | needs DRC/LVS first |
+
+Two environment blockers, both verified, neither worked around by faking a
+result:
+
+1. **KLayout 0.30.0 cannot run the gf180 deck.** The deck calls
+   `evaluate_nets()` and `nets()`; those need KLayout >= 0.30.9. Earlier the
+   same bug appeared as `Heap lost: the DeepShapeStore container no longer
+   exists` under the parallel workers. Removing the connectivity decks
+   (`-rd decks=all,-antenna,-dnwell,...`) just moves the failure to the next
+   deck (ldnmos, lpw, ...), so there is no honest partial run.
+2. **Magic needs a display here.** This build initialises Tk even with
+   `-d null -noconsole`, failing with `no display name and no $DISPLAY`
+   before the PDK tech file is read.
+
+`analog/r2r/drc.sh` therefore (a) always runs the generator's own structural
+checks, (b) refuses to claim a DRC run when the tool cannot perform one, exit
+code 3, and (c) runs the real deck unchanged once KLayout is new enough.
+Signing off P1 needs a KLayout >= 0.30.9 build (or a CI image that has one);
+nothing in the generator needs to change for that.
+
+sky130 is documented but not simulated: this ngspice 44.2 cannot select bins
+from the 180-block binned BSIM4 models (`could not find a valid modelname`),
+because the bin expressions reference `*_slope` params that the PDK defines in
+a file included later. `gen_r2r.py --pdk sky130` now fails with that reason
+instead of emitting a deck full of untrustworthy numbers.
+
 ## 8. Application fit
 
 | Target | Best fit | Note |

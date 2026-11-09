@@ -1,0 +1,19 @@
+{
+    "DESIGN_NAME": "dac_r2r_dig",
+    "VERILOG_FILES": [
+        "dir::../../verilog/rtl/dac_r2r_dig.v"
+    ],
+    "CLOCK_PORT": "clk_i",
+    "CLOCK_NET": "clk_i",
+    "CLOCK_PERIOD": 20,
+    "FP_SIZING": "absolute",
+    "DIE_AREA": "0 0 150 100",
+    "PL_TARGET_DENSITY_PCT": 30,
+    "RUN_CTS": false,
+    "//note": "Digital half of the R-2R leaf. The analog ladder is hardened by",
+    "//note2": "analog/r2r/gen_gds.py and abutted by the wrapper; no analog",
+    "//note3": "device is placed by this flow.",
+    "pdk::gf180mcu*": {
+        "DIE_AREA": "0 0 250 150"
+    }
+}

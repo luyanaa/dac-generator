@@ -7,7 +7,7 @@
 #   ./run.sh <macro> [pdk-spec] [extra librelane args...]
 #
 #   macro     one of: const_gen | config_reg_mux | audiodac | tempsense
-#             | pwmdac
+#             | pwmdac | dac_r2r_dig
 #             or "all" to run the leaf macros in dependency order.
 #   pdk-spec  one of the keys in the table below (default: sky130)
 #
@@ -153,7 +153,7 @@ run_one () {
 }
 
 if [ "$MACRO" = all ]; then
-    for m in const_gen config_reg_mux audiodac pwmdac tempsense; do
+    for m in const_gen config_reg_mux audiodac pwmdac tempsense dac_r2r_dig; do
         run_one "$m" "$@"
     done
 else

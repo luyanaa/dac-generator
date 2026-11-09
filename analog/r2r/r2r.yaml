@@ -1,0 +1,83 @@
+# R-2R ladder DAC leaf description.
+#
+# The analog core is a voltage-mode R-2R ladder whose 2R branches are driven by
+# CMOS buffers (one per bit).  Ratio accuracy comes from using one identical
+# resistor unit everywhere: 1R = one unit, 2R = two units in series, and one
+# unit of every driven 2R is shortened to absorb the mean driver on-resistance.
+#
+# Values follow ihsan-sa/ece298a-r2r-dac (gf180, 8 bit): unit W=2 um,
+# L=150 um (~27 kOhm at 350 ohm/sq), trim L=148.36 um (~295 ohm).
+
+name: r2r
+bits: 8
+
+# Resistor unit (drawn geometry, micrometres).
+unit_w: 2.0
+unit_l: 150.0
+trim_l: 148.36
+
+# Supply and reference (volts).
+vdd: 3.3
+
+# Bit driver: CMOS inverter chain.  Stage-2 device widths set the drive
+# resistance; they are sized so that the pull-up and pull-down resistances are
+# close (the residual delta is the part that cannot be trimmed).
+drv_wn: 6.0
+drv_wp: 16.0
+drv_l: 0.28
+
+# Output load used only for the settling bench.
+load_r: 1000000.0
+load_c_pf: 7.0
+
+# Per-PDK device bindings.
+pdk:
+  gf180:
+    model_lib: sm141064.ngspice
+    design_file: design.spice
+    libs: [typical, res_typical]
+    res_subckt: ppolyf_u
+    res_ports: [p, n, b]
+    nfet: nfet_03v3
+    pfet: pfet_03v3
+    # ppolyf_u instance parameters are r_width / r_length.
+    res_w_param: r_width
+    res_l_param: r_length
+    res_rsh: 350.0
+    vmax: 3.3
+  sky130:
+    # --- geometry only: pre-layout simulation is NOT possible here ---------
+    # The xhigh poly unit is 2000 ohm/sq, so the same ~27 kOhm unit needs
+    # L = 27 um at W = 2 um (drawn cell width is 1.41 um; the model only
+    # needs the electrical w/l).  These numbers are for the layout generator
+    # and for documentation; gen_r2r.py refuses to emit a sky130 deck.
+    #
+    # Blocker (verified on ngspice 44.2): the sky130 BSIM4 device models are
+    # shipped as 180 binned `.model ...__model.<n>` blocks.  ngspice can only
+    # select a bin once *all* bins parse, but each bin's toxe/vth0/voff
+    # expressions reference the `*_slope` params that live in the
+    # `__mismatch.corner.spice` file, which the corner file includes *after*
+    # the model file.  Result: "could not find a valid modelname" for every
+    # W/L.  Defining the slopes up front makes the bins parse, but ngspice
+    # then still refuses bin selection, and it also breaks whenever two bins
+    # are loaded together (bins 24+2 fail, 24 alone passes).  This needs a
+    # newer binned-model-aware ngspice or the Spectre/ngspice OSDI models,
+    # neither of which exists in this environment.
+    models_ok: false
+    models_blocker: >-
+      sky130 BSIM4 binned models cannot be selected by ngspice 44.2 in this
+      environment; see the comment in r2r.yaml.  Device/pre-layout numbers for
+      sky130 are therefore NOT verified - do not quote them.
+    unit_l: 27.0
+    trim_l: 26.7
+    model_lib: sky130.lib.spice
+    design_file: null
+    libs: [tt]
+    res_subckt: sky130_fd_pr__res_xhigh_po_1p41
+    res_ports: [p, n, b]
+    nfet: sky130_fd_pr__nfet_01v8
+    pfet: sky130_fd_pr__pfet_01v8
+    res_w_param: w
+    res_l_param: l
+    res_rsh: 2000.0
+    vmax: 3.3
