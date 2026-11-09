@@ -6,6 +6,7 @@
 #   make dac_string_dig # resistor-string digital testbench
 #   make dac_csteer_dig # unit-current-steering digital testbench
 #   make dac_cdac_dig   # binary-CDAC digital testbench
+#   make dac_video_dig  # video current-steering digital testbench
 #   make lint         # Verilator lint of the RTL
 #   make wave         # regenerate and open the VCD (needs a viewer)
 #   make clean
@@ -36,9 +37,13 @@ CD_SRCS := $(RTL)/dac_cdac_dig.v
 CD_TB   := dac_cdac_dig_tb.v
 CD_OUT  := dac_cdac_dig_tb.vvp
 
-.PHONY: all run lint clean wave dac_r2r_dig dac_string_dig dac_csteer_dig dac_cdac_dig
+VID_SRCS := $(RTL)/dac_video_dig.v
+VID_TB   := dac_video_dig_tb.v
+VID_OUT  := dac_video_dig_tb.vvp
 
-all: run dac_r2r_dig dac_string_dig dac_csteer_dig dac_cdac_dig
+.PHONY: all run lint clean wave dac_r2r_dig dac_string_dig dac_csteer_dig dac_cdac_dig dac_video_dig
+
+all: run dac_r2r_dig dac_string_dig dac_csteer_dig dac_cdac_dig dac_video_dig
 
 $(OUT): $(TB) $(SRCS)
 	$(IVERILOG) -g2012 -Wall -I$(RTL) -o $@ -s audiodac_tb $(TB) $(SRCS)
@@ -70,7 +75,13 @@ $(CD_OUT): $(CD_TB) $(CD_SRCS)
 dac_cdac_dig: $(CD_OUT)
 	$(VVP) $(CD_OUT)
 
-lint: $(SRCS) $(R2R_SRCS) $(STR_SRCS) $(CS_SRCS) $(CD_SRCS)
+$(VID_OUT): $(VID_TB) $(VID_SRCS)
+	$(IVERILOG) -g2012 -Wall -I$(RTL) -o $@ -s dac_video_dig_tb $(VID_TB) $(VID_SRCS)
+
+dac_video_dig: $(VID_OUT)
+	$(VVP) $(VID_OUT)
+
+lint: $(SRCS) $(R2R_SRCS) $(STR_SRCS) $(CS_SRCS) $(CD_SRCS) $(VID_SRCS)
 	$(VERILATOR) --lint-only -Wall -Wno-fatal --top-module audiodac \
 		-I$(RTL) $(RTL)/audiodac.v $(RTL)/audiodac_dsmod.v \
 		$(RTL)/audiodac_fifo.v $(RTL)/audiodac_sinegen.v
@@ -82,10 +93,12 @@ lint: $(SRCS) $(R2R_SRCS) $(STR_SRCS) $(CS_SRCS) $(CD_SRCS)
 		-I$(RTL) $(RTL)/dac_csteer_dig.v
 	$(VERILATOR) --lint-only -Wall -Wno-fatal --top-module dac_cdac_dig \
 		-I$(RTL) $(RTL)/dac_cdac_dig.v
+	$(VERILATOR) --lint-only -Wall -Wno-fatal --top-module dac_video_dig \
+		-I$(RTL) $(RTL)/dac_video_dig.v
 
 wave: $(OUT)
 	$(VVP) $(OUT)
 	@echo "wrote audiodac_tb.vcd"
 
 clean:
-	rm -f $(OUT) audiodac_tb.vcd $(R2R_OUT) $(STR_OUT) $(CS_OUT) $(CD_OUT)
+	rm -f $(OUT) audiodac_tb.vcd $(R2R_OUT) $(STR_OUT) $(CS_OUT) $(CD_OUT) $(VID_OUT)

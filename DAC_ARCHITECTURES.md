@@ -88,6 +88,7 @@ digital half (`_dig`) abutted in the wrapper:
 | 8-bit resistor string | `analog/string/` | `dac_string_dig` | pre-layout; layout class C |
 | 8-bit unit current steering (4+4 + DWA) | `analog/csteer/` | `dac_csteer_dig` | pre-layout + DEM model; layout class C, active I-V required |
 | 8-bit differential binary CDAC (SAR target) | `analog/cdac/` | `dac_cdac_dig` | model + digital half + 256-unit array macro; DRC 0, LVS/PEX clean; wrapper/comparator open |
+| 8-bit 25 MS/s video binary current-steering | `analog/video/` | `dac_video_dig` | model + digital half; binary carry DNL 0.68 worst, passive-load INL 1.5 LSB; class C layout open |
 
 `./run-analog.sh <topology> <pdk> [prelayout\|gds\|drc\|all]` is the analog
 entry point and fails closed: it refuses a stage it cannot actually run

@@ -313,12 +313,44 @@ The leaf therefore ships both backends: the flat-cap design is the gated one,
 the moscap array is a recorded study (`./measure.py --cap moscap --expect
 study`), so the physics stays visible instead of being tuned away.
 
+### 7.5 P5 (video-rate binary current steering) status
+
+Named target: 8 bit, 25 MS/s (40 ns), single-ended video, 37.5 ohm at the DAC
+(75 ohm line double terminated), gf180. Class C. The leaf asks whether a
+plain binary decoder is viable at 8 bit when the weights are parallel copies
+of one unit cell rather than scaled devices - the decoder cost question, not
+another segmentation study.
+
+| Gate | State | Evidence |
+|---|---|---|
+| Device cell | reused (gf180, measured) | P3 cell: 16 uA, ro 425 kOhm, W/L 8/1 + 8/0.5 um cascoded PMOS mirror |
+| Array model | closed | 255 identical unit cells grouped 1/2/4/.../128; full scale 4.08 mA |
+| DC, binary decode | **marginal** | seed 0 DNL -0.176/+0.176, INL -0.199/+0.199; 20 seeds worst DNL **0.680**, INL 0.442; 5/20 seeds exceed 0.5 LSB DNL |
+| DC, unary decode (control) | closed | same 255 cells, same seeds: worst DNL 0.066, INL 0.487 |
+| DC, passive 37.5 ohm load | **fails** | INL +1.517 LSB; needs virtual ground or unit ro >= 1.3 MOhm |
+| Binary carry glitch | characterised | 127->128: 50.8 LSB transient with 25 ps bit skew, settles 735 ps (0 LSB / 260 ps at 0 ps skew); 63->64: 25.1 LSB |
+| Speed | closed | 0.83 ns worst settling vs 40 ns period (48x); array is not the limit |
+| Digital half | closed | `dac_video_dig` 9148 checks, lint clean; one launch register, `ready` guard = SETTLE_CYCLES |
+| Layout / DRC / LVS / PEX | **open, class C** | 255-cell array + binary switch banks + output stage are hand layout; no generator |
+
+Two results size the leaf. **Binary decoding is an INL-neutral, DNL-costly
+choice**: over 20 seeds the binary array's INL matches the thermometer
+control within 0.05 LSB, but its carry DNL reaches 0.68 LSB and crosses the
+0.5 target in 5 seeds, while the thermometer version stays at 0.066. A pure
+binary decoder is therefore only usable with MSB-group trim/calibration;
+otherwise the answer is P3's 4+4 segmentation + DEM. **The output impedance
+is still the static limit**: 425 kOhm per cell is 1.67 kOhm for the whole
+array, and into 37.5 ohm that is a code-dependent gain worth +1.5 LSB INL, so
+the leaf requires a transimpedance I-V (or a regulated cascode). The carry
+glitch is large (51 LSB) but short (0.74 ns), which is why the digital half
+trades it for a settle window instead of trying to remove it in logic.
+
 ## 8. Application fit
 
 | Target | Best fit | Note |
 |---|---|---|
 | Audio, 16 bit, 48 kHz | existing ΔΣ + RC (A) | no analog leaf needed; 0 dBFS via 1st order |
-| Video, 8 bit, 25 MHz | current-steering matrix (B) or resistor string (B) | external I-to-V / 75 Ω |
+| Video, 8 bit, 25 MHz | current-steering (C with trim/segmentation; pure binary decode costs 0.68 LSB DNL) | external 75 Ω, transimpedance I-V |
 | General 8–12 bit, low speed | R-2R (B) | smallest area at 8–10 bit |
 | Mid-speed monotonic, 8 bit | resistor string (B, buffered) | 2^N resistors, switch Ron sets DNL; Edwards 8-bit fails its own INL with a follower |
 | High-speed / RF | CML/HBT (C) | ihp130 only |
@@ -368,8 +400,16 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   gds|drc|all` drives it. Still open, and explicitly not claimed: the
   differential wrapper (two mirrored arrays), the comparator/TG bias (class
   C) and the 256-code post-layout transient sweep.
-- **P5.** Binary-weighted current-steering (C) and CML/HBT (C) only with a
-  named high-speed target and a layout owner.
+- **P5. DONE on gf180 (pre-layout + digital half), layout open.** 8 bit,
+  25 MS/s video-rate binary current steering, 255 parallel unit cells decoded
+  1/2/4/.../128. Binary decode is INL-neutral but costs carry DNL: 0.680
+  worst vs 0.066 for the same cells with a thermometer decoder (5/20 seeds
+  over 0.5 LSB). A passive 37.5 ohm load fails at +1.517 LSB INL, so the leaf
+  requires a transimpedance I-V; the 25 ps bit-skew carry glitch is 50.8 LSB
+  but settles in 735 ps, which the digital half converts into a `ready`
+  settle window. Class C: no array GDS, `run-analog.sh video gf180 gds`
+  refuses. CML/HBT remains blocked: ihp130 has no installed HBT models or
+  magic tech, so there is no SiGe device to build from.
 
 ## 10. Risks / non-goals
 

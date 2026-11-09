@@ -5,7 +5,7 @@
 #
 #   ./run-analog.sh <topology> <pdk> [stage]
 #
-#   topology   r2r | string | csteer | cdac
+#   topology   r2r | string | csteer | cdac | video
 #   pdk        gf180 | sky130
 #   stage      prelayout (default) | gds | drc | all
 #
@@ -25,8 +25,9 @@ r2r) DIR=analog/r2r ;;
 string) DIR=analog/string ;;
 csteer) DIR=analog/csteer ;;
 cdac) DIR=analog/cdac ;;
+video) DIR=analog/video ;;
 *)
-    echo "error: unknown topology '$TOP' (implemented: r2r, string, csteer, cdac)" >&2
+    echo "error: unknown topology '$TOP' (implemented: r2r, string, csteer, cdac, video)" >&2
     exit 2
     ;;
 esac
@@ -41,6 +42,14 @@ gf180 | sky130) ;;
 esac
 
 [ -d "$DIR" ] || { echo "error: $DIR missing" >&2; exit 2; }
+
+# video is sized from the gf180 cell bench; there is no sky130 cell data for
+# this leaf, so refusing is honest rather than silently running a quadratic
+# model on a PDK whose devices it never touched.
+if [ "$TOP" = video ] && [ "$PDK" != gf180 ]; then
+    echo "error: video leaf is gf180-only (cell data from analog/csteer)" >&2
+    exit 2
+fi
 
 # GDS stage.  Two leaves have device generators: R-2R (gf180) and the CDAC
 # array (sky130).  The string's switch tree/follower and the current-steering
