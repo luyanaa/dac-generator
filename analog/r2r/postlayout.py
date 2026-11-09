@@ -390,14 +390,19 @@ def measure_tran(path: Path) -> dict:
     for k in range(1, len(steps)):
         t0 = k * step_us * 1e-6
         t1 = (k + 1) * step_us * 1e-6
-        ib = [i for i in range(len(t)) if t0 <= t[i] <= t1]
-        if not ib:
+        # The next step's 10 ns ramp starts at t1 - 10 ns and would leak into
+        # this window, so stop 50 ns short of it.  Half-open below t0 as well:
+        # the sample at t0 is already the new code.
+        t1 -= 50e-9
+        ib = [i for i in range(len(t)) if t0 <= t[i] < t1]
+        if len(ib) < 2:
             die(f"{path.name}: no samples in step {k}")
         vf = vout[ib[-1]]
         cross = None
-        for i in reversed(ib):
-            if abs(vout[i] - vf) > tol:
-                cross = t[min(i + 1, len(t) - 1)] - t0
+        for j in range(len(ib) - 1, -1, -1):
+            if abs(vout[ib[j]] - vf) > tol:
+                if j + 1 < len(ib):
+                    cross = t[ib[j + 1]] - t0
                 break
         out.append({"from": steps[k - 1], "to": steps[k],
                     "final_v": vf,
