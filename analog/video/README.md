@@ -341,10 +341,18 @@ planes, met1 vss rail), and it is where the closure stops:
   (`l=0.5 w=8 nf=4`, `guard 0`) it is a 2.29 x 1.43 um cell with nwell/tap/
   psdm/HVI/npc/poly/li1/mcon/m1 and three port labels - i.e. the DRC-clean
   device the array needs, and magic is also the DRC/LVS/PEX engine for
-  sky130 (same flow as the gf180 macro).  The open work is the generator
-  itself: confirm the gencell parameter semantics (one gencell per magic
-  process - a second call hits a GUI callback and dies headless), assemble
-  1022 devices + rails + 510 pads, then drive magic DRC/LVS/PEX.
+  sky130 (same flow as the gf180 macro).  `gen_devices.py` drives it
+  headlessly and the syntax is now pinned: options are space-separated pairs
+  (`l 0.5 w 8 nf 4 guard 0` - `k=v` makes `dict create` see keys like `l=0.5`
+  and silently fall back to defaults), the instance name must be non-empty
+  (empty opens the GUI parameter dialog, which dies headless), and one
+  gencell per magic process (a second call hits the dialog callback).
+  A `w=8 nf=4 l=0.5` device comes out as a 3.8 x 9.0 um cell with *per-finger*
+  ports on li1 - `D0 G0 S1 G1 D2 G2 S3 G3 D4` - over five met1 source/drain
+  rails (x -1.70/-0.91/-0.12/0.68/1.47 um), so the cell has to strap the
+  drains, the sources and the four gates itself.  That strapping, the 1022
+  placements, the rails and the 510 pads are the remaining generator work;
+  DRC/LVS/PEX then run in magic, as for gf180.
 * **icsprout55**.  The KLayout cell
   `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
   its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC
