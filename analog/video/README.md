@@ -297,18 +297,38 @@ whose mirror keeps *both* Vgs and Vds constant - a steering pair with a dump
 tail, i.e. P3's cell - avoids the charge, and that costs 2x supply current,
 one more device and one more pin per cell.
 
-What the array needs is a low-impedance bias drive. Modelled on the same
-extraction as an ideal unity-gain buffer with a series output resistance (the
-replica's diode node as input, the array's bars as output, the bars' extracted
-capacitance kept on the array side), **300 Ohm passes**: carry 128.405 LSB
-(+0.405, 35 ns) and full scale 255.000 (+0.000, 12 ns). The carry has little
-margin left because the cell itself sits at +0.266 LSB with an ideal bias, so
-the block should target ~100-300 Ohm, not "a few hundred". A bare source
-follower will not do: it level-shifts by its Vgs, i.e. by ~1 V on the array's
-bias, so it has to be an amplifier whose feedback closes around the replica.
-That is a class-C block of roughly ten devices plus 0.2-0.5 mA, alongside the
-wrapper and the output driver. Until it exists, the macro is signed off on DC,
-matching, DRC/LVS/PEX and pins, and the carry is open.
+The topology that does close it is the **dump-tail cell** (P3's): the mirror
+and cascode keep 16 uA flowing at all times and a 4/0.28 NMOS pair steers the
+tail between `iout` and `idump`, so neither Vgs nor Vds of the mirror moves.
+Measured at the device level on 255 cells (no parasitics, but the mirrors' own
+~8 pF of gate capacitance is in the model, and that is what the bias sees):
+
+| case | settled @41 ns | error | settle | bias at 41 ns |
+|---|---|---|---|---|
+| carry 127 -> 128 | 127.995 LSB | -0.005 | 2.34 ns | vbp +0.00 mV, vcp +0.00 mV |
+| full scale 0 -> 255, bare bias | 250.744 LSB | -4.256 | - | vcp +5.0 mV |
+| full scale, 100 pF on `vcp` | 254.768 LSB | -0.232 | 2.92 ns | vcp +0.5 mV |
+| full scale, `vcp` ideal | 255.031 LSB | +0.031 | 2.97 ns | 0 |
+
+The carry - the normal case - needs nothing: the bias is flat to the printout
+and the output settles in 2.3 ns. The full-scale step kicks the cascode-gate
+line (255 x Cgd x 0.15 V) and 5 mV there is 3.8 LSB at code 255, so a 100 pF
+cap on `vcp` brings it to 0.23 LSB. Cost: 4 devices per cell (768 -> 1022 plus
+the 2-device replica), **two pins per cell** (510 on a 3.75 um grid), a `vss`
+bulk rail and an `idump` bus, plus that cap. The macro has to be redrawn and
+the LVS/pin contracts and all four benches follow it; until then the committed
+`tran` result above stands for the macro as drawn.
+
+One residual dynamic item, independent of the bias: the full-scale step
+injects a ~165 LSB spike that decays in ~3 ns (present even with `vcp` ideal).
+It is the pair's switching charge into the 2 pF output; the 40 ns sample point
+is clear of it, so it is a glitch spec, not a settling one.
+
+For reference, if the cell as drawn were kept, the alternative is a buffer on
+the bias pins: modelled as an ideal unity-gain amp with 300 Ohm output on a
+split net, the carry lands at 128.405 LSB (35 ns) and full scale at 255.000
+(12 ns). A bare follower cannot be used (it level-shifts by its Vgs), so it
+would be a class-C amplifier with feedback around the replica.
 
 Gates: the settled value must be within 0.5 LSB of the loaded DC transfer at
 41 ns (40 ns after the edge) and `vbp`/`vcp` within 2 mV of their DC values
@@ -365,6 +385,9 @@ missing replica switch.
 
 The `tran` stage was added last and it *fails*: the 25 MS/s carry does not
 settle because the one-cell replica cannot drive a 7-10 pF bias node inside
-40 ns (see *Dynamic settling*). That is the open item on this leaf, with the
-fix sized there; until it lands, the leaf is signed off as "array operating
-point and linearity closed, dynamic carry open".
+40 ns (see *Dynamic settling*). The fix is chosen - the dump-tail cell, which
+keeps the mirror's operating point constant and is measured to close the carry
+(-0.005 LSB) and, with 100 pF on `vcp`, the full-scale step (-0.232 LSB) - but
+it is not drawn or signed off yet: the macro is still the source-switch cell,
+and until the redraw lands the leaf is signed off as "array operating point and
+linearity closed, dynamic carry open".
