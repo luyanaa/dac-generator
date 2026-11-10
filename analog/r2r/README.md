@@ -50,6 +50,7 @@ linearity).
 | `run.sh` | one-command pre-layout regression |
 | `gen_gds.py` | device-array GDS generator (KLayout pya) |
 | `signoff.py` | fail-closed DRC / LVS / PEX (Magic, gf180) |
+| `postlayout.py` | post-layout DC/transient on the extracted ladder, poly R-C reconstructed from the PDK model |
 
 ## Pre-layout results (gf180mcuA, `ppolyf_u`)
 
@@ -141,6 +142,38 @@ Two things the first signoff caught, both in `gen_gds.py`:
   dangling ports plus a dangling `vout`, while the real output was the pad's
   `n7`. The labels are now on the straps and the pad carries `vout`.
 
+## Post-layout (`postlayout.py`)
+
+`run-analog.sh r2r gf180 postlayout` (or `./signoff.py --stage postlayout`)
+re-runs the extracted ladder. Magic's gf180 tech deliberately does not extract
+parasitics from resistor *bodies* (the `# Do not extract parasitics from
+resistors` block), so the poly R-C is reconstructed from the PDK model's own
+constants rather than fitted: `ppolyf_u` rsh 350 ohm/sq, `r_dl` 2e-11 m,
+`r_dw` 2.55e-8 m and the 1 um `ppolyf_u_t` end resistors at 60 ohm/sq, plus the
+`fox_sub` field-oxide capacitance 8.85e-5 F/m2 — applied to the length/width
+Magic extracted (`r_length`/`r_width`, `.option scale=5n`). Each body is split
+into 20 segments (R/20, C/20) instead of the model's single-section pi. The
+extracted *top-level* caps (metal straps, pad-to-pad) are kept unchanged.
+
+Two netlists are built and both are run: `lumped` is the extraction verbatim
+(one pi per resistor), `segmented` is the 20-section line. DC must agree — that
+proves the reconstruction did not change the ladder — and the transient
+difference is the part of settling the poly R-C owns.
+
+| mode | DNL (LSB) | INL (LSB) | Vfs | worst settle |
+|---|---|---|---|---|
+| lumped | -0.001 .. +0.041 | -0.014 .. +0.036 | 3.287122 V | 1139.1 ns (255->0) |
+| segmented | -0.001 .. +0.041 | -0.014 .. +0.036 | 3.287116 V | 1140.0 ns (255->0) |
+
+Lumped vs segmented full-scale delta is 0.0059 mV (gate < 1 mV), and the
+distributed poly R-C costs +0.9 ns on a 1139 ns worst-case settle — 0.08 %, so
+the ladder's settling is the 1 Mohm load and the switch, not the resistor
+body. The DC numbers are the same because capacitors are open at DC: this
+stage proves the *parasitic* reconstruction is consistent, it does not add a
+new linearity mechanism. What it does not cover is the DAC above the ladder
+(drivers, TG tree, digital macro), so no full-DAC post-layout number is
+claimed.
+
 The DRC claim is scoped to Magic's gf180 rule set: spacing, width, enclosure,
 overlap and via rules. Density/coverage checks (DCF.1a/b, PL.8, M1.4-M5.4,
 MT.3) are not in the tech's `drc` section, so no fill or density waiver is
@@ -154,9 +187,9 @@ a trim) to prove the gate actually rejects wrong connectivity.
 
 Still open, and **not claimed**:
 
-* post-layout DC/transient sweep of the extracted ladder (the netlist is kept
-  for it — Magic does not model the poly resistor's distributed R-C, so a
-  post-layout linearity number needs a device model the deck does not provide);
+* a post-layout sweep of the *whole DAC* — the ladder below is extracted and
+  re-run, but the per-bit drivers, the TG tree and the digital macro are not in
+  that netlist;
 * the per-bit CMOS drivers, the vdd/vss ring and the wrapper around the
   digital half: hand work, class C.
 

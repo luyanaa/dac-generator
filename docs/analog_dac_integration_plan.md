@@ -208,7 +208,7 @@ use a Python model instead of SPICE MC.
 | DRC | closed | Magic `drc check` / `drc catchup` / `drc count total`: 0 items |
 | LVS | closed | extracted netlist: 17 unit (150.0 um) + 8 trim (148.36 um) = 25 resistors; 9-row ladder, 7-unit 1R chain, termination 2R, ports `vss b0..b7 n0..n6 vout` |
 | PEX | closed (netlist) | hierarchical, `cthresh`/`rthresh` 0: 25 instances, 37 C entries; per-net geometric caps reported, not gated |
-| Post-layout linearity | **open, not claimed** | Magic does not model the poly resistor's distributed R-C; the netlist is kept for that pass |
+| Post-layout linearity | **closed for the ladder (gf180, PEX)** | `postlayout.py` reconstructs the poly R-C from the PDK model (`ppolyf_u` rsh 350 ohm/sq + 60 ohm/sq ends, `fox_sub` 8.85e-5 F/m2) on the extracted geometry and splits each body into 20 segments. Both the verbatim extraction and the segmented line are run: DNL -0.001/+0.041, INL -0.014/+0.036 LSB, Vfs 3.28712 V for both, full-scale delta 0.0059 mV; the distributed poly R-C adds +0.9 ns to a 1139 ns worst settle, so the load owns settling. Not claimed: the DAC above the ladder (drivers, TG tree, digital macro) |
 
 gf180 ships no KLayout DRC deck in this install, so the leaf signs off through
 Magic, which does work headless here: `-dnull -noconsole` is fine, and the
