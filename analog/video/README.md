@@ -300,28 +300,32 @@ on - but the sizes do, because 16 uA needs a very different Vov per process:
   PDK's own readme says "for hspice only".  That is a model-porting job, not a
   sizing one.
 
-Not claimed: layouts.  The macro, the DRC/LVS/PEX/pins stages and the bench
-nets in this leaf stay gf180-only; the per-PDK numbers above are what a
-generator for that PDK would be sized from.
+Not claimed: layouts on ihp/ics.  The gf180 macro and benches stay the
+reference; sky130 now has its own device-level macro and signoff
+(`analog/video_sky130/`), and the per-PDK numbers above are what a generator
+for the remaining PDKs would be sized from.
 
 ### Layout closure per PDK: what the tooling actually gives us
 
-`analog/video_sky130/gen_gds.py` is the first attempt at a sky130 macro (the
-same 4-device cell, 510 met2 pads on a 3.75 um row, met3 vdd/iout/idump
-planes, met1 vss rail), and it is where the closure stops:
-
-* **sky130**.  The only in-repo device drawer is `pya_draw`
-  (`/opt/OpenSERDES`), and it has no headless support for the devices this
-  cell needs: its 5 V path raises `NameError: hvntm_layer` (the layer is
-  missing from `layers_def.py`; sky130's `hvntm.drawing` is 125/20 and the
-  generator patches it), and the drawn 5 V pfet puts HVI outside its own
-  nwell (DRC `hvi.2a`).  The drawer is also *context-sensitive*: the same
-  devices inside the CDAC array pass the sky130A_mr deck (0 items, 181 rule
-  categories exercised), while isolated probes of them report 75-91 items
-  (`licon.1`, `ct.1_b`, `ct.2`, `MR_licon.SP.1`) - so a sky130 cell must be
-  iterated as a full-context layout, not assembled from isolated devices.
-  `via.1a_b` also showed that sky130 vias are fixed 0.15 squares with 0.06
-  enclosures, not the bars a gf180-style router draws.
+**sky130 is closed** (`analog/video_sky130/`).  `gen_devices.py` drives
+magic's `gencell` (the KLayout paths cannot supply the 5 V pfet) and
+`gen_gds.py` builds the 255-cell array + replica: 7.5 um pitch (the pin
+contract is two met2 pads per cell on a 3.75 um grid), 4 devices per cell,
+met2 md/cd straps and vbp/vcp buses, met3 vdd/iout/idump, met1 vss, 510 pads.
+The gencell syntax is load-bearing: options are space-separated pairs
+(`l 0.5 w 8 nf 1 guard 1`; `k=v` silently falls back to the defaults), the
+instance name must be non-empty (empty opens the GUI dialog and dies
+headless) and one gencell fits per magic process.  `guard 1` draws the bulk
+tap ring and its `B` port; the ring is contacted on its **side walls** (li1 +
+licon only - the gencell puts no mcon on it), so the array adds the li1->m1
+mcon squares itself and then ties pfet -> met1 -> via1 -> m2 -> via2 -> m3
+vdd / nfet -> met1 vss.  The pfet nwells and the 5 V hvi markers are
+continuous bars across the row: at 7.5 um the nwell spacing rule (1.27 um)
+only passes if the wells are merged.  DRC is **0 items** on the full
+1536 x 27.6 um array; magic extraction is **1022 devices, 512 pfet / 510
+nfet, all pfet bulks vdd and all nfet bulks vss**; the pad-pair walk passes
+on all 255 cells; the drawn pads measure 510 on the 3.75 um grid.  The
+signoff is `analog/video_sky130/signoff.py` (build/drc/lvs/pins/pex).
 * **ihp-sg13g2**.  The tooling is complete - KLayout `sg13g2_pycell_lib`,
   `tech/drc/run_drc.py`, `tech/lvs/run_lvs.py`, and a magic tech - but the
   *device layouts* are not: `libs.ref/sg13g2_pr/gds/sg13g2_pr.gds` holds only
@@ -330,40 +334,17 @@ planes, met1 vss rail), and it is where the closure stops:
   framework, which needs KLayout's PCell host rather than the plain
   `create_cell(...)` API gf180's macro uses.  A generator therefore starts
   with a device drawer (act/poly/li1/contacts/nwell/implants) and a DRC loop.
-* **sky130 device source: magic's `gencell`.**  The KLayout paths are not it -
-  `sky130_fd_pr.gds` has foundry RF layouts for the 1.8 V pfet/nfet and the
-  5 V nfet but **no 5 V pfet**, and `pya_draw` at W=8 is not DRC-clean
-  (`licon.1`/`ct.1_b` 44 each on one device, its 8 um-wide source/drain
-  contact stacks).  The PDK's *magic* tech does have the device generator:
-  `sky130A.tcl` registers `sky130::sky130_fd_pr__pfet_g5v0d10v5` (and the
-  nfet, and the 16 V flavours) with `magic::gencell`, which draws the device
-  from the tech's own rules and puts named ports on li1.  Generated in magic
-  (`l=0.5 w=8 nf=4`, `guard 0`) it is a 2.29 x 1.43 um cell with nwell/tap/
-  psdm/HVI/npc/poly/li1/mcon/m1 and three port labels - i.e. the DRC-clean
-  device the array needs, and magic is also the DRC/LVS/PEX engine for
-  sky130 (same flow as the gf180 macro).  `gen_devices.py` drives it
-  headlessly and the syntax is now pinned: options are space-separated pairs
-  (`l 0.5 w 8 nf 4 guard 0` - `k=v` makes `dict create` see keys like `l=0.5`
-  and silently fall back to defaults), the instance name must be non-empty
-  (empty opens the GUI parameter dialog, which dies headless), and one
-  gencell per magic process (a second call hits the dialog callback).
-  A `w=8 nf=4 l=0.5` device comes out as a 3.8 x 9.0 um cell with *per-finger*
-  ports on li1 - `D0 G0 S1 G1 D2 G2 S3 G3 D4` - over five met1 source/drain
-  rails (x -1.70/-0.91/-0.12/0.68/1.47 um), so the cell has to strap the
-  drains, the sources and the four gates itself.  That strapping, the 1022
-  placements, the rails and the 510 pads are the remaining generator work;
-  DRC/LVS/PEX then run in magic, as for gf180.
 * **icsprout55**.  The KLayout cell
   `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
   its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC
   released)", so a macro built on it would not be a DRC closure even if the
   deck (`ics55_drc.drc`) ran; the models are HSPICE-only as recorded above.
 
-So the three layout closures are device-layout engineering tasks on top of
-the sizing done here, not plumbing: each needs a DRC-clean device drawer (or
-verified PDK pcells) and a full-context DRC iteration, then the LVS/PEX
-contract.  The gf180 macro keeps the leaf's signoff; the per-PDK cell data
-and the sky130 skeleton are what that work starts from.
+So the remaining two layout closures are device-layout engineering tasks on
+top of the sizing done here, not plumbing: each needs a DRC-clean device
+drawer (or verified PDK pcells) and a full-context DRC iteration, then the
+LVS/PEX contract.  gf180 and sky130 keep the leaf's signoff; ihp/ics have the
+per-PDK sizing data as the starting point.
 
 ## Files and how to run
 

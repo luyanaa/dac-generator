@@ -42,7 +42,7 @@ DEVICES = {
     "pfet": "sky130_fd_pr__pfet_g5v0d10v5",
     "nfet": "sky130_fd_pr__nfet_g5v0d10v5",
 }
-W, L, NF = 8.0, 0.5, 4
+W, L, NF = 8.0, 0.5, 1
 
 
 def die(msg: str) -> None:
@@ -66,7 +66,7 @@ def gen(pdk: Path, kind: str, out: Path) -> None:
         "drc off\n"
         "box 0 0 0 0\n"
         f"magic::gencell sky130::{cell} dev0 l {L:g} w {W:g} nf {NF} "
-        "guard 0\n"
+        "guard 1\n"
         f"gds write {out}\n"
         "quit -noprompt\n")
     env = dict(os.environ)

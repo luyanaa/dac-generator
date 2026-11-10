@@ -59,11 +59,12 @@ esac
 
 [ -d "$DIR" ] || { echo "error: $DIR missing" >&2; exit 2; }
 
-# video is sized from the gf180 cell bench; there is no sky130 cell data for
-# this leaf, so refusing is honest rather than silently running a quadratic
-# model on a PDK whose devices it never touched.
-if [ "$TOP" = video ] && [ "$PDK" != gf180 ]; then
-    echo "error: video leaf is gf180-only (cell data from analog/csteer)" >&2
+# video has a per-PDK cell study (analog/video/pdk_cell.py) and device-level
+# macro layouts on gf180 and sky130; ihp/ics have no leaf layout, so refusing
+# is honest rather than silently running a quadratic model on a PDK whose
+# devices it never touched.
+if [ "$TOP" = video ] && [ "$PDK" != gf180 ] && [ "$PDK" != sky130 ]; then
+    echo "error: video leaf has no layout on $PDK (gf180, sky130 only)" >&2
     exit 2
 fi
 
@@ -85,7 +86,7 @@ gds() {
 # here instead of a second script means `gds` cannot succeed while `drc` checks
 # a different file.
 case "$TOP:$PDK" in
-cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180)
+cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky130)
     SIGN="$DIR/signoff.py"
     [ -x "$SIGN" ] || { echo "error: $SIGN missing" >&2; exit 2; }
     case "$STAGE" in
@@ -98,7 +99,12 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180)
     postlayout | mm | tran)
         # Only the leaves that own a bench get these stages: the stage is
         # routed, never silently run against another leaf's netlist.
-        "$SIGN" --stage "$STAGE"
+        if [ "$PDK" = gf180 ]; then
+            "$SIGN" --stage "$STAGE"
+        else
+            echo "error: video/$PDK has no $STAGE bench yet" >&2
+            exit 2
+        fi
         ;;
     all)
         PDK="$PDK" "$DIR/run.sh" all
