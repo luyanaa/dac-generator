@@ -304,6 +304,40 @@ Not claimed: layouts.  The macro, the DRC/LVS/PEX/pins stages and the bench
 nets in this leaf stay gf180-only; the per-PDK numbers above are what a
 generator for that PDK would be sized from.
 
+### Layout closure per PDK: what the tooling actually gives us
+
+`analog/video_sky130/gen_gds.py` is the first attempt at a sky130 macro (the
+same 4-device cell, 510 met2 pads on a 3.75 um row, met3 vdd/iout/idump
+planes, met1 vss rail), and it is where the closure stops:
+
+* **sky130**.  The only in-repo device drawer is `pya_draw`
+  (`/opt/OpenSERDES`), and it has no headless support for the devices this
+  cell needs: its 5 V path raises `NameError: hvntm_layer` (the layer is
+  missing from `layers_def.py`; sky130's `hvntm.drawing` is 125/20 and the
+  generator patches it), and the drawn 5 V pfet puts HVI outside its own
+  nwell (DRC `hvi.2a`).  The drawer is also *context-sensitive*: the same
+  devices inside the CDAC array pass the sky130A_mr deck (0 items, 181 rule
+  categories exercised), while isolated probes of them report 75-91 items
+  (`licon.1`, `ct.1_b`, `ct.2`, `MR_licon.SP.1`) - so a sky130 cell must be
+  iterated as a full-context layout, not assembled from isolated devices.
+  `via.1a_b` also showed that sky130 vias are fixed 0.15 squares with 0.06
+  enclosures, not the bars a gf180-style router draws.
+* **ihp-sg13g2**.  The tooling is complete - KLayout `sg13g2_pycell_lib`,
+  `tech/drc/run_drc.py`, `tech/lvs/run_lvs.py`, and a magic tech - but the
+  repo has no ihp generator/drawer to start from: the cell geometry (device
+  terminals, rails, 510 pads) has to be written and DRC'd from scratch.
+* **icsprout55**.  The KLayout cell
+  `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
+  its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC
+  released)", so a macro built on it would not be a DRC closure even if the
+  deck (`ics55_drc.drc`) ran; the models are HSPICE-only as recorded above.
+
+So the three layout closures are device-layout engineering tasks on top of
+the sizing done here, not plumbing: each needs a DRC-clean device drawer (or
+verified PDK pcells) and a full-context DRC iteration, then the LVS/PEX
+contract.  The gf180 macro keeps the leaf's signoff; the per-PDK cell data
+and the sky130 skeleton are what that work starts from.
+
 ## Files and how to run
 
 ```
