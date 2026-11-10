@@ -269,16 +269,17 @@ isolates the tree, is the only honest way to size it.
 | Gate | State | Evidence |
 |---|---|---|
 | Device cell | closed (gf180) | cascoded PMOS, 7 corner/temp points: I 15.63-15.87 uA, ro 275-549 MOhm |
-| Mismatch model | closed, deterministic | measured 0.519 %/mV x Pelgrom 3.5 mV = 1.8 %/cell |
-| DC linearity | closed (gf180, ideal cells) | sigma=0 control exact; 1.8 %/unary cell (7.2 %/sqrt(w) binary): DNL -0.89/+0.28, INL -0.48/+1.37 LSB |
-| DEM | closed (model) | 15-state DWA: mean INL +/-0.48, worst sample +/-1.37, 0.39 LSB rms |
+| Mismatch model | **closed on the PEX (gf180)** | PDK `sm141064` area law `0.7071*par_vth*1e-6/sqrt(Leff Weff)` gives sigma_VT 1.79 mV for the 8/1 unary mirror and 6.59 mV for the 0.5/1 binary cell; the extracted cell converts that to 0.99 % and 3.33 %/cell. The pre-layout 0.519 %/mV x Pelgrom 3.5 mV = 1.8 %/cell assumed A_VT 10 mV*um, i.e. 1.8x pessimistic |
+| DC linearity | closed (gf180, ideal cells) | sigma=0 control exact; 1.8 %/unary cell (7.2 %/sqrt(w) binary): DNL -0.89/+0.28, INL -0.48/+1.37 LSB. On the PEX at the PDK sigma it is much better: see the post-layout mismatch row |
+| DEM | closed (model) | 15-state DWA: mean INL +/-0.48, worst sample +/-1.37, 0.39 LSB rms (pre-layout 1.8 %); on the PEX at 1.0 % the mean is 0.43 and the worst pointer 1.14 |
 | Digital half | closed | `dac_csteer_dig` 3733/3733 checks, lint clean, hardened config added; also generates the 60 complementary switch levels |
 | Output I-V | **closed: a resistor is enough** | cascoded cell ro is 425 MOhm (not 425 kOhm: the first bench printed `ro/1e3` as kOhm), so 15 unary cells in parallel are 28 MOhm and a 1 kOhm passive I-V at 255 mV output costs 0.002 LSB with perfectly matched cells. The extracted core confirms it: 0.177 / 0.166 LSB with 0 ohm or 1 kOhm at `iout`. An opamp I-V is optional, not a requirement |
 | Switch | **closed pre-layout, drawn (gf180)** | differential NMOS pair W/L 4/0.28 with the tail on the cascode drain: Ron 391 Ohm, compliance 2.26 V, event charge error 8.3 fC, pair charge error 0.3 fC, settle 55 ps; corners 301-553 Ohm / 2.10-2.44 V / 45-85 ps (`run_switch.py`) |
 | Cascode bias | **closed pre-layout (gf180)** | replica of the cell with the cascode drain diode-tied: Iref 16 uA through Mref 8/1 and Mcas 8/0.5 gives vbp/vcp; 15 corner/temp points hold Icell 16.000-16.002 uA, mirror margin >= 0.57 V, cascode margin >= 1.80 V |
 | Layout | **core generator closed; analog-facing pin row closed; wrapper (fragment) class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS cells in one row with shared vdd/vbp/vcp rails, the replica cascode bias, and one 4/0.28 NMOS switch pair per cell feeding `iout`/`idump`; each cell exposes `swa_<tag>`/`swb_<tag>` on M2 pads. 15 unary cells are 8/1 (16 uA), all 15 binary cells are 0.5/1 (1 uA) and the 1/2/4/8 weight is the cell count on a gate net, matching the digital fan-out. The 60 gate pins come out on one M2 row, two per cell on a uniform 2.75 um grid in cell order (`swa` then `swb`), so the hardened digital macro can abut with its outputs on that grid; `pinplan.py` re-reads the GDS and the `pins` stage gates it. The digital macro generates all 60 drive levels; the wrapper's pin script and the differential wrapper stay hand layout |
 | DRC / LVS / PEX | **closed for the core macro** | `signoff.py`: DRC 0 items, LVS 122 devices (30 cells + 2 bias + 60 switches) / 126 nets (6 rails + 30 tails + 30 internal + 60 gates), pins 96 labelled ports / 60 on the 2.75 um row, PEX 122 instances / 1022 C entries; LVS also checks width against weight (8/1 unary, 0.5/1 binary, mirror must match its cascode); `--selftest` fails drop-unit, swap-gate, short-tail, drop-switch, short-drain, wrong-source, bias-gate, bias-source, cell-width, mirror-width, and five pin-plan mutations (off-grid, swapped, widened pad, dropped port, wrong layer) |
-| Post-layout core | **closed (gf180, PEX)** | `run_postlayout.py` on the 122-device / 1022-cap extraction: dc pair sum error 1e-5 %, Ron 391 Ohm, compliance 2.26 V, event charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, and a 256-code sweep of the extracted array: FS 255.2 uA, unary step 15.99 LSB, DNL 0.177 / INL 0.166 LSB, 0 non-monotonic steps. The sweep runs into 0 V and through 1 kOhm and the two must agree to 0.05 LSB INL / 0.5 % FS - they do (0.166 vs 0.166). Gates 1 % / 800 Ohm / 1.5 V / 25 fC / 5 fC / 500 ps / 5 % / 1 LSB / 0.5 LSB / 1 LSB / termination. Deterministic transfer only: mismatch linearity comes from the pre-layout model |
+| Post-layout mismatch | **closed (gf180, PEX, PDK area law)** | `run_mismatch_pex.py`: `delvto`/`mulu0` drawn per extracted device from the PDK law, 32 samples, one 31-point deck each. Two gates: zero draws reproduce the measured transfer exactly (0.177 / 0.166 LSB), and the within-sample unary spread lands on the law (0.99 % vs 1.00 %). Fixed pointer DNL 0.268-0.658 / INL 0.364-1.142; DEM mean 0.064-0.451 DNL / 0.053-0.428 INL; 0 non-monotonic samples. The residual is the binary field (a weight-w bit is w 0.5/1 cells, sigma 3.3 %*sqrt(w) LSB), which DEM does not average - the same conclusion P5 reaches. `--selftest` rejects a single shared draw (spread collapses to 0.0000 %) and half-sigma per-device draws (0.35 %) |
+| Post-layout core | **closed (gf180, PEX)** | `run_postlayout.py` on the 122-device / 1022-cap extraction: dc pair sum error 1e-5 %, Ron 391 Ohm, compliance 2.26 V, event charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, and a 256-code sweep of the extracted array: FS 255.2 uA, unary step 15.99 LSB, DNL 0.177 / INL 0.166 LSB, 0 non-monotonic steps. The sweep runs into 0 V and through 1 kOhm and the two must agree to 0.05 LSB INL / 0.5 % FS - they do (0.166 vs 0.166). Gates 1 % / 800 Ohm / 1.5 V / 25 fC / 5 fC / 500 ps / 5 % / 1 LSB / 0.5 LSB / 1 LSB / termination. Deterministic transfer only; mismatch is the row above |
 
 The design point here is the DEM state count: 15 unary cells mean 15 pointer
 states, not 16. Over 15 samples every cell must see the average current, and
@@ -289,7 +290,11 @@ leaf:
   1.8 %/unit the fixed-pointer INL is 1.37 LSB for one seed (1.38 worst over
   10 seeds); DEM averaging pulls the mean to 0.48 LSB but the instantaneous
   worst sample stays at 1.37 (1.93 over 10 seeds) and adds 0.4-1.0 LSB of
-  shaped noise. The ten-seed sweep is in `analog/csteer/README.md`.
+  shaped noise. The ten-seed sweep is in `analog/csteer/README.md`. The PEX
+  Monte Carlo (PDK area law, 1.0 %/cell) halves all of that - fixed INL
+  0.36-1.14, DEM mean 0.05-0.43 - and moves the limit to the binary field:
+  once the unary cells are 1 %, the 15 binary 0.5/1 cells (3.3 %/cell) set the
+  residual DNL, which DEM cannot average.
 * **A passive I-V is usable at 8 bit.** The cascoded cell ro is 425 MOhm
   (275-549 MOhm over corners), so 1 kOhm across the 255 mV full scale costs
   0.002 LSB of INL even with perfect cells; the regression reports both

@@ -93,7 +93,9 @@ Gate-referred sensitivity at tt/25 C:
 | 10 mV | -5.197 % | -0.520 %/mV |
 | 20 mV | -10.263 % | -0.513 %/mV |
 
-so `dI/I = -0.519 %/mV`. With Pelgrom `A_VT = 10 mV*um` and
+so `dI/I = -0.519 %/mV` on this bench (the extracted cell measures 0.558
+%/mV, because its cascode bias node is distributed RC - `run_mismatch_pex.py`
+uses the extracted number). With Pelgrom `A_VT = 10 mV*um` and
 `W*L = 8*1 um^2`, `sigma_VT = 3.5 mV`, hence `sigma_I/I = 1.8 %` per unary
 cell - the number the dc bench injects. A 1 LSB cell is 16x smaller, so its
 `sigma_VT` is 4x larger and `sigma_I/I = 7.2 %`; a binary bit of weight `w`
@@ -184,8 +186,9 @@ Ten-seed sweep (same sigma; extremes over the seeds):
 | DEM rms at worst code | 1.003 | 0.600 |
 
 At 8 bit and 1.8 %/unit cell the unary field is the DNL limit; DEM recovers about
-half the static INL. Trimming or larger cells is the next step if a tighter
-DNL is required.
+half the static INL. The post-layout MC below re-measures this with the PDK's
+own area law (1.0 %/cell) and finds the *binary* field becomes the limit once
+the unary cells are that good - the conclusion is not sigma-independent.
 
 ## Files
 
@@ -198,6 +201,7 @@ DNL is required.
 | `run_switch.py` | replica bias matrix + one steering event (Ron, compliance, charge, settling) |
 | `pinplan.py` | the port geometry, re-read from the written GDS (KLayout) |
 | `run_postlayout.py` | the switch gates and the 256-code transfer re-run on the extracted core (PEX netlist) |
+| `run_mismatch_pex.py` | static mismatch MC on the extracted devices (PDK area law, DWA pointers) |
 | `run_mismatch.py` | per-cell mismatch seed sweep |
 | `run.sh` | one-command pre-layout regression |
 
@@ -311,13 +315,72 @@ loading of the cells, is what a designer then has to bound).
 
 This is a core-level result: the drawn switches behave, the charge numbers are
 real, the 256-code transfer is monotonic with the right segmentation, and the
-layout adds nothing fatal. It is **not** a mismatch linearity claim: the PEX
-netlist has one deterministic model for all 30 cells, so static INL/DNL under
-process mismatch still comes from the pre-layout Pelgrom model above. What is
+layout adds nothing fatal. The PEX netlist has one deterministic model for all
+30 cells, so this stage is *layout* matching, not process mismatch - the
+mismatch is measured separately below, on the same extracted devices. What is
 still missing is the differential wrapper and the wrapper's pin script (class C
 hand work; the analog side of the contract is `build/pinplan.json`). The stage
 is fail-closed: no PEX, or a PEX older than `csteer.gds`, exits 2 instead of
 running a stale netlist.
+
+
+## Post-layout mismatch (`run_mismatch_pex.py`)
+
+`run-analog.sh csteer gf180 mm` (or `./signoff.py --stage mm`) is the static
+mismatch Monte Carlo on the same extraction. It does not use the PDK's
+`*_03v3_dss` statistical wrapper directly: that wrapper adds source/drain
+diffusion resistors the extractor has already produced, and Magic's PEX puts
+all 15 cells of a weight inside one generated subckt, so a per-wrapper draw
+would be a *global* draw. Instead the two instance parameters the wrapper uses
+are taken apart - `delvto = mis_vth`, `mulu0 = 1-mis_k` - drawn in Python from
+the PDK's own area law
+
+    sigma_VT = 0.7071 * par_vth * 1e-6 / sqrt((l-0.15u)(w+0.1u))
+
+with `par_vth/par_k` from `sm141064.ngspice` (pfet 6.66 mV, nfet 7.15 mV), and
+written as literals onto each of the 122 extracted devices. Capacitors are
+dropped (a dc study). Each sample is one 31-point deck that turns on exactly
+one cell at a time, so all 30 cell currents come out directly; the 256-code
+transfer is reconstructed from them and fitted with `measure.fit`, and the DWA
+pointer is applied analytically by rotating the unary window.
+
+Two gates make the number trustworthy. **(1)** With zero draws the
+reconstruction must reproduce the measured 256-code transfer: it gives DNL
+0.177 / INL 0.166 LSB, exactly the `run_postlayout.py` values, so the per-cell
+decomposition *is* the transfer. **(2)** The within-sample cell-to-cell spread
+must land on the area law; it does to 1 %.
+
+| quantity (32 samples, seed 0, tt 25 C) | value |
+|---|---|
+| unary cell (8/1) sigma_VT / current spread | 1.79 mV / **0.99 %** |
+| binary cell (0.5/1) sigma_VT / current spread | 6.59 mV / 3.33 % |
+| mirror sensitivity on the extracted cell | 0.558 %/mV (device bench 0.519) |
+| fixed pointer DNL / INL | 0.268..0.658 / 0.364..1.142 LSB |
+| DEM mean DNL / INL | 0.064..0.451 / 0.053..0.428 LSB |
+| worst pointer, any sample | DNL 0.658 / INL 1.142 LSB |
+| monotonic | 0 bad samples |
+
+The pre-layout bench assumed 1.8 % per unary cell, from `A_VT = 10 mV*um` and
+`W*L = 8 um^2`. The PDK's own law gives 1.79 mV on the same area, i.e.
+**1.0 %, 1.8x smaller**; the extracted cell converts that to 0.99 %. So the
+pre-layout DNL/INL table above is pessimistic by construction, and the
+post-layout DEM mean (0.45 DNL / 0.43 INL worst over 32 seeds) sits inside the
+0.5 / 1.0 LSB target rather than the pre-layout 0.52 / 0.48.
+
+The residual is the **binary** field, not the unary one. DEM averages the 15
+unary pointers and leaves the binary carry alone, and a weight-`w` bit is `w`
+cells whose sum has `sigma = 3.3 % * sqrt(w)` of one LSB - 0.09 LSB for bit 8,
+0.13 LSB for a 7-vs-8 carry. The worst DEM-mean DNL in 32 samples (0.451 LSB)
+is at code `16j+8`, i.e. exactly that carry. This is the same conclusion P5
+reaches from the other direction: at 8 bit the binary cells, not the unary
+ones, are what a trim or more segmentation has to fix.
+
+The stage is fail-closed like the others (no PEX, a PEX older than the GDS, or
+no `postlayout.json` exits 2) and `--selftest` mutates the two ways it could
+silently pass: one draw shared by every device collapses the spread to 0.0000 %
+and is rejected, and correct per-device draws at half the PDK sigma (0.35 %)
+are rejected as well, so the gate checks magnitude, not merely that something
+moved.
 
 
 ## Digital half
@@ -361,17 +424,19 @@ Verilator lint clean.
 ../../run-analog.sh csteer gf180 all      # array macro: DRC/LVS/PEX
 ../../run-analog.sh csteer gf180 gds
 ../../run-analog.sh csteer gf180 postlayout  # same switch gates on the PEX core
+../../run-analog.sh csteer gf180 mm         # static mismatch MC on the PEX core
 make -C ../../verilog/tb dac_csteer_dig
 ```
 
 ## Status / next steps
 
 Verified: device cell current and ro over 7 corner/temperature points, the Vth
-sensitivity that justifies the 1.8 % sigma, the replica cascode bias over the
-full 15-point corner/temperature matrix, one steering event (Ron, compliance,
-charge and settling), dc linearity with and without DEM, the passive-I-V
-penalty, the digital half, and the switch metrics again on the extracted core
-(`run_postlayout.py`).
+sensitivity, the replica cascode bias over the full 15-point
+corner/temperature matrix, one steering event (Ron, compliance, charge and
+settling), dc linearity with and without DEM, the passive-I-V penalty, the
+digital half, the switch metrics on the extracted core (`run_postlayout.py`),
+and now static mismatch on the extracted *devices* (`run_mismatch_pex.py`:
+1.0 %/unary cell from the PDK area law, DEM mean 0.45 DNL / 0.43 INL worst).
 
 Not verified / not done:
 
@@ -390,9 +455,17 @@ Not verified / not done:
   wrapper, and the 1 kOhm output resistor.
 * **No full-DAC post-layout.** The core macro is extracted and re-checked on
   the PEX netlist (`run_postlayout.py`: Ron 391 Ohm, compliance 2.26 V, event
-  charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, all gates PASS), but
-  post-layout linearity of the leaf is not claimed: that needs the wrapper,
-  the output resistor and the switch drive in one netlist.
+  charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, all gates PASS), and the
+  mismatch MC runs on the same devices - but both stop at the analog block
+  boundary. Linearity of the *wrapper* (digital macro + resistor + probe pads)
+  is not claimed: that needs the wrapper in one netlist.
+* **Mismatch MC is a model, not silicon.** It uses the PDK's own `par_vth` /
+  `par_k` area law at tt/25 C and 122 independent draws; it does not include
+  die-to-die or wafer-level gradients (which are common-mode after the
+  endpoint fit) or the nfet switch's contribution to the tail, which the
+  single-cell decomposition does not see. 32 samples bound the mean well and
+  the tail poorly (the 0.451 LSB DEM-mean DNL is the max of 32, not a
+  3-sigma bound).
 * **Switch drivers are assumed.** The event bench drives the pair with ideal
   0..3.3 V edges and a 30 ps overlap. A real standard-cell inverter adds
   skew/jitter and the digital macro has no de-glitch; those are not modelled.

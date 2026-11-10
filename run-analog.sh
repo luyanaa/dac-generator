@@ -9,6 +9,7 @@
 #   pdk        gf180 | sky130
 #   stage      prelayout (default) | gds | drc | lvs | pex | pins | all
 #              postlayout (r2r: poly R-C reconstruction; csteer: PEX core)
+#              mm (csteer: static mismatch Monte Carlo on the PEX netlist)
 #
 # gds/drc/lvs/pex are implemented for the leaves that have a device-level
 # macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
@@ -91,6 +92,9 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180)
     postlayout)
         "$SIGN" --stage postlayout
         ;;
+    mm)
+        "$SIGN" --stage mm
+        ;;
     all)
         PDK="$PDK" "$DIR/run.sh" all
         "$SIGN"
@@ -108,7 +112,7 @@ case "$STAGE" in
 prelayout)
     PDK="$PDK" "$DIR/run.sh" all
     ;;
-gds | drc | lvs | pex | pins | all)
+gds | drc | lvs | pex | pins | mm | all)
     # Class C leaves have no generator, so every layout stage refuses rather
     # than reporting a run that did not happen.
     gds
