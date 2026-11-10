@@ -2,10 +2,11 @@
 r"""Generate the 255-cell array of the 8-bit 25 MS/s video DAC (P5).
 
 This is the reusable *device* generator for P5: 255 **identical** switched
-cascoded-PMOS unit cells in one row, the shared bias/supply distribution, the
-replica cascode bias generator, and the analog-facing pin row.  It does not
-draw transistor geometry: every device is the PDK `pfet` PCell, and the script
-only adds the M1/poly straps, the via stacks and the terminal pads.
+cascoded-PMOS unit cells in one row, the shared bias/supply distribution, a
+replica *cell* as the bias generator (same switch, mirror and cascode, diode
+connected), and the analog-facing pin row.  It does not draw transistor
+geometry: every device is the PDK `pfet` PCell, and the script only adds the
+M1/poly straps, the via stacks and the terminal pads.
 
 The 1/2/4/.../128 weight is the *cell count* on each gate net, not the device
 width: all 255 cells are the same 8/1 mirror + 8/0.5 cascode, and the cell tag
@@ -30,6 +31,11 @@ zero current):
     one pin wide instead of two and the pin riser drops straight down.
   * the pin row is at the bottom edge on a uniform 7.5 um grid: one M2 pad per
     cell, in cell order, so a hardened digital macro can abut below it.
+  * the bias branch repeats the cell's series switch, because that switch
+    drops I*Ron in the mirror's source and so sets the operating point: a
+    bias branch without it runs the cells ~50 % low.  Its gate is `vgnd`, a
+    static 0 V reference the wrapper grounds - the one port besides the four
+    rails.
   * the cascode drain is wired straight down to the shared iout bus, so the
     array has a single output node (single-ended video output).
 
@@ -94,6 +100,7 @@ Y_IOUT = (-3.60, -1.80)  # output bus, M3 (MT30.1: 1.8 um min width)
 Y_PIN = (-4.60, -4.20)   # analog-facing pin row, M2
 PIN_W = 0.60
 PIN_DX = 1.00            # pin centre inside the cell
+VGND_PAD = (-3.20, -2.60)  # replica-switch gate pad, M2 (bias side, not the row)
 
 
 def left_term():
@@ -231,53 +238,87 @@ def main() -> int:
         return pcell_cache[key]
 
     nsw = sw_terms(SW_X, SW_Y)
+    lt = left_term()
+    rt_m = right_term(MIR_L)
+    rt_c = right_term(CAS_L)
+    tie = tie_span()
+    sw_pcell = pfet_pcell(SW_L, SW_W)
+
+    def reg(layer, net, x1, y1, x2, y2):
+        regions.setdefault((layer, net), pya.Region()).insert(
+            box(x1, y1, x2, y2))
+
+    def draw_switch(x, src_net, gate_net, row_pad=True):
+        """The series supply switch and its gate pin path.
+
+        `src_net` is the mirror source / switch drain (an internal node in a
+        cell, `n_ref` in the replica bias); `gate_net` is what switches it.
+        The drain strap, the vdd source/tie strap and the riser into the
+        mirror's bulk-tie strip are the same in both uses, so the replica
+        switch is drawn by the same code as a cell's - that is the point of
+        putting one there (see the replica section).
+        """
+        top.insert(pya.CellInstArray(sw_pcell.cell_index(),
+                                     pya.Trans(pya.Trans.R90,
+                                               int((x + SW_X) * 1000),
+                                               int(SW_Y * 1000))))
+        reg(m1, "vdd", x + nsw["src"][0], nsw["src"][2],
+            x + nsw["src"][1], nsw["src"][3])
+        reg(m1, src_net, x + nsw["drain"][0], nsw["drain"][2],
+            x + nsw["drain"][1], nsw["drain"][3])
+        reg(m1, "vdd", x + nsw["tie"][0], nsw["tie"][2],
+            x + nsw["tie"][1], nsw["tie"][3])
+        reg(poly, gate_net, x + nsw["gate"][0], nsw["gate"][2],
+            x + nsw["gate"][1], nsw["gate"][3])
+        # drain -> mirror source
+        add(m1, x + lt[0], -0.33, x + lt[1], 0.02, src_net)
+        # source + bulk tie -> vdd, then left and up into the mirror tie strip
+        add(m1, x + nsw["tie"][0], -1.84, x + nsw["src"][1], -1.13, "vdd")
+        add(m1, x - 0.64, -1.84, x + nsw["tie"][0], -1.50, "vdd")
+        add(m1, x - 0.64, -1.84, x - 0.39, 0.30, "vdd")
+        # gate paddle -> contact -> M1 -> via1 -> M2
+        add(poly, x + 0.59, -1.06, x + 1.34, -0.78, gate_net)
+        add(poly, x + 0.68, -1.14, x + 1.30, -0.70, gate_net)
+        top.shapes(cont).insert(box(x + 0.76, -1.03, x + 1.00, -0.79))
+        add(m1, x + 0.70, -1.12, x + 1.30, -0.74, gate_net)
+        top.shapes(via1).insert(box(x + 0.98, -1.02, x + 1.24, -0.76))
+        if row_pad:
+            # Down to the analog-facing pin row, one pad per cell.
+            add(m2, x + 0.89, -4.30, x + 1.29, -0.72, gate_net)
+            add(m2, x + PIN_DX - PIN_W / 2, Y_PIN[0],
+                x + PIN_DX + PIN_W / 2, Y_PIN[1], gate_net)
+            label(x + PIN_DX, (Y_PIN[0] + Y_PIN[1]) / 2, gate_net, m2_lbl)
+        else:
+            # A bias-side pad, clear of the 255-pad digital row.
+            add(m2, x + 0.89, -2.60, x + 1.29, -0.72, gate_net)
+            add(m2, x + 0.79, VGND_PAD[0], x + 1.39, VGND_PAD[1], gate_net)
+            label(x + 1.09, (VGND_PAD[0] + VGND_PAD[1]) / 2, gate_net, m2_lbl)
 
     for k, (tag, bit) in enumerate(cells):
         x = k * PITCH
         out_net = "d_" + tag
+        src_net = "n2_" + tag
         top.insert(pya.CellInstArray(pfet_pcell(MIR_L, W).cell_index(),
                                      pya.Trans(int(x * 1000), 0)))
         top.insert(pya.CellInstArray(pfet_pcell(CAS_L, W).cell_index(),
                                      pya.Trans(int((x + CAS_DX) * 1000), 0)))
-        top.insert(pya.CellInstArray(pfet_pcell(SW_L, SW_W).cell_index(),
-                                     pya.Trans(pya.Trans.R90,
-                                               int((x + SW_X) * 1000),
-                                               int(SW_Y * 1000))))
 
-        # PCell terminals, for the self-check and for the straps below.
-        lt = left_term()
-        rt_m = right_term(MIR_L)
-        rt_c = right_term(CAS_L)
-        tie = tie_span()
-        regions.setdefault((m1, "n_" + tag), pya.Region()).insert(
-            box(x + rt_m[0], -0.01, x + rt_m[1], W + 0.01))   # mirror drain
-        regions.setdefault((m1, "n_" + tag), pya.Region()).insert(
-            box(x + CAS_DX + lt[0], -0.01, x + CAS_DX + lt[1], W + 0.01))
-        regions.setdefault((m1, "vdd"), pya.Region()).insert(
-            box(x + tie[0], 0.0, x + tie[1], W))              # mirror tie
-        regions.setdefault((m1, out_net), pya.Region()).insert(
-            box(x + lt[0], -0.01, x + lt[1], W + 0.01))       # mirror source
-        regions.setdefault((m1, "iout"), pya.Region()).insert(
-            box(x + CAS_DX + rt_c[0], -0.01,
-                x + CAS_DX + rt_c[1], W + 0.01))              # cascode drain
-        regions.setdefault((m1, "vdd"), pya.Region()).insert(
-            box(x + nsw["src"][0], nsw["src"][2],
-                x + nsw["src"][1], nsw["src"][3]))
-        regions.setdefault((m1, out_net), pya.Region()).insert(
-            box(x + nsw["drain"][0], nsw["drain"][2],
-                x + nsw["drain"][1], nsw["drain"][3]))
-        regions.setdefault((m1, "vdd"), pya.Region()).insert(
-            box(x + nsw["tie"][0], nsw["tie"][2],
-                x + nsw["tie"][1], nsw["tie"][3]))
-        regions.setdefault((poly, out_net), pya.Region()).insert(
-            box(x + nsw["gate"][0], nsw["gate"][2],
-                x + nsw["gate"][1], nsw["gate"][3]))
+        # PCell terminals, for the self-check and for the straps below.  The
+        # switch drain and the mirror source are a *separate* node from the
+        # pad net, and the bookkeeping says so: naming both `d_<tag>` would
+        # hide a drawn short between them from the self-check.
+        reg(m1, "n_" + tag, x + rt_m[0], -0.01, x + rt_m[1], W + 0.01)
+        reg(m1, "n_" + tag, x + CAS_DX + lt[0], -0.01,
+            x + CAS_DX + lt[1], W + 0.01)
+        reg(m1, "vdd", x + tie[0], 0.0, x + tie[1], W)
+        reg(m1, src_net, x + lt[0], -0.01, x + lt[1], W + 0.01)
+        reg(m1, "iout", x + CAS_DX + rt_c[0], -0.01,
+            x + CAS_DX + rt_c[1], W + 0.01)
         g = gate_span(MIR_L)
-        regions.setdefault((poly, "vbp"), pya.Region()).insert(
-            box(x + g[0], -0.22, x + g[1], W + 0.22))
+        reg(poly, "vbp", x + g[0], -0.22, x + g[1], W + 0.22)
         g = gate_span(CAS_L)
-        regions.setdefault((poly, "vcp"), pya.Region()).insert(
-            box(x + CAS_DX + g[0], -0.22, x + CAS_DX + g[1], W + 0.22))
+        reg(poly, "vcp", x + CAS_DX + g[0], -0.22,
+            x + CAS_DX + g[1], W + 0.22)
 
         # --- mirror drain -> cascode source, over the top (P3's bridge) ----
         add(m1, x + rt_m[0], W - 0.01, x + rt_m[1], 8.55, "n_" + tag)
@@ -286,13 +327,8 @@ def main() -> int:
         add(m1, x + rt_m[0], 8.25, x + CAS_DX + lt[1] - 0.04, 8.55,
             "n_" + tag)
 
-        # --- switch ------------------------------------------------------
-        # drain -> mirror source
-        add(m1, x + lt[0], -0.33, x + lt[1], 0.02, out_net)
-        # source + bulk tie -> vdd, then left and up into the mirror tie strip
-        add(m1, x + nsw["tie"][0], -1.84, x + nsw["src"][1], -1.13, "vdd")
-        add(m1, x - 0.64, -1.84, x + nsw["tie"][0], -1.50, "vdd")
-        add(m1, x - 0.64, -1.84, x - 0.39, 0.30, "vdd")
+        # --- series switch + its gate pin ---------------------------------
+        draw_switch(x, src_net, out_net)
 
         # --- mirror gate -> vbp (poly -> contact -> M1 -> via1 -> M2) -----
         g = gate_span(MIR_L)
@@ -300,13 +336,6 @@ def main() -> int:
         add(m1, x + 0.50, 8.44, x + 1.24, 8.80, "vbp")
         top.shapes(cont).insert(box(x + 0.57, 8.51, x + 0.81, 8.75))
         top.shapes(via1).insert(box(x + 0.90, 8.50, x + 1.16, 8.76))
-
-        # --- switch gate -> pin (poly paddle -> contact -> M1 -> via1) ----
-        add(poly, x + 0.59, -1.06, x + 1.34, -0.78, out_net)
-        add(poly, x + 0.68, -1.14, x + 1.30, -0.70, out_net)
-        top.shapes(cont).insert(box(x + 0.76, -1.03, x + 1.00, -0.79))
-        add(m1, x + 0.70, -1.12, x + 1.30, -0.74, out_net)
-        top.shapes(via1).insert(box(x + 0.98, -1.02, x + 1.24, -0.76))
 
         # --- cascode gate -> vcp (poly riser, no contact) -----------------
         g = gate_span(CAS_L)
@@ -327,12 +356,6 @@ def main() -> int:
         top.shapes(via1).insert(box(x - 0.68, 1.02, x - 0.42, 1.28))
         add(m2, x - 0.76, 0.96, x - 0.34, 1.76, "vdd")
         top.shapes(via2).insert(box(x - 0.69, 1.40, x - 0.39, 1.70))
-
-        # --- pin ----------------------------------------------------------
-        add(m2, x + 0.89, -4.30, x + 1.29, -0.72, out_net)
-        add(m2, x + PIN_DX - PIN_W / 2, Y_PIN[0],
-            x + PIN_DX + PIN_W / 2, Y_PIN[1], out_net)
-        label(x + PIN_DX, (Y_PIN[0] + Y_PIN[1]) / 2, out_net, m2_lbl)
 
     n_placed = len(cells)
     x_last = (n_placed - 1) * PITCH
@@ -363,13 +386,22 @@ def main() -> int:
     label(0.5, (Y_IOUT[0] + Y_IOUT[1]) / 2, "iout", m3_lbl)
 
     # ---------- replica cascode bias --------------------------------------
-    # One 16 uA reference injected at the vcp pad drives
-    #   Mref (8/1)   vdd -> vbp, gate = drain = vbp
-    #   Mcas (8/0.5) vbp -> vcp, gate = drain = vcp
-    # so vbp is the mirror gate and vcp one cascode Vgs below it.  The replica
-    # has no series switch: the cells' switches degenerate their own mirrors,
-    # which is a systematic gain term (see README, and the post-layout bench
-    # measures it), not a matching term.
+    # The bias branch is a *copy of one cell*: the same series switch, mirror
+    # and cascode, with the mirror diode-connected (drain = gate = vbp) and
+    # the cascode diode-connected (drain = gate = vcp).  16 uA injected at the
+    # vcp pad therefore sets the cells' unit current.
+    #
+    # The replica switch is not decoration.  The cell's series switch drops
+    # I*Ron in the mirror's source, which degenerates the mirror; a bias
+    # branch *without* it would set vbp for an undegenerated 8/1 device and
+    # the cells would run ~50 % low (the first post-layout run measured
+    # 8.07 uA against the modelled 16 uA).  With the same switch in both
+    # branches the drop is common mode and the unit current is the reference
+    # current - to first order independent of Ron, corner and temperature.
+    # Its gate is the static 0 V reference `vgnd`, the one port P5 has besides
+    # the four rails (the wrapper grounds it; a cell's own gate is driven by
+    # the digital macro).
+    draw_switch(x_b, "n_ref", "vgnd", row_pad=False)
     pcell_mir = pfet_pcell(MIR_L, W)
     pcell_cas = pfet_pcell(CAS_L, W)
     top.insert(pya.CellInstArray(pcell_mir.cell_index(),
@@ -378,15 +410,6 @@ def main() -> int:
                                  pya.Trans(int((x_b + CAS_DX) * 1000), 0)))
     g = gate_span(MIR_L)
     rt = right_term(MIR_L)
-    # Mref source + tie to vdd: one M1 bar under the device, then a via stack
-    # up to the plane on the tie strip (same stack as a cell).
-    add(m1, x_b - 0.78, -0.75, x_b + 2.24, -0.30, "vdd")
-    add(m1, x_b - 0.01, -0.75, x_b + 0.37, 0.02, "vdd")
-    add(m1, x_b - 0.76, -0.75, x_b - 0.32, 0.02, "vdd")
-    add(m1, x_b + CAS_DX - 0.76, -0.75, x_b + CAS_DX - 0.32, 0.02, "vdd")
-    top.shapes(via1).insert(box(x_b - 0.68, 1.02, x_b - 0.42, 1.28))
-    add(m2, x_b - 0.76, 0.96, x_b - 0.34, 1.76, "vdd")
-    top.shapes(via2).insert(box(x_b - 0.69, 1.40, x_b - 0.39, 1.70))
     # Mref gate + drain -> vbp
     add(poly, x_b + g[0], W + 0.22, x_b + g[1], Y_VBP_POLY, "vbp")
     add(m1, x_b + 0.50, 8.44, x_b + rt[1], 8.80, "vbp")
@@ -413,11 +436,21 @@ def main() -> int:
     top.shapes(cont).insert(box(xc + 0.09, 9.52, xc + 0.33, 9.76))
     add(m1, xc, Y_VCP[0], xc + 0.60, 10.05, "vcp")
     label(xc + 0.3, 9.75, "vcp")
+    # Mref bulk tie -> vdd plane (the mirror's source is n_ref via the switch).
+    top.shapes(via1).insert(box(x_b - 0.68, 1.02, x_b - 0.42, 1.28))
+    add(m2, x_b - 0.76, 0.96, x_b - 0.34, 1.76, "vdd")
+    top.shapes(via2).insert(box(x_b - 0.69, 1.40, x_b - 0.39, 1.70))
+    # Mcas bulk tie -> vdd, same via1/M2/via2 stack as a cell's mirror tie.
+    top.shapes(via1).insert(box(x_b + CAS_DX - 0.68, 1.02,
+                                x_b + CAS_DX - 0.42, 1.28))
+    add(m2, x_b + CAS_DX - 0.76, 0.96, x_b + CAS_DX - 0.34, 1.76, "vdd")
+    top.shapes(via2).insert(box(x_b + CAS_DX - 0.69, 1.40,
+                                x_b + CAS_DX - 0.39, 1.70))
 
     # ---------- self-check ------------------------------------------------
     problems = []
     if do_check:
-        want_dev = 3 * n_placed + 2
+        want_dev = 3 * n_placed + 3
         want_pins = n_placed if not dbg else dbg
         if len(cells) != want_pins:
             problems.append(f"{len(cells)} cells, want {want_pins}")
@@ -434,9 +467,9 @@ def main() -> int:
                         f"SHORT {keys[i][1]} <-> {keys[j][1]} at "
                         f"({bb.left / 1000:.2f},{bb.bottom / 1000:.2f})")
         print(f"devices    : {want_dev} pfet "
-              f"(3 per cell + replica bias), {len(cells)} unit cells")
+              f"(3 per cell + 3-device replica cell), {len(cells)} unit cells")
         print(f"pins       : {len(cells)} switch gates on a {PITCH} um M2 row "
-              f"at y={Y_PIN[0]}")
+              f"at y={Y_PIN[0]}, vgnd pad at y={VGND_PAD[0]}")
         print(f"rails      : vdd M3 plane {Y_PLANE[0]}..{Y_PLANE[1]}, "
               f"vbp M2 {Y_VBP}, vcp poly {Y_VCP}, iout M3 {Y_IOUT}")
         for p in problems:

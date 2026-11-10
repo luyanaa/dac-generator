@@ -25,4 +25,5 @@ mgmt_core_wrapper
 /analog/*/build/
 
 .slim/deepwork/
+.qoder/
 __pycache__/

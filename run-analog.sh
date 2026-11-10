@@ -8,9 +8,10 @@
 #   topology   r2r | string | csteer | cdac | video
 #   pdk        gf180 | sky130
 #   stage      prelayout (default) | gds | drc | lvs | pex | pins | all
-#              postlayout (r2r: poly R-C reconstruction; csteer: PEX core)
-#              mm (csteer: static mismatch Monte Carlo on the PEX netlist)
-#              video has no post-layout/mm bench yet and refuses those.
+#              postlayout (r2r: poly R-C reconstruction; csteer, video:
+#              extracted DC transfer)
+#              mm (csteer: static mismatch Monte Carlo on the PEX netlist;
+#              video refuses it - no P5 mismatch deck yet).
 #
 # gds/drc/lvs/pex are implemented for the leaves that have a device-level
 # macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
@@ -93,12 +94,13 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180)
     pex) "$SIGN" --stage pex ;;
     pins) "$SIGN" --stage pins ;;
     postlayout | mm)
-        # Only the leaves with a post-layout bench own these stages.  video's
-        # extracted DC sweep is not written yet, so it refuses instead of
-        # running csteer's bench on a netlist it was not built for.
-        if [ "$TOP" = video ]; then
-            echo "error: video has no $STAGE bench yet" >&2
-            echo "       pre-layout: ./run.sh; layout: gds|drc|lvs|pex|pins" >&2
+        # Only the leaves with a post-layout bench own these stages.  video has
+        # the extracted DC sweep but no mismatch Monte Carlo yet, so it refuses
+        # `mm` instead of running csteer's bench on a netlist it was not built
+        # for.
+        if [ "$TOP" = video ] && [ "$STAGE" = mm ]; then
+            echo "error: video has no mismatch MC yet" >&2
+            echo "       post-layout: postlayout (see analog/video/README.md)" >&2
             exit 2
         fi
         "$SIGN" --stage "$STAGE"

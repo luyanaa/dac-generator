@@ -3,12 +3,14 @@
 
     ./signoff.py                 # build + drc + lvs + pins + pex, gate on all
     ./signoff.py --stage lvs
+    ./signoff.py --stage postlayout   # delegate to the extracted DC bench
     ./signoff.py --selftest      # prove the gates reject mutations
 
 This is the P5 counterpart of `../csteer/signoff.py`.  `gen_gds.py` generates
 the analog core: 255 identical switched-cascode PMOS unit cells in one row, the
-shared vdd/vbp/vcp/iout distribution, a two-device replica bias at the right
-end, and one M2 pad per cell on a 7.5 um pin row.  The digital half
+shared vdd/vbp/vcp/iout distribution, a replica *cell* at the right end (same
+switch, mirror and cascode, diode-connected), and one M2 pad per cell on a
+7.5 um pin row.  The digital half
 (`verilog/rtl/dac_video_dig.v`, 255 registered switches) is a separate
 standard-cell macro, the wrapper that abuts them and the output pad/ESD are
 class C (hand layout), so the gates below sign off the array, not the DAC.
@@ -29,9 +31,14 @@ class C (hand layout), so the gates below sign off the array, not the DAC.
          * switch source = vdd, and the switch sits *between* the supply and
            the mirror, so an off cell draws no current: there is no `idump`
            and no `vss` anywhere in this core (both are negative checks).
-         * the replica bias: one 8/1 diode vdd -> vbp and one 8/0.5 diode
-           vbp -> vcp, so vcp sits one cascode Vgs below the mirror gate.
-         * 4 rails + 255 pin nets + 2 internal nodes per cell = 769 nets.
+         * the replica bias is a copy of one cell: the same 0.5/0.28 switch
+           on a static 0 V gate (`vgnd`) feeding a vdd -> vbp 8/1 diode and a
+           vbp -> vcp 8/0.5 diode.  The switch has to be there: the cell's own
+           switch drops I*Ron in its mirror's source, and a bias branch
+           without that drop sits ~50 % away from the cells' operating point
+           (measured 8.07 uA against the modelled 16 uA before the fix).
+         * 5 rails (vdd/vbp/vcp/iout/vgnd) + 255 pin nets + 2 internal nodes
+           per cell + the replica switch node = 771 nets.
 
   pins The 255 pads are checked on the drawn GDS (`pinplan.py`), not on the
        generator's variables: one M2 pad per cell in cell order on an exact
@@ -39,7 +46,7 @@ class C (hand layout), so the gates below sign off the array, not the DAC.
        derives the rail resistances from the drawn metal and reports the
        supply droop and the iout bus drop as evidence (see the README).
 
-  pex  hierarchical extraction, cthresh/rthresh 0; 767 instances and the
+  pex  hierarchical extraction, cthresh/rthresh 0; 768 instances and the
        per-net capacitance, kept as evidence for the digital driver load and
        for the vbp/vcp bias settling.
 
@@ -78,8 +85,9 @@ PIN_H_UM = 0.40
 
 # The single-ended array: no ground and no dump leg (an off cell is a real
 # zero, which is the whole reason P5 uses a series switch).
-ANALOG_PORTS = ("vdd", "vbp", "vcp", "iout")
-RAIL_LAYER = {"vdd": "m3", "iout": "m3", "vbp": "m2", "vcp": "m1"}
+ANALOG_PORTS = ("vdd", "vbp", "vcp", "iout", "vgnd")
+RAIL_LAYER = {"vdd": "m3", "iout": "m3", "vbp": "m2", "vcp": "m1",
+              "vgnd": "m2"}
 
 # gf180 sheet resistance (ohm/sq) for the drawn rails.  M3 is 9x better than
 # M1/M2, which is why the supply and the output bus are on M3 here: the same
@@ -258,7 +266,7 @@ def check(devs, scale, cfg) -> list[str]:
     sw_w = float(cfg.get("sw_w", 0.5))
     sw_l = float(cfg.get("sw_l", 0.28))
 
-    rails = {"vdd", "vbp", "vcp", "iout"}
+    rails = {"vdd", "vbp", "vcp", "iout", "vgnd"}
     pin_nets = {"d_" + t for t in tags}
 
     def um(tok: str) -> float:
@@ -269,6 +277,7 @@ def check(devs, scale, cfg) -> list[str]:
     switches = []         # (name, drain, gate, source)
     bias_m = []
     bias_c = []
+    bias_s = []
     allnets: set[str] = set()
 
     for name, nets, sub, params in devs:
@@ -286,9 +295,14 @@ def check(devs, scale, cfg) -> list[str]:
             problems.append(f"{name}: bulk {b}, want vdd")
         if g == "vbp":
             if d == "vbp":
-                # Replica bias mirror: diode-connected from vdd to vbp.
-                if s != "vdd":
-                    problems.append(f"{name}: bias mirror source {s}, want vdd")
+                # Replica bias mirror: diode-connected, but its source is the
+                # replica switch's drain, not vdd - without the switch its drop
+                # would be missing from the bias branch and the cells would run
+                # ~50 % low.  The pair is checked below.
+                if s in rails | pin_nets:
+                    problems.append(f"{name}: bias mirror source {s} is a "
+                                    f"rail/port; it must be the replica "
+                                    f"switch drain")
                 if abs(W - cell_w) > 1e-6 or abs(L - mir_l) > 1e-6:
                     problems.append(f"{name}: bias mirror {W:.3f}/{L:.3f} um, "
                                     f"want {cell_w:.3f}/{mir_l}")
@@ -337,20 +351,42 @@ def check(devs, scale, cfg) -> list[str]:
             if d in rails | pin_nets:
                 problems.append(f"{name}: switch drain {d} is a port")
             switches.append((name, d, g, s))
+        elif g == "vgnd":
+            # Replica switch: the *same* device as a cell's, on a static 0 V
+            # gate, so the bias branch sees the same series drop as a cell.
+            if abs(W - sw_w) > 1e-6 or abs(L - sw_l) > 1e-6:
+                problems.append(f"{name}: replica switch {W:.3f}/{L:.3f} um, "
+                                f"want {sw_w:.3f}/{sw_l}")
+            if s != "vdd":
+                problems.append(f"{name}: replica switch source {s}, want vdd")
+            if d in rails | pin_nets:
+                problems.append(f"{name}: replica switch drain {d} is a "
+                                f"rail/port")
+            bias_s.append((name, d, g, s))
         else:
-            problems.append(f"{name}: gate net {g} is not a cell pad, vbp "
-                            f"or vcp")
+            problems.append(f"{name}: gate net {g} is not a cell pad, vbp, "
+                            f"vcp or vgnd")
 
-    if len(devs) != 3 * n_cells + 2:
-        problems.append(f"{len(devs)} devices, want {3 * n_cells + 2} "
-                        f"(3 per cell + replica bias)")
+    if len(devs) != 3 * n_cells + 3:
+        problems.append(f"{len(devs)} devices, want {3 * n_cells + 3} "
+                        f"(3 per cell + a 3-device replica cell)")
     for label, got, want in (("cell mirrors", len(mirrors), n_cells),
                              ("cell cascodes", len(cascodes), n_cells),
                              ("switches", len(switches), n_cells),
                              ("bias mirrors", len(bias_m), 1),
-                             ("bias cascodes", len(bias_c), 1)):
+                             ("bias cascodes", len(bias_c), 1),
+                             ("bias switches", len(bias_s), 1)):
         if got != want:
             problems.append(f"{got} {label}, want {want}")
+    # The replica is a copy of a cell, so its mirror source must be its own
+    # switch's drain - that is what makes the series drop common mode.
+    if bias_m and bias_s:
+        if bias_m[0][2] != bias_s[0][1]:
+            problems.append(f"bias mirror source {bias_m[0][2]} is not the "
+                            f"replica switch drain {bias_s[0][1]}; the cells' "
+                            f"series drop is then missing from the bias")
+        if bias_m[0][2] in set(x[1] for x in switches):
+            problems.append("replica switch drain is a cell's switch drain")
 
     # The tag is visible only on the switch gate.  Walk the cell from there so
     # the contract does not depend on how Magic named the internal nodes.
@@ -401,11 +437,12 @@ def check(devs, scale, cfg) -> list[str]:
         if bad in allnets:
             problems.append(f"core contains {bad}; P5 has no such rail")
 
-    want_nets = len(rails) + n_cells + 2 * n_cells
+    want_nets = len(rails) + n_cells + 2 * n_cells + 1
     NETCOUNT = len(allnets)
     if len(allnets) != want_nets:
         problems.append(f"{len(allnets)} nets, want {want_nets} "
-                        f"(4 rails + {n_cells} pins + 2 internal per cell)")
+                        f"(5 rails + {n_cells} pins + 2 internal per cell "
+                        f"+ the replica's switch node)")
     return problems
 
 
@@ -434,7 +471,7 @@ def lvs(pdk: Path) -> dict:
     problems = check(devs, scale, cfg)
     n_cells = len(cell_tags(cfg))
     return {"ok": not problems, "devices": len(devs), "cells": n_cells,
-            "switches": n_cells, "bias": 2, "nets": NETCOUNT,
+            "switches": n_cells, "bias": 3, "nets": NETCOUNT,
             "scale_nm": round(scale * 1e9, 3),
             "problems": problems, "netlist": str(spice)}
 
@@ -473,9 +510,9 @@ def pex(pdk: Path) -> dict:
     cfg = load_cfg()
     n_cells = len(cell_tags(cfg))
     devs = sum(1 for f in insts if f[-1].startswith(("pfet", "nfet")))
-    if devs != 3 * n_cells + 2:
+    if devs != 3 * n_cells + 3:
         die(f"PEX netlist instantiates {devs} devices, want "
-            f"{3 * n_cells + 2}")
+            f"{3 * n_cells + 3}")
     caps = sum(1 for ln in body if ln.strip().startswith("C"))
     if caps == 0:
         die("PEX top subckt has no capacitance; extraction did not run")
@@ -609,8 +646,9 @@ def rails(plan: dict, cfg) -> dict:
         else:
             out[name]["cell_current_error_lsb"] = round(
                 d_one / ro / i_unit, 5)
-    # vbp/vcp carry no DC current (gates only); report them for settling.
-    for name in ("vbp", "vcp"):
+    # vbp/vcp/vgnd carry no DC current (gates only); report them for settling
+    # (vgnd is the replica switch's static 0 V reference).
+    for name in ("vbp", "vcp", "vgnd"):
         b = pins[name]["bbox"]
         out[name] = {"layer": pins[name]["layer"],
                      "length_um": round(b[2] - b[0], 3),
@@ -726,10 +764,22 @@ def selftest() -> int:
     # Move one cascode drain off iout (single-ended array, one bus only).
     p8 = check(swaps(cas_i[-1], lambda n: ["idump", n[1], n[2], n[3]]),
                scale, cfg) if cas_i else ["none"]
+    # The replica switch: killing it (gate to vdd), shorting it (source to
+    # vbp), and the pre-fix bug itself - the bias mirror fed straight from vdd
+    # so the cells' series drop is missing from the bias branch.
+    bs = idx(lambda d: d[1][1] == "vgnd")
+    p9 = check(swaps(bs[0], lambda n: [n[0], "vdd", n[2], n[3]]), scale,
+               cfg) if bs else ["none"]
+    p10 = check(swaps(bs[0], lambda n: [n[0], n[1], "vbp", n[3]]), scale,
+                cfg) if bs else ["none"]
+    p11 = check(swaps(bm[0], lambda n: [n[0], n[1], "vdd", n[3]]), scale,
+                cfg) if bm else ["none"]
     for name, prob in (("drop-switch", p1), ("relabel-gate", p2),
                        ("swap-drains", p3), ("casc-length", p4),
                        ("mirror-width", p5), ("bias-gate", p6),
-                       ("bias-source", p7), ("casc-drain", p8)):
+                       ("bias-source", p7), ("casc-drain", p8),
+                       ("bias-sw-gate", p9), ("bias-sw-src", p10),
+                       ("bias-undegenerated", p11)):
         print(f"selftest {name:12}: {'FAIL' if prob else 'PASS (bad!)'} "
               f"({len(prob)})")
         ok &= bool(prob)
@@ -797,12 +847,20 @@ def selftest() -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--stage", default="all",
-                    choices=["all", "build", "drc", "lvs", "pex", "pins"])
+                    choices=["all", "build", "drc", "lvs", "pex", "pins",
+                             "postlayout"])
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--brief", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
+    if a.stage == "postlayout":
+        # The bench owns the netlist, the gates and the report, so the stage
+        # cannot drift from what it means.
+        cmd = [sys.executable, str(ROOT / "run_postlayout.py")]
+        if a.brief:
+            cmd.append("--brief")
+        return subprocess.run(cmd).returncode
 
     pdk = find_pdk()
     rep: dict = {"pdk": str(pdk), "top": TOP, "steps": {}}
@@ -821,7 +879,7 @@ def main(argv=None) -> int:
         if not r["ok"]:
             failed.append("lvs")
         print(f"lvs  {'PASS' if r['ok'] else 'FAIL'}  {r['devices']} devices "
-              f"({r['cells']} identical cells + {r['bias']} bias), "
+              f"({r['cells']} identical cells + {r['bias']}-device replica), "
               f"{r['nets']} nets, scale {r['scale_nm']:g} nm")
         for p in r["problems"]:
             print(f"     {p}")

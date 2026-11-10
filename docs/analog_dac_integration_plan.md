@@ -359,17 +359,29 @@ scaled devices - the decoder cost question, not another segmentation study.
 | Binary carry glitch | characterised | 127->128: 51.4 LSB transient with 25 ps bit skew, settles 740 ps (0 LSB / 262 ps at 0 ps skew); 63->64: 25.3 LSB |
 | Speed | closed | 0.83 ns worst settling vs 40 ns period (48x); array is not the limit |
 | Digital half | closed | `dac_video_dig` 9148 checks, lint clean; one launch register, `ready` guard = SETTLE_CYCLES; `dout` is **255 bits, one per physical cell** (cell j = smallest k with j < 2^(k+1)-1), so bit k fans to all 2^k cells from the same launch edge |
-| Array macro | closed | `analog/video/gen_gds.py`: 767 pfet = 255 x (8/1 mirror + 8/0.5 cascode + 0.5/0.28 supply switch) + 2-device replica bias; no standard cell in the macro |
-| DRC / LVS / PEX | closed | `signoff.py`: Magic DRC 0 items; LVS 767 devices, 769 nets, 255 *identical* cells re-derived from the pin tag (pad d_tag -> switch drain -> mirror source -> mirror drain -> cascode source -> iout) and negative checks for `vss`/`idump`; PEX 767 instances, 4597 C entries (197.8 kB) |
-| Pins / rails | closed | 255 M2 pads, cell order, exact 7.5 um grid (one per cell, so the digital macro abuts); vdd plane 2.4 ohm = 1.2 mV at full code (1.2% gain, endpoint-calibrated), iout bus 10.7 ohm = 21.8 mV one-ended which costs 3e-6 LSB/cell through ro; vbp/vcp carry gates only (311/358 fF, bias settling) |
+| Array macro | closed | `analog/video/gen_gds.py`: 768 pfet = 255 x (8/1 mirror + 8/0.5 cascode + 0.5/0.28 supply switch) + a 3-device replica *cell*; no standard cell in the macro |
+| DRC / LVS / PEX | closed | `signoff.py`: Magic DRC 0 items; LVS 768 devices, 771 nets, 255 *identical* cells re-derived from the pin tag (pad d_tag -> switch drain -> mirror source -> mirror drain -> cascode source -> iout), the replica's mirror source required to be its own switch drain, and negative checks for `vss`/`idump`; PEX 768 instances, 4609 C entries (198.2 kB) |
+| Pins / rails | closed | 255 M2 pads, cell order, exact 7.5 um grid (one per cell, so the digital macro abuts) plus a separate `vgnd` pad on the bias side; vdd plane 2.4 ohm = 1.2 mV at full code (1.2% gain, endpoint-calibrated), iout bus 10.7 ohm = 21.8 mV one-ended which costs 3e-6 LSB/cell through ro; vbp/vcp/vgnd carry gates only (311/358 fF, bias settling) |
+| Post-layout DC | closed (nominal) | `run_postlayout.py`: 256-code sweep on the extracted netlist, virtual ground and 37.5 ohm - 4.080 mA full scale, **16.000 uA/cell**, DNL/INL 0.000 LSB, 0 bad steps, `vbp` 1.951 V / `vcp` 0.505 V; the loaded run is indistinguishable from virtual ground. Nominal only: Magic extracts capacitance, not metal R, and identical cells make the transfer exact by construction, so this gates the operating point, not linearity |
 
-The first extraction is what closed the last hole: the vcp poly bar stopped at
-the last cell, so the 255 cascode gates were one unnamed island and only the
-replica cascode sat on `vcp`. The LVS stage printed 255 gates on a net that
-was not a port. `--selftest` (14 mutations) rejects a dropped switch, a
-relabelled gate, a shorted drain, a wrong cascode length or mirror width, a
-broken bias diode, a cascode drain off `iout`, five pin-plan mutations and a
-narrowed vdd plane.
+Two extraction findings, both caught by a gate rather than by reading the
+generator. (1) The vcp poly bar stopped at the last cell, so the 255 cascode
+gates were one unnamed island and only the replica cascode sat on `vcp` -
+LVS printed 255 gates on a net that was not a port. (2) The post-layout bench
+measured 8.07 uA per cell instead of 16 uA: the cell's series switch drops
+I*Ron *inside* the mirror's source, degenerating it by 0.075 V at a 0.23 V
+overdrive, while the two-device replica bias had no such drop. The fix is the
+standard one - repeat the cell's switch in the bias branch, gate on a static
+0 V `vgnd` reference - which makes the drop common mode and the unit current
+equal to the reference current to first order (measured 16.000 uA; the
+degenerated bias is reproduced as a `--selftest` mutation and rejected at
+-49.5 %). Side effects recorded: degeneration cuts the cell's current sigma
+from 1.8 % to ~0.8 % (the pre-layout study stays conservative), and a 0.1 V
+digital-low error now moves a cell 0.013 LSB.
+`signoff.py --selftest` (17 mutations) rejects a dropped switch, a relabelled
+gate, a shorted drain, a wrong cascode length or mirror width, a broken bias
+diode, a cascode drain off `iout`, a dead or shorted or *absent* replica
+switch, five pin-plan mutations and a narrowed vdd plane.
 
 Two results size the leaf. **Binary decoding is an INL-neutral, DNL-costly
 choice**: over 20 seeds the binary array's INL matches the thermometer
@@ -466,8 +478,9 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   gds|drc|all` drives it. Still open, and explicitly not claimed: the
   differential wrapper (two mirrored arrays), the comparator/TG bias (class
   C) and the 256-code post-layout transient sweep.
-- **P5. DONE on gf180 (pre-layout + digital half + array macro).** 8 bit,
-  25 MS/s video-rate binary current steering, 255 parallel unit cells decoded
+- **P5. DONE on gf180 (pre-layout + digital half + array macro + post-layout
+  DC).** 8 bit, 25 MS/s video-rate binary current steering, 255 parallel unit
+  cells decoded
   1/2/4/.../128. Binary decode is INL-neutral but costs carry DNL: 0.680
   worst vs 0.066 for the same cells with a thermometer decoder (5/20 seeds
   over 0.5 LSB). A passive 37.5 ohm load is fine: the P3 cell ro is 425 MOhm,
@@ -479,13 +492,22 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   switched-cascode cells (series 0.5/0.28 PMOS between vdd and the mirror, so
   an *off* cell is a real zero and there is no dump bus), one M2 pad per cell
   on a 7.5 um row so the 255-bit digital macro can abut, vdd/iout on M3 for
-  the 1.9 mm run. `signoff.py` gates DRC 0, LVS 767 devices/769 nets with the
-  cell identity re-derived from the pad tag, PEX 767 instances and the pin
+  the 1.9 mm run. `signoff.py` gates DRC 0, LVS 768 devices/771 nets with the
+  cell identity re-derived from the pad tag, PEX 768 instances and the pin
   grid, plus a rail estimate from the drawn metal (1.2 mV vdd drop, 21.8 mV
-  iout bus). `run-analog.sh video gf180 gds|drc|lvs|pex|pins|all` drives it.
+  iout bus). The extracted 256-code sweep (`run_postlayout.py`) is what
+  caught the design error the layout had: the cells' series switch
+  degenerates the mirror, and the two-device replica bias did not reproduce
+  that drop, so the array ran at 8.07 uA/cell against the modelled 16. With
+  the switch repeated in the bias branch (static 0 V `vgnd` gate) the
+  extracted array gives 16.000 uA/cell, 4.080 mA full scale, DNL/INL 0.000 on
+  virtual ground and on 37.5 ohm. That sweep is nominal-only (no metal R in a
+  Magic extraction, and identical cells make the transfer exact), so it gates
+  the operating point, not linearity.
+  `run-analog.sh video gf180 gds|drc|lvs|pex|pins|postlayout|all` drives it.
   Still open: the digital macro is not hardened here, the wrapper and output
-  driver stay class C, and there is no extracted DC sweep (item 5) or
-  mismatch MC on the P5 netlist yet. CML/HBT remains blocked: ihp130 has no
+  driver stay class C, and there is no mismatch MC on the P5 netlist yet.
+  CML/HBT remains blocked: ihp130 has no
   installed HBT models or magic tech, so there is no SiGe device to build
   from.
 

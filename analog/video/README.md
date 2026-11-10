@@ -34,7 +34,10 @@ weights are made of *parallel unit cells* rather than scaled devices.
 ## Results
 
 Model: 255 ideal current cells with a per-cell gain error and finite ro (the
-P3 measured constants), endpoint fit. All numbers are pre-layout.
+P3 measured constants), endpoint fit. All numbers below are **pre-layout**;
+the extracted DC transfer is in *Layout* below (it is exact by construction
+there, because all 255 cells are drawn identically - its job is the operating
+point, and it earned that job).
 
 | bench | DNL (LSB) | INL (LSB) |
 |---|---|---|
@@ -113,14 +116,18 @@ the RTL expands in a generate loop and the testbench re-expands independently.
 `gen_gds.py` emits `build/video.gds` (KLayout + the PDK pfet PCell; no
 transistor geometry is drawn by hand):
 
-* 767 pfet = 255 x (8/1 mirror + 8/0.5 cascode + 0.5/0.28 series supply
-  switch) + a 2-device replica bias. All 255 cells are *identical*: the
-  1/2/4/.../128 weight is the digital fanout, so there is no per-cell width
-  table to get wrong (P3's mistake).
+* 768 pfet = 255 x (8/1 mirror + 8/0.5 cascode + 0.5/0.28 series supply
+  switch) + a replica *cell* (the same three devices, diode connected). All
+  255 cells are *identical*: the 1/2/4/.../128 weight is the digital fanout,
+  so there is no per-cell width table to get wrong (P3's mistake).
 * the switch sits between vdd and the mirror, gate = the cell's only pin, so
   an off cell is a real zero: no dump bus, no ground rail in the array.
+* the replica bias repeats the cell's switch, on a static 0 V gate (`vgnd`).
+  That is not decoration: the next section's post-layout run is what found
+  that a bias branch without it is ~50 % off.
 * one M2 pad per cell in cell order on an exact 7.5 um row at the bottom edge,
-  on a grid the hardened digital macro can abut.
+  on a grid the hardened digital macro can abut; `vgnd` is a separate M2 pad
+  on the bias side, so it never lands under the digital macro.
 * vdd is an M3 plane over the devices and iout an M3 bus under them (M3 is
   0.01 Ohm/sq against 0.09 for M1/M2; a 1.9 mm M1 bar would be hundreds of
   ohms). vbp is an M2 bar, vcp a poly bar.
@@ -130,9 +137,10 @@ transistor geometry is drawn by hand):
 | stage | result |
 |---|---|
 | drc | Magic `drc count total` = 0 items at 2, 8 and 255 cells |
-| lvs | 767 devices, 769 nets: 255 identical cells, 2 bias diodes, 4 rails; each cell re-derived from its pad tag (pad -> switch gate, drain -> mirror source, mirror drain -> cascode source -> iout) |
-| pins | 259 labelled ports; 255 m2 pads on the 7.5 um grid (`pinplan.py` reads the GDS back) |
-| pex | 767 instances, 4597 C entries, 197.8 kB: vdd 490 fF, vbp 311 fF, vcp 358 fF, iout 296 fF, 0.69 fF per pad |
+| lvs | 768 devices, 771 nets: 255 identical cells, a 3-device replica cell, 5 rails (vdd/vbp/vcp/iout/vgnd); each cell re-derived from its pad tag (pad -> switch gate, drain -> mirror source, mirror drain -> cascode source -> iout), and the replica's mirror source must be its own switch drain |
+| pins | 260 labelled ports; 255 m2 pads on the 7.5 um grid (`pinplan.py` reads the GDS back) |
+| pex | 768 instances, 4609 C entries, 198.2 kB: vdd 490 fF, vbp 311 fF, vcp 358 fF, iout 296 fF, 0.69 fF per pad |
+| postlayout | 256-code DC transfer on the extracted netlist, virtual ground and 37.5 ohm: 4.080 mA full scale, 16.000 uA/cell, DNL/INL 0.000 LSB, 0 bad steps |
 
 The same pins stage estimates the rails from the *drawn* metal: vdd 2.4 ohm ->
 1.2 mV at full code, i.e. 1.2 % of gain (2*drop/vov), which endpoint
@@ -140,8 +148,33 @@ calibration absorbs because the drop scales with the code; iout 10.7 ohm ->
 21.8 mV between the farthest cell and the pad, which costs nothing in gain
 (KCL still delivers every cell's current) and 3e-6 LSB/cell through ro. vbp
 and vcp carry gates only, so their 311/358 fF matter for bias settling, not
-IR. `--selftest` proves the gates reject 14 mutations, including a narrowed
-vdd plane.
+IR. `--selftest` proves the gates reject 17 mutations, including a narrowed
+vdd plane and a bias branch with the series switch shorted out.
+
+### The series switch is part of the operating point
+
+The first post-layout run measured **8.07 uA per cell, not 16 uA** (-49.5 %),
+and it was right to: the cell's switch drops I*Ron inside the mirror's source,
+which degenerates the mirror and costs 0.075 V of Vsg at an overdrive of only
+0.23 V. A bias branch without that switch sets `vbp` for an undegenerated
+8/1 and every cell then runs half current. Fixing it by adding the same switch
+to the replica makes the drop common mode, so the unit current *is* the
+reference current to first order - independent of Ron, corner and temperature -
+and the measured 16.000 uA at `vbp` 1.951 V / `vcp` 0.505 V confirms it.
+
+Two side effects are worth recording rather than hiding:
+
+* the degeneration *improves* matching - the effective gm is gm/(1+gm*Ron) =
+  0.44*gm, so a cell's current sigma is 0.8 % rather than the 1.8 % the
+  pre-layout study assumed (that study therefore stays conservative);
+* the gain is now sensitive to the digital macro's *low* level: 0.1 V of
+  low-level error moves a cell 1.3 %, i.e. 0.013 LSB. Per-cell spread at that
+  level is negligible; a common shift is a gain term calibration already
+  absorbs.
+
+`run_postlayout.py --selftest` re-runs the deck with the replica switch
+shorted out and requires the bench to reject it (8.074 uA, -49.5 %), so the
+measurement cannot silently lose the mechanism it was built to check.
 
 ## Files and how to run
 
@@ -156,20 +189,28 @@ vdd plane.
 
 ./signoff.py             build + drc + lvs + pins + pex, gate on all four
 ./signoff.py --stage lvs
-./signoff.py --selftest  14 mutations the gates must reject
+./signoff.py --stage postlayout   # extracted 256-code DC transfer
+./signoff.py --selftest  17 mutations the gates must reject
 
-../../run-analog.sh video gf180 [prelayout|gds|drc|lvs|pex|pins|all]
+./run_postlayout.py      virtual ground + 37.5 ohm load (add --riv 0)
+./run_postlayout.py --selftest    the un-degenerated bias must be rejected
+
+../../run-analog.sh video gf180 [prelayout|gds|drc|lvs|pex|pins|postlayout|all]
 ```
 
-`run-analog.sh video gf180 postlayout|mm` refuses with exit 2: there is no
-extracted DC sweep or mismatch MC for this leaf yet, and running P3's bench on
-a netlist it was not built for would be worse than refusing. The deck is
-behavioural on purpose - it models the decode and the carry timing, while the
-cell current and ro come from the P3 device bench and are copied into
-`video.yaml` with provenance.
+`run-analog.sh video gf180 mm` refuses with exit 2: there is no mismatch Monte
+Carlo on the P5 netlist yet, and running P3's bench on a netlist it was not
+built for would be worse than refusing. The pre-layout deck is behavioural on
+purpose - it models the decode and the carry timing, while the cell current and
+ro come from the P3 device bench and are copied into `video.yaml` with
+provenance.
 
 Still open, and not claimed: the hardened digital macro (only the RTL exists
 here), the wrapper/pin script that abuts it, the output pad/ESD/cable driver,
-the extracted DC sweep that would turn the rail estimate into a measured
-DNL/INL, mismatch MC on the P5 netlist, and a post-layout rerun of the carry
-transients with extracted bit-slice skew.
+mismatch MC on the P5 netlist, and a post-layout rerun of the carry transients
+with extracted bit-slice skew. The extracted DC sweep is nominal-only: the
+netlist carries no metal resistance (Magic extracts capacitance only), so the
+vdd-drop term stays the analytic estimate in `signoff.py`, and the DNL/INL it
+reports are exact by construction - all 255 cells are drawn identically. What
+that sweep *is* good for showed up immediately: it measured the array's unit
+current and found the missing replica switch.

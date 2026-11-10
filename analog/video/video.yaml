@@ -49,8 +49,12 @@ pdk: gf180
 cell_w: 8.0              # mirror and cascode PMOS width, um
 mir_l: 1.0               # cell mirror length (the P3 measured device), um
 cas_l: 0.5               # cascode length, um
-sw_w: 0.5                # series supply switch, um
+sw_w: 0.5                # series supply switch, um (a cell's and the replica's)
 sw_l: 0.28
+# The replica bias is a copy of one cell - switch included - because the
+# switch drops I*Ron in the mirror's source and so sets the operating point.
+# Its gate is the static 0 V reference `vgnd`; the extracted bench measures
+# 16.00 uA/cell with it and 8.07 uA (-49.5 %) without it.
 
 # --- rail budget -----------------------------------------------------------
 # The vdd plane drop scales with the code, so it is a gain term absorbed by
