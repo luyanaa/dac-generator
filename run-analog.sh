@@ -63,8 +63,8 @@ esac
 # macro layouts on gf180 and sky130; ihp/ics have no leaf layout, so refusing
 # is honest rather than silently running a quadratic model on a PDK whose
 # devices it never touched.
-if [ "$TOP" = video ] && [ "$PDK" != gf180 ] && [ "$PDK" != sky130 ]; then
-    echo "error: video leaf has no layout on $PDK (gf180, sky130 only)" >&2
+if [ "$TOP" = video ] && [ "$PDK" != gf180 ] && [ "$PDK" != sky130 ] && [ "$PDK" != ihp-sg13g2 ]; then
+    echo "error: video leaf has no layout on $PDK (gf180, sky130, ihp-sg13g2)" >&2
     exit 2
 fi
 
@@ -86,7 +86,7 @@ gds() {
 # here instead of a second script means `gds` cannot succeed while `drc` checks
 # a different file.
 case "$TOP:$PDK" in
-cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky130)
+cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky130 | video:ihp-sg13g2)
     SIGN="$DIR/signoff.py"
     [ -x "$SIGN" ] || { echo "error: $SIGN missing" >&2; exit 2; }
     case "$STAGE" in
@@ -94,9 +94,23 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky1
     gds) "$SIGN" --stage build ;;
     drc) "$SIGN" --stage drc ;;
     lvs) "$SIGN" --stage lvs ;;
-    pex) "$SIGN" --stage pex ;;
+    pex)
+        if [ "$PDK" = gf180 ] || [ "$PDK" = sky130 ]; then
+            "$SIGN" --stage pex
+        else
+            echo "error: video/$PDK has no PEX stage yet" >&2
+            exit 2
+        fi
+        ;;
     pins) "$SIGN" --stage pins ;;
-    dc) "$SIGN" --stage dc ;;
+    dc)
+        if [ "$TOP:$PDK" = video:sky130 ]; then
+            "$SIGN" --stage dc
+        else
+            echo "error: $TOP/$PDK has no DC stage yet" >&2
+            exit 2
+        fi
+        ;;
     postlayout | mm | tran)
         # Only the leaves that own a bench get these stages: the stage is
         # routed, never silently run against another leaf's netlist.
@@ -108,7 +122,9 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky1
         fi
         ;;
     all)
-        PDK="$PDK" "$DIR/run.sh" all
+        if [ "$PDK" = gf180 ]; then
+            PDK="$PDK" "$DIR/run.sh" all
+        fi
         "$SIGN"
         ;;
     *)

@@ -326,14 +326,17 @@ only passes if the wells are merged.  DRC is **0 items** on the full
 nfet, all pfet bulks vdd and all nfet bulks vss**; the pad-pair walk passes
 on all 255 cells; the drawn pads measure 510 on the 3.75 um grid.  The
 signoff is `analog/video_sky130/signoff.py` (build/drc/lvs/pins/pex).
-* **ihp-sg13g2**.  The device source is solved: the PDK's `SG13_dev`
-  PCells work headlessly in KLayout once the library is imported, the
-  `sg13g2` technology is set (`KLAYOUT_PATH`), parameters are **unit strings**
-  (`"8u"`, not metres) and the top is flattened before writing.  A 4-device
-  dump-tail cell core (pmos 8/1 + 8/0.5, nmos 4/0.28, gate lands, ntap/ptap
-  taps, merged nwell bar) is **DRC 0 items** on the PDK deck at one and two
-  cells (`analog/video_ihp/`).  The array routing (md/cd, vbp/vcp split,
-  iout/idump, pads, replica) and the LVS/PEX hand-off remain.
+* **ihp-sg13g2 is closed at DRC/LVS/pins** (`analog/video_ihp/`).  The
+  PDK's `SG13_dev` PCells run headless (import the library, set
+  `technology_name`, unit-string params, flatten).  The array is 255 cells
+  on a 7.5 um pitch + the diode-connected replica: **1022 devices (512 pmos /
+  510 nmos)**, 510 met2 pads on the 3.75 um grid.  DRC is **0 items** on the
+  full 1918.5 x 26.6 um array with the PDK deck; LVS extraction gives 516
+  ports, all pmos bulks vdd / nmos bulks vss, and the pad-pair walk passes
+  all 255 cells (replica 1/1, selftest 3/3).  Key routing: cd on met3 to
+  cross the buses, vbp on met2 / vcp on met1 (a met2 vcp riser shorts to
+  vbp), and the 0.19 um via rules.  PEX/benches remain: no KLayout PEX deck
+  and the magic tech's device extractor is unvalidated for these PCells.
 * **icsprout55**.  The KLayout cell
   `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
   its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC
