@@ -433,10 +433,14 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   and closed the earlier all-16-uA array, which transferred a sawtooth. The
   digital macro generates all 60 complementary switch levels and the analog
   side publishes the abutment grid (60 pins, 2.75 um pitch, `build/pinplan.json`,
-  gated by the `pins` stage); the wrapper's pin script and the differential
-  wrapper stay class C hand layout (the I-V is now just a 1 kOhm resistor), so
-  `run-analog.sh csteer gf180 gds` builds the core macro only and no
-  post-layout *mismatch* linearity is claimed.
+  gated by the `pins` stage). Static mismatch is measured on the same
+  extracted devices (`run_mismatch_pex.py`, PDK area law, 32 samples): 1.0 %
+  per unary cell (the pre-layout 1.8 % was 1.8x pessimistic), DEM mean
+  0.06-0.45 DNL / 0.05-0.43 INL, 0 non-monotonic samples, with the residual
+  in the binary carry rather than the unary field. `run-analog.sh csteer gf180
+  gds` builds the core macro only: the wrapper's pin script and the
+  differential wrapper stay class C hand layout (no hardened `dac_csteer_dig`
+  is built here, so no wrapper GDS exists), and the I-V is a 1 kOhm resistor.
 - **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs

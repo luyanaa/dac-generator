@@ -263,8 +263,9 @@ metal, not on the generator's own coordinates.
 
 Not in this macro: the gate drive itself (the digital macro generates both
 phases; the wrapper only routes them to these pins) and the differential
-wrapper. The 256-code sweep below is a *deterministic* transfer check;
-mismatch INL/DNL is not claimed.
+wrapper. The 256-code sweep below is a *deterministic* transfer check of the
+drawn geometry; mismatch on the same extracted devices is a separate stage
+(`run_mismatch_pex.py`, further down).
 
 ## Post-layout (`run_postlayout.py`)
 
