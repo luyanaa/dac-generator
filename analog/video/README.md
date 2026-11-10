@@ -274,7 +274,7 @@ on - but the sizes do, because 16 uA needs a very different Vov per process:
 
 | PDK | supply | devices | mirror | cascode | pair | vbp / vcp | carry | full scale |
 |---|---|---|---|---|---|---|---|---|
-| sky130 | 3.3 V | g5v0d10v5 | 8/0.5 | 8/0.5 | 8/0.5 | 2.192 / 0.843 V | dc only | dc only |
+| sky130 | 3.3 V | g5v0d10v5 | 8/0.5 | 8/0.5 | 8/0.5 | 2.192 / 0.843 V | +0.562 (fail) | +0.242 |
 | ihp-sg13g2 | 1.8 V | lv (PSP103) | 8/1 | 8/0.5 | 4/0.28 | 1.232 / 0.627 V | +0.024 LSB | -0.412 LSB |
 | icsprout55 | 1.2 V | nm1p2/pm1p2 | - | - | - | - | - | **blocked** |
 
