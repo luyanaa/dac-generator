@@ -344,8 +344,10 @@ study`), so the physics stays visible instead of being tuned away.
 
 Named target: 8 bit, 25 MS/s (40 ns), single-ended video, 37.5 ohm at the DAC
 (75 ohm line double terminated), gf180. The 255-cell array is generated and
-signed off; the digital macro, the wrapper that abuts it, and the output
-driver are class C. The leaf asks whether a plain binary decoder is viable at
+signed off on DC, matching, DRC/LVS/PEX and pins; its carry does not settle
+(below), so the bias buffer that would fix it is now a required class-C block,
+alongside the digital macro, the wrapper that abuts it and the output driver.
+The leaf asks whether a plain binary decoder is viable at
 8 bit when the weights are parallel copies of one unit cell rather than
 scaled devices - the decoder cost question, not another segmentation study.
 
@@ -356,14 +358,17 @@ scaled devices - the decoder cost question, not another segmentation study.
 | DC, binary decode | **marginal at the pre-layout sigma** | seed 0 DNL -0.176/+0.176, INL -0.199/+0.199; 20 seeds worst DNL **0.680**, INL 0.442; 5/20 seeds exceed 0.5 LSB DNL. At the PDK area law (0.72 %/cell) the extracted netlist gives 0.174 worst - see *Post-layout mismatch* |
 | DC, unary decode (control) | closed | same 255 cells, same seeds: worst DNL 0.066, INL 0.487 |
 | DC, passive load | **passes; the load is not the limit** | 425 MOhm cell ro makes the 37.5 ohm load a 0.006 LSB gain error: INL -0.198/+0.200 LSB vs -0.199/+0.199 virtual ground, and 37.5/100/300/550 ohm all within 0.02 LSB. 1 LSB would need a 1.7 MOhm load. The earlier "+1.517 LSB fail" came from a 1000x kOhm/MOhm printout slip |
-| Binary carry glitch | characterised | 127->128: 51.4 LSB transient with 25 ps bit skew, settles 740 ps (0 LSB / 262 ps at 0 ps skew); 63->64: 25.3 LSB |
-| Speed | closed | 0.83 ns worst settling vs 40 ns period (48x); array is not the limit |
+| Binary carry glitch, pre-layout | **superseded** | the ideal-current-source model gave 51.4 LSB / 740 ps at 127->128 (63->64: 25.3 LSB). It holds `vbp`/`vcp` stiff; the extracted array gives 103 LSB and never settles - see *Post-layout carry* |
+| Speed, pre-layout | **superseded** | 0.83 ns worst settling in the behavioural model; the extracted array uses 24.4 ns of the 40 ns window even with an ideal bias |
 | Digital half | closed | `dac_video_dig` 9148 checks, lint clean; one launch register, `ready` guard = SETTLE_CYCLES; `dout` is **255 bits, one per physical cell** (cell j = smallest k with j < 2^(k+1)-1), so bit k fans to all 2^k cells from the same launch edge |
 | Array macro | closed | `analog/video/gen_gds.py`: 768 pfet = 255 x (8/1 mirror + 8/0.5 cascode + 0.5/0.28 supply switch) + a 3-device replica *cell*; no standard cell in the macro |
 | DRC / LVS / PEX | closed | `signoff.py`: Magic DRC 0 items; LVS 768 devices, 771 nets, 255 *identical* cells re-derived from the pin tag (pad d_tag -> switch drain -> mirror source -> mirror drain -> cascode source -> iout), the replica's mirror source required to be its own switch drain, and negative checks for `vss`/`idump`; PEX 768 instances, 4609 C entries (198.2 kB) |
 | Pins / rails | closed | 255 M2 pads, cell order, exact 7.5 um grid (one per cell, so the digital macro abuts) plus a separate `vgnd` pad on the bias side; vdd plane 2.4 ohm = 1.2 mV at full code (1.2% gain, endpoint-calibrated), iout bus 10.7 ohm = 21.8 mV one-ended which costs 3e-6 LSB/cell through ro; vbp/vcp/vgnd carry gates only (311/358 fF, bias settling) |
 | Post-layout DC | closed (nominal) | `run_postlayout.py`: 256-code sweep on the extracted netlist, virtual ground and 37.5 ohm - 4.080 mA full scale, **16.000 uA/cell**, DNL/INL 0.000 LSB, 0 bad steps, `vbp` 1.951 V / `vcp` 0.505 V; the loaded run is indistinguishable from virtual ground. Nominal only: Magic extracts capacitance, not metal R, and identical cells make the transfer exact by construction, so this gates the operating point, not linearity |
 | Post-layout mismatch | **closed (PDK area law)** | `run_mismatch_pex.py`: `delvto`/`mulu0` drawn per extracted device from `par_vth`/`par_k` of `pfet_03v3_dss` (the wrapper itself is not used - it adds diffusion R the extraction has, and draws once per subckt), 16 samples of a 255-point selector sweep. Cell spread **0.720 %** vs the law's 0.727 % (mirror Vth 0.454 %, switch Vth 0.449 %, switch beta 0.345 % in quadrature); fixed DNL **0.035..0.174** LSB, INL 0.028..0.124, 16/16 monotonic; the zero-draw reconstruction reproduces the bench transfer to 0.0004 LSB. `--selftest` rejects a single shared draw (0.0000 %), half-sigma draws (0.345 %) and mirror-only draws (0.489 %) |
+| Post-layout carry, binary | **FAIL** | `run_transient_pex.py`: extracted netlist *with its capacitance*, 20 ps edges, 25 ps bit skew, 25 MS/s. 127->128 settles to **118.503 LSB at 40 ns (-9.497)** and never enters the 0.5 LSB window; 128->127 -8.590, 63->64 -2.440. `vbp` +31.8 mV / `vcp` +46.1 mV (2 mV is 0.5 LSB at code 128). Converged: 2 ps and 20 ps timesteps agree to 0.007 LSB, so it is not numerical |
+| Post-layout carry, ideal bias | cell and output path close; the bias does not | the same carry with `vbp`/`vcp` forced: 128.266 LSB (+0.266), 0.5 LSB at **24.4 ns** of the 40 ns window, glitch 99.9 LSB, and a full-scale 0->255 step at **3.0 ns**. Every step size closes on the cell and output path; the ~50 ns bias pole is the whole deficit |
+| Post-layout carry, thermometer | one cell per step passes, full scale fails worse | `--decode thermo`: 127->128 -0.432 LSB / 18.3 ns / 0.6 LSB glitch, but 0->255 (every cell on at once) is **81.721 LSB (-173.279)** with `vbp` +313 mV, `vcp` +431 mV. Thermometer decode buys DNL (0.680 -> 0.066 at the pre-layout sigma; binary is 0.174 at the PDK law) and one-cell carries, not 25 MS/s operation |
 
 Two extraction findings, both caught by a gate rather than by reading the
 generator. (1) The vcp poly bar stopped at the last cell, so the 255 cascode
@@ -400,9 +405,27 @@ limit; the decoder is**: the P3 cell ro is 425 MOhm (a 1000x kOhm/MOhm
 printout slip had put 425 kOhm here), so 37.5 ohm across the 153 mV full
 scale costs 0.006 LSB of gain error - 0.02 LSB even at the 2.24 V compliance
 edge - and a resistor is a sufficient termination. The static limit is the
-binary carry DNL above. The carry
-glitch is large (51 LSB) but short (0.74 ns), which is why the digital half
-trades it for a settle window instead of trying to remove it in logic.
+binary carry DNL above; the dynamic one is worse.
+
+**The 25 MS/s carry fails on the extracted netlist**, and not because of the
+decoder. The series switch puts the mirror's source on a 0.59 V pedestal that
+moves with every cell transition, the 255 mirror gates load `vbp` with ~8 pF,
+and the one-cell replica drives them at 1/gm ~ 6-7 kOhm: a 50-80 ns pole against
+a 40 ns period. Binary 127->128 lands 9.5 LSB low and never settles; a
+thermometer full-scale step lands 173 LSB low. With `vbp`/`vcp` forced the same
+carry settles in 24.4 ns and a full-scale step in 3.0 ns, so the cell and
+output path are fine and the bias network is the whole deficit - the pre-layout
+51 LSB / 0.74 ns glitch was an
+artifact of holding the bias stiff. Thermometer decode is a DNL fix, not a
+settling fix. A scaled replica was sized on the same extraction: 8x
+(64/1 + 64/0.5 + 4/0.28 at 128 uA, same current density) still misses at
+-1.13 LSB on the carry and -63 LSB on full scale, and the full-scale error
+shrinks much more slowly than 1/M; a 16x *single* device is not even
+simulable, because the PDK's binned models stop at W = 100.01 um and ngspice
+silently picks no bin (the run came back at 2x current with `vcp` negative).
+The fix is a buffer on the bias pins: recovering ~2.5 pC into 8 pF to 1.6 mV
+inside 39 ns is an output impedance of ~900 Ohm, i.e. a small class-C block of
+the same kind as the wrapper and the output driver.
 
 ## 8. Application fit
 
@@ -485,9 +508,9 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   gds|drc|all` drives it. Still open, and explicitly not claimed: the
   differential wrapper (two mirrored arrays), the comparator/TG bias (class
   C) and the 256-code post-layout transient sweep.
-- **P5. DONE on gf180 (pre-layout + digital half + array macro + post-layout
-  DC + mismatch MC).** 8 bit, 25 MS/s video-rate binary current steering, 255
-  parallel unit cells decoded
+- **P5. DONE on gf180 except the 25 MS/s carry (pre-layout + digital half +
+  array macro + post-layout DC + mismatch MC).** 8 bit, 25 MS/s video-rate
+  binary current steering, 255 parallel unit cells decoded
   1/2/4/.../128. Binary decode is INL-neutral but costs carry DNL: 0.680
   worst vs 0.066 for the same cells with a thermometer decoder (5/20 seeds
   over 0.5 LSB) - at the pre-layout 1.8 %/cell sigma. At the PDK area law the
@@ -495,10 +518,9 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   (INL 0.124) over 16 samples, 16/16 monotonic, so the binary penalty is real
   but inside the 0.5 LSB target. A passive 37.5 ohm load is fine: the P3 cell ro is 425 MOhm,
   so it costs 0.006 LSB of gain error (0.02 LSB at the 2.24 V compliance
-  edge) and the leaf needs no transimpedance stage; the 25 ps bit-skew carry
-  glitch is 50.8 LSB
-  but settles in 735 ps, which the digital half converts into a `ready`
-  settle window. The array macro is generated and signed off: 255 identical
+  edge) and the leaf needs no transimpedance stage. The pre-layout carry
+  figure (50.8 LSB glitch, 735 ps settle) did not survive extraction: a
+  `ready` window cannot fix a bias that does not settle (below). The array macro is generated and signed off: 255 identical
   switched-cascode cells (series 0.5/0.28 PMOS between vdd and the mirror, so
   an *off* cell is a real zero and there is no dump bus), one M2 pad per cell
   on a 7.5 um row so the 255-bit digital macro can abut, vdd/iout on M3 for
@@ -520,12 +542,26 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   0.174 max. Note the matching story: the 0.5/0.28 series switch contributes
   as much mismatch as the 8/1 mirror, so it cannot be shrunk for area without
   paying DNL.
-  `run-analog.sh video gf180 gds|drc|lvs|pex|pins|postlayout|mm|all` drives it.
-  Still open: the digital macro is not hardened here, the wrapper and output
-  driver stay class C, and the carried transients have not been rerun on the
-  extracted netlist. CML/HBT remains blocked: ihp130 has no
-  installed HBT models or magic tech, so there is no SiGe device to build
-  from.
+  `run-analog.sh video gf180 gds|drc|lvs|pex|pins|postlayout|mm|tran|all`
+  drives it. The last gate, `run_transient_pex.py` (the `tran` stage), **fails
+  and that is the leaf's current answer**: at 25 MS/s the binary 127->128
+  carry settles to 118.5 LSB (-9.5 LSB) with `vbp` +31.8 mV / `vcp` +46.1 mV,
+  and a thermometer full-scale step (0->255) is worse: -173.3 LSB, `vbp`
+  +313 mV. The cell is not the limit - with an ideal bias the same carry
+  settles in 24.4 ns of the 40 ns window - the bias network is: the series
+  switch moves each mirror source 0.59 V, the 255 gates load the bias lines
+  with ~8 pF, and the one-cell replica drives them at 1/gm ~ 6-7 kOhm, a
+  50-80 ns pole. The pre-layout "51 LSB glitch, 0.74 ns settle" claim is
+  superseded. The fix is a bias buffer, not a bigger replica: an 8x scaled
+  replica (128 uA, same current density) still misses at -1.13 LSB on the
+  carry and -63 LSB on full scale, a 16x single device is not even simulable
+  (the PDK bins stop at W = 100.01 um), and the array needs only ~900 Ohm on
+  `vbp`/`vcp` to recover ~2.5 pC into 8 pF inside 39 ns. That buffer is
+  class C, like the wrapper and the output driver; with the bias ideal every
+  step size closes, including full scale in 3.0 ns. Still open: the buffer,
+  the digital macro (not hardened here), the wrapper and output driver.
+  CML/HBT remains blocked: ihp130 has no installed HBT models or magic tech,
+  so there is no SiGe device to build from.
 
 ## 10. Risks / non-goals
 

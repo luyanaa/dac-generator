@@ -5,6 +5,7 @@
     ./signoff.py --stage lvs
     ./signoff.py --stage postlayout   # delegate to the extracted DC bench
     ./signoff.py --stage mm           # delegate to the mismatch Monte Carlo
+    ./signoff.py --stage tran         # delegate to the carry transient
     ./signoff.py --selftest      # prove the gates reject mutations
 
 This is the P5 counterpart of `../csteer/signoff.py`.  `gen_gds.py` generates
@@ -51,15 +52,17 @@ class C (hand layout), so the gates below sign off the array, not the DAC.
        per-net capacitance, kept as evidence for the digital driver load and
        for the vbp/vcp bias settling.
 
-  postlayout / mm  delegated to `run_postlayout.py` (extracted 256-code dc
-       transfer) and `run_mismatch_pex.py` (static mismatch Monte Carlo with
-       per-device `delvto`/`mulu0` drawn from the PDK area law).  They own
-       their netlist, gates and report, so the stage name cannot drift from
-       what ran.
+  postlayout / mm / tran  delegated to `run_postlayout.py` (extracted
+       256-code dc transfer), `run_mismatch_pex.py` (static mismatch Monte
+       Carlo with per-device `delvto`/`mulu0` drawn from the PDK area law) and
+       `run_transient_pex.py` (carry transient on the extracted netlist with
+       its capacitance).  They own their netlist, gates and report, so the
+       stage name cannot drift from what ran.
 
-Not claimed: the digital macro, the wrapper, the output pad/ESD/cable driver,
-or the per-sample settling.  The array's own post-layout linearity is `mm`'s
-job (static mismatch only: no dynamic error, no envelope, no cable driver).
+Not claimed: the digital macro, the wrapper, the output pad/ESD/cable driver.
+The array's own post-layout linearity is `mm`'s job (static mismatch only);
+`tran` measures the carry settling but has no envelope and no cable driver,
+and on the current draw it fails - see `run_transient_pex.py`.
 """
 from __future__ import annotations
 
@@ -856,17 +859,18 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--stage", default="all",
                     choices=["all", "build", "drc", "lvs", "pex", "pins",
-                             "postlayout", "mm"])
+                             "postlayout", "mm", "tran"])
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--brief", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
-    if a.stage in ("postlayout", "mm"):
+    if a.stage in ("postlayout", "mm", "tran"):
         # Each bench owns the netlist, the gates and the report, so a stage
         # cannot drift from what it means.
-        script = ("run_postlayout.py" if a.stage == "postlayout"
-                  else "run_mismatch_pex.py")
+        script = {"postlayout": "run_postlayout.py",
+                  "mm": "run_mismatch_pex.py",
+                  "tran": "run_transient_pex.py"}[a.stage]
         cmd = [sys.executable, str(ROOT / script)]
         if a.brief:
             cmd.append("--brief")

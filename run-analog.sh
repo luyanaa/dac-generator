@@ -11,7 +11,9 @@
 #              postlayout (r2r: poly R-C reconstruction; csteer, video:
 #              extracted DC transfer)
 #              mm (csteer, video: static mismatch Monte Carlo on the PEX
-#              netlist; video is a flat dc sweep, ~1 min per sample).
+#              netlist; video is a flat dc sweep, ~1 min per sample)
+#              tran (video: carry transient on the extracted netlist, with
+#              its capacitance; the stage that sees bias settling).
 #
 # gds/drc/lvs/pex are implemented for the leaves that have a device-level
 # macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
@@ -93,7 +95,7 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180)
     lvs) "$SIGN" --stage lvs ;;
     pex) "$SIGN" --stage pex ;;
     pins) "$SIGN" --stage pins ;;
-    postlayout | mm)
+    postlayout | mm | tran)
         # Only the leaves that own a bench get these stages: the stage is
         # routed, never silently run against another leaf's netlist.
         "$SIGN" --stage "$STAGE"
@@ -115,7 +117,7 @@ case "$STAGE" in
 prelayout)
     PDK="$PDK" "$DIR/run.sh" all
     ;;
-gds | drc | lvs | pex | pins | mm | all)
+gds | drc | lvs | pex | pins | mm | tran | all)
     # Class C leaves have no generator, so every layout stage refuses rather
     # than reporting a run that did not happen.
     gds

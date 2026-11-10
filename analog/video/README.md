@@ -68,8 +68,9 @@ would cost 1 LSB at `R ~ ro_unit/255` = 1.7 Mohm, which needs 7 kV at full
 scale, so no transimpedance stage is required: a resistor into the cable
 driver is enough.
 
-**The binary carry glitch is the timing item.** One code step, each bit slice
-delayed by k x 25 ps, 20 ps edges, 37.5 ohm || 2 pF:
+**The binary carry glitch is the timing item in the behavioural model.** It is
+superseded by *Dynamic settling* below, which runs the extracted netlist. One
+code step, each bit slice delayed by k x 25 ps, 20 ps edges, 37.5 ohm || 2 pF:
 
 | step | bit skew | glitch outside the envelope | settle to 0.5 LSB |
 |---|---|---|---|
@@ -78,12 +79,14 @@ delayed by k x 25 ps, 20 ps edges, 37.5 ohm || 2 pF:
 | 63 -> 64 | 25 ps | 25.3 LSB | 663 ps |
 | 255 -> 0 | 25 ps | 0.0 LSB (falling only) | 834 ps |
 
-The glitch is large but short: 0.83 ns worst, 2 % of the 40 ns period. It is
-not a linearity error if nothing samples inside it, so the digital half turns
-it into a contract - `ready` stays low for a settle window after every launch
-and `stb` is ignored meanwhile. The remaining requirement is layout: the eight
-banks must be launched with matched clock/data delay, because the model's
-25 ps is already 51 LSB at mid-code.
+The model says the glitch is large but short: 0.83 ns worst, 2 % of the 40 ns
+period, so the digital half turns it into a contract - `ready` stays low for a
+settle window after every launch and `stb` is ignored meanwhile. Extraction
+takes that back: the real glitch is 103 LSB and the bias tail is still moving
+at 40 ns, so a `ready` window inside the period cannot rescue a carry. The
+model's other requirement stands: the eight banks must be launched with
+matched clock/data delay, because 25 ps of slice skew is already 51 LSB
+mid-code.
 
 Speed budget at 25 MS/s:
 
@@ -94,8 +97,9 @@ Speed budget at 25 MS/s:
 | margin | 48x |
 | digital guard (`SETTLE_CYCLES` = 4 at 100 MHz) | 40 ns |
 
-The array is not the speed limit; the output driver and the clock/data skew
-are.
+In this model the array is not the speed limit; the extracted run below shows
+the bias network is, and that the output driver and clock/data skew are not
+reachable until it is fixed.
 
 ## Digital half
 
@@ -142,6 +146,7 @@ transistor geometry is drawn by hand):
 | pex | 768 instances, 4609 C entries, 198.2 kB: vdd 490 fF, vbp 311 fF, vcp 358 fF, iout 296 fF, 0.69 fF per pad |
 | postlayout | 256-code DC transfer on the extracted netlist, virtual ground and 37.5 ohm: 4.080 mA full scale, 16.000 uA/cell, DNL/INL 0.000 LSB, 0 bad steps |
 | mismatch | `run_mismatch_pex.py`: PDK area law drawn per extracted device, 16 samples; cell spread 0.720 % (law 0.727 %), fixed DNL 0.035..0.174 LSB, INL 0.028..0.124 LSB, 0 non-monotonic |
+| tran | **fails, and that is the result** | `run_transient_pex.py`: carry transient on the PEX netlist with its capacitance; binary 127->128 settles to 118.503 LSB at 40 ns (**-9.497 LSB**), bias +31.8 mV (`vbp`) / +46.1 mV (`vcp`). A thermometer one-cell step passes (-0.432 LSB, 18.3 ns) but a thermometer full-scale step is worse (-173.3 LSB, +313 mV), and binary with an ideal bias passes (24.4 ns): the bias network is the limit, not the decoder |
 
 The same pins stage estimates the rails from the *drawn* metal: vdd 2.4 ohm ->
 1.2 mV at full code, i.e. 1.2 % of gain (2*drop/vov), which endpoint
@@ -218,6 +223,81 @@ per-device draws at half the law (0.345 %) and draws applied only to the
 mirrors (0.489 %). 16 samples take ~16 min (one 255-point selector sweep per
 sample, ~1 min); `--samples` changes the count.
 
+### Dynamic settling: the switch in the mirror's source
+
+The pre-layout carry study modelled each cell as an ideal current source and
+held the bias at an ideal voltage. Both assumptions flatter the design, and the
+extracted cell breaks both. The series switch sits in the *mirror's source*, so
+switching a cell moves that source between 2.563 V (off) and 3.149 V (on) and
+swings the cascode source by ~1.4 V; `vbp`/`vcp` carry the gate capacitance of
+all 255 mirrors/cascodes plus 311/358 fF of extracted metal (7-10 pF on `vbp`);
+and the replica driving them is *one* cell, 1/gm ~ 6-7 kOhm. That is a
+50-80 ns bias pole (the measured tail is ~75 ns), longer than the 40 ns
+sample period.
+
+`run_transient_pex.py` (the `tran` stage) runs the PEX netlist *with its
+capacitance* through the carries - 255 PWL pads with the yaml's 20 ps edges and
+25 ps bit skew, into `r_load || c_load_pf` - and compares the value 40 ns after
+the edge with the loaded DC transfer. (The PEX top subckt leaves the device
+bodies on a local `VSUBS` net: fine for LVS, floating for simulation, so the
+bench promotes it to a port and ties it to vdd. The patched netlist is a build
+product.)
+
+| case (20 ps edge, 25 ps skew) | settled @41 ns | error | settle to 0.5 LSB | glitch | dvbp | dvcp |
+|---|---|---|---|---|---|---|
+| binary 127 -> 128 | 118.503 LSB | **-9.497** | never | 103.1 LSB | +31.8 mV | +46.1 mV |
+| binary 128 -> 127 | 118.410 LSB | **-8.590** | never | 98.7 LSB | +29.1 mV | +42.4 mV |
+| binary 63 -> 64 | 61.560 LSB | **-2.440** | never | 48.8 LSB | +16.7 mV | +24.3 mV |
+| binary 127 -> 128, bias forced | 128.266 LSB | +0.266 | 24.4 ns | 99.9 LSB | - | - |
+| thermo 127 -> 128 | 127.568 LSB | -0.432 | 18.3 ns | 0.6 LSB | +1.4 mV | +1.9 mV |
+| thermo 0 -> 255 | 81.721 LSB | **-173.279** | never | 80.2 LSB | +313.0 mV | +430.7 mV |
+| thermo 0 -> 255, bias forced | 255.000 LSB | +0.000 | 3.0 ns | 78.8 LSB | - | - |
+
+Binary at 25 MS/s **fails**, by an order of magnitude: 9.5 LSB low 40 ns after
+the carry, and the output never enters the 0.5 LSB window. The error is a bias
+tail, not a numerical spike - 2 ps and 20 ps timesteps agree to 0.007 LSB - and
+it is not the cell: with `vbp`/`vcp` forced the carry settles in 24.4 ns and a
+full-scale step in 3.0 ns, so every step size closes on the cell and output
+path and the bias network's pole (50-80 ns) is the whole deficit.
+
+Decode alone does not fix it, and the worst case is not the carry. A
+thermometer full-scale step (0 -> 255, every cell turning on at once) is
+**worse** than the binary 127 -> 128 carry even though the same 255 gates
+switch: 81.7 LSB against a target of 255 (-173.3 LSB), `vbp` +313 mV against
++31.8 mV. The direction matters - the carry has 127 cells falling and 128
+rising, a full-scale step has all 255 rising - so decode cannot be used to
+dodge the problem. Thermometer decode buys DNL (0.680 -> 0.066 LSB at the
+pre-layout sigma; at the PDK law binary is already 0.174) and one-cell
+carries, but it does not make the array usable at 25 MS/s: the bias network
+has to be strengthened either way.
+
+The obvious fix - a proportionally larger replica - was sized on this same
+extraction (a prediction: the macro was not regenerated), by scaling the
+replica's PEX subckts and the reference current: at
+8x (64/1 + 64/0.5 + 4/0.28 at 128 uA, the same current density, so the array
+cells stay at 16 uA) the carry still misses at -1.13 LSB and a full-scale step
+at -63 LSB, and the full-scale disturbance shrinks much more slowly than 1/M,
+so the M that would close it is not credible. Scaling a single device past 8x
+also hits the PDK's binned models, which stop at W = 100.01 um: a 16x replica
+(128 um) silently simulated at twice the current with `vcp` negative - a trap
+worth remembering, since it is a wrong answer, not an error.
+
+What the array actually needs is a stiff bias pin: ~2.5 pC has to be recovered
+into 8 pF to 1.6 mV in 39 ns, i.e. an output impedance of ~900 Ohm or less.
+That is a small class-C buffer (source follower or one-stage amp) on `vbp` and
+`vcp` - the same class as the wrapper and the output driver, not something the
+array macro can generate. Until it exists, the macro is signed off on DC,
+matching, DRC/LVS/PEX and pins, and the carry is open.
+
+Gates: the settled value must be within 0.5 LSB of the loaded DC transfer at
+41 ns (40 ns after the edge) and `vbp`/`vcp` within 2 mV of their DC values
+(0.253 %/mV on `vbp` is ~0.32 LSB/mV at code 128, so 2 mV is the same window
+seen from the cause). `--selftest` proves the gate is not vacuous: the same
+carry with an ideal bias passes (128.266 LSB) and a wrong target is rejected
+(-4.734 LSB). `./signoff.py --stage tran` therefore exits **1** on this leaf;
+`run-analog.sh video gf180 tran` propagates that code and reports nothing it
+did not measure.
+
 ## Files and how to run
 
 ```
@@ -241,7 +321,12 @@ sample, ~1 min); `--samples` changes the count.
 ./run_mismatch_pex.py --samples 32
 ./run_mismatch_pex.py --selftest  shared / half-sigma / mirror-only draws rejected
 
-../../run-analog.sh video gf180 [prelayout|gds|drc|lvs|pex|pins|postlayout|mm|all]
+./run_transient_pex.py   carry transient, extracted netlist + capacitance
+./run_transient_pex.py --decode thermo --from 127 --to 128   one cell per step
+./run_transient_pex.py --stiff-bias --from 127 --to 128      the cell alone
+./run_transient_pex.py --selftest  ideal bias passes, wrong target rejected
+
+../../run-analog.sh video gf180 [prelayout|gds|drc|lvs|pex|pins|postlayout|mm|tran|all]
 ```
 
 The pre-layout deck is behavioural on purpose - it models the decode and the
@@ -249,10 +334,16 @@ carry timing, while the cell current and ro come from the P3 device bench and
 are copied into `video.yaml` with provenance.
 
 Still open, and not claimed: the hardened digital macro (only the RTL exists
-here), the wrapper/pin script that abuts it, the output pad/ESD/cable driver,
-and a post-layout rerun of the carry transients with extracted bit-slice skew. The extracted DC sweep is nominal-only: the
-netlist carries no metal resistance (Magic extracts capacitance only), so the
-vdd-drop term stays the analytic estimate in `signoff.py`, and the DNL/INL it
-reports are exact by construction - all 255 cells are drawn identically. What
-that sweep *is* good for showed up immediately: it measured the array's unit
-current and found the missing replica switch.
+here), the wrapper/pin script that abuts it, and the output pad/ESD/cable
+driver. The extracted DC sweep is nominal-only: the netlist carries no metal
+resistance (Magic extracts capacitance only), so the vdd-drop term stays the
+analytic estimate in `signoff.py`, and the DNL/INL it reports are exact by
+construction - all 255 cells are drawn identically. What that sweep *is* good
+for showed up immediately: it measured the array's unit current and found the
+missing replica switch.
+
+The `tran` stage was added last and it *fails*: the 25 MS/s carry does not
+settle because the one-cell replica cannot drive a 7-10 pF bias node inside
+40 ns (see *Dynamic settling*). That is the open item on this leaf, with the
+fix sized there; until it lands, the leaf is signed off as "array operating
+point and linearity closed, dynamic carry open".
