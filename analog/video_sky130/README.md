@@ -68,6 +68,7 @@ and draws the rails:
 | lvs | magic flat extraction, pad-pair walk (1022 devices, 512 pfet / 510 nfet, all bulks vdd/vss) |
 | pins | the 510 met2 pads measured on the drawn GDS on the 3.75 um grid |
 | pex | magic hierarchical extraction, cthresh/rthresh 0: **1022 instances, 7150 caps, 7.94 pF, no floating node** |
+| dc | extracted array, 16 uA at vcp, all 255 cells to iout: **4.0996 mA** full scale (+0.479 %), **vbp 2.1916 V / vcp 0.8427 V** - the study's 2.192/0.843 V |
 
 The 100 pF on vcp is a **wrapper** requirement (the benches model it with
 `--vcp-cap-pf`); it is not part of this macro.

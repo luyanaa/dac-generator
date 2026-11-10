@@ -414,6 +414,52 @@ def pex(pdk: Path) -> dict:
             "spice": str(spice)}
 
 
+def dc(pdk: Path) -> dict:
+    """Extracted DC: 255 cells to iout, 16 uA at vcp; gate the full scale."""
+    pex = MAGIC_DIR / "pex.spice"
+    if not pex.is_file():
+        die("no build/magic/pex.spice; run --stage pex first")
+    if pex.stat().st_mtime < GDS.stat().st_mtime:
+        die("pex.spice is older than the GDS; rerun --stage pex")
+    lib = pdk / "sky130A/libs.tech/ngspice/sky130.lib.spice"
+    if not lib.is_file():
+        die(f"no ngspice library at {lib}")
+    body = [ln for ln in pex.read_text().splitlines()
+            if not ln.strip().startswith((".subckt", ".ends"))]
+    out = ["* sky130 extracted array DC: all 255 cells to iout",
+           f'.lib "{lib}" tt', ""] + body
+    out += ["", "Vdd vdd 0 3.3", "Vss vss 0 0", "Iref vcp 0 16u",
+            "Viout iout 0 0", "Vdump idump 0 0"]
+    for tag in cell_tags():
+        out += [f"Vd_{tag} d_{tag} 0 3.3", f"Vdb_{tag} db_{tag} 0 0"]
+    out += [".op", ".control", "run", "print i(Viout)", "print v(vbp) v(vcp)",
+            ".endc", ".end"]
+    deck = BUILD / "dc_transfer.spice"
+    deck.write_text("\n".join(out) + "\n")
+    env = dict(os.environ)
+    env["PDK_ROOT"] = str(pdk)
+    env["PDK"] = "sky130A"
+    p = run(["ngspice", "-b", deck], cwd=BUILD, env=env, timeout=3600)
+    (BUILD / "dc_transfer.log").write_text(p.stdout + p.stderr)
+    m = re.search(r"i\(viout\)\s*=\s*([-+0-9.eE]+)", p.stdout + p.stderr, re.I)
+    vb = re.search(r"v\(vbp\)\s*=\s*([-+0-9.eE]+)", p.stdout + p.stderr, re.I)
+    vc = re.search(r"v\(vcp\)\s*=\s*([-+0-9.eE]+)", p.stdout + p.stderr, re.I)
+    if not (m and vb and vc):
+        die("ngspice produced no iout/vbp/vcp (see build/dc_transfer.log)")
+    iout = abs(float(m.group(1)))
+    vbp, vcp = float(vb.group(1)), float(vc.group(1))
+    want = N_CELLS * 16e-6
+    checks = {
+        "iout_full_scale_mA": round(iout * 1e3, 4),
+        "iout_error_pct": round((iout / want - 1) * 100, 3),
+        "vbp_V": round(vbp, 4), "vcp_V": round(vcp, 4),
+    }
+    ok = (abs(iout / want - 1) < 0.02 and 1.8 < vbp < 2.5
+          and 0.5 < vcp < 1.2)
+    return {"ok": ok, **checks, "want_mA": round(want * 1e3, 3),
+            "netlist": str(deck), "log": str(BUILD / "dc_transfer.log")}
+
+
 def selftest() -> int:
     """Mutate the extracted netlist and prove the contract rejects it."""
     spice = MAGIC_DIR / "lvs.spice"
@@ -464,19 +510,19 @@ def selftest() -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", default="all",
-                    choices=["all", "build", "drc", "lvs", "pins", "pex"])
+                    choices=["all", "build", "drc", "lvs", "pins", "pex", "dc"])
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
     pdk = find_pdk()
     report = {}
-    stages = (["build", "drc", "lvs", "pins", "pex"] if a.stage == "all"
+    stages = (["build", "drc", "lvs", "pins", "pex", "dc"] if a.stage == "all"
               else [a.stage])
     rc = 0
     for st in stages:
         fn = {"build": build, "drc": drc, "lvs": lvs,
-              "pins": pins, "pex": pex}[st]
+              "pins": pins, "pex": pex, "dc": dc}[st]
         try:
             res = build() if st == "build" else (pins() if st == "pins"
                                                  else fn(pdk))

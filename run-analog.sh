@@ -96,6 +96,7 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky1
     lvs) "$SIGN" --stage lvs ;;
     pex) "$SIGN" --stage pex ;;
     pins) "$SIGN" --stage pins ;;
+    dc) "$SIGN" --stage dc ;;
     postlayout | mm | tran)
         # Only the leaves that own a bench get these stages: the stage is
         # routed, never silently run against another leaf's netlist.
