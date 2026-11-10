@@ -330,15 +330,21 @@ planes, met1 vss rail), and it is where the closure stops:
   framework, which needs KLayout's PCell host rather than the plain
   `create_cell(...)` API gf180's macro uses.  A generator therefore starts
   with a device drawer (act/poly/li1/contacts/nwell/implants) and a DRC loop.
-* **sky130 device sources** (checked, because the drawer problem decides the
-  closure): `libs.ref/sky130_fd_pr/gds/sky130_fd_pr.gds` has *foundry* RF
-  layouts for the 1.8 V pfet/nfet (`rf_pfet_01v8_aM04W3p00L0p15` ...) and for
-  the **5 V nfet**, but **no 5 V pfet** - and the array needs the 5 V pair at
-  3.3 V because the 1.8 V stack cannot carry 16 uA.  `pya_draw` is the only
-  drawing path for it and its W=8 output is not DRC-clean (`licon.1` /
-  `ct.1_b` 44 each on a single device; the drawer's 8 um-wide source/drain
-  contact stacks are the problem), so the sky130 closure needs a 5 V pfet
-  device drawer before the cell can be iterated.
+* **sky130 device source: magic's `gencell`.**  The KLayout paths are not it -
+  `sky130_fd_pr.gds` has foundry RF layouts for the 1.8 V pfet/nfet and the
+  5 V nfet but **no 5 V pfet**, and `pya_draw` at W=8 is not DRC-clean
+  (`licon.1`/`ct.1_b` 44 each on one device, its 8 um-wide source/drain
+  contact stacks).  The PDK's *magic* tech does have the device generator:
+  `sky130A.tcl` registers `sky130::sky130_fd_pr__pfet_g5v0d10v5` (and the
+  nfet, and the 16 V flavours) with `magic::gencell`, which draws the device
+  from the tech's own rules and puts named ports on li1.  Generated in magic
+  (`l=0.5 w=8 nf=4`, `guard 0`) it is a 2.29 x 1.43 um cell with nwell/tap/
+  psdm/HVI/npc/poly/li1/mcon/m1 and three port labels - i.e. the DRC-clean
+  device the array needs, and magic is also the DRC/LVS/PEX engine for
+  sky130 (same flow as the gf180 macro).  The open work is the generator
+  itself: confirm the gencell parameter semantics (one gencell per magic
+  process - a second call hits a GUI callback and dies headless), assemble
+  1022 devices + rails + 510 pads, then drive magic DRC/LVS/PEX.
 * **icsprout55**.  The KLayout cell
   `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
   its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC
