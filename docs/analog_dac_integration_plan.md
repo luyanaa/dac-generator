@@ -369,6 +369,7 @@ segmentation study.
 | Post-layout mismatch | **closed (PDK area law)** | `run_mismatch_pex.py`: `delvto`/`mulu0` per extracted device from the PDK law (pfet and nfet), 16 samples of a 255-point selector sweep.  Cell spread **1.00 %** vs the law's 1.003 % - the mirror's Vth alone (0.558 %/mV x 1.79 mV = 1.00 %); the pair's sensitivity is 0.000 %/mV because it sits in the drain path.  Fixed DNL **0.12..0.24** LSB, INL 0.09..0.16, 16/16 monotonic; the zero-draw reconstruction reproduces the bench transfer to 0.0000 LSB.  `--selftest` rejects a shared draw, half-sigma draws and pair-only draws |
 | Post-layout carry | **closed** | `run_transient_pex.py`: 510 PWL pads, 20 ps edges, 25 ps bit skew, 25 MS/s.  127->128 **128.000 LSB (+0.000), 0.5 LSB at 2.30 ns**; 128->127 and 63->64 likewise; full scale 0->255 **254.693 (-0.307), 2.72 ns**; `vbp`/`vcp` within 0.48 mV.  With the wrapper's 100 pF on `vcp`: without it the full-scale step lands at -4.3 LSB (device level), and that cap is a documented wrapper requirement |
 | Glitch | recorded, not gated | the steering pair's switching charge into the 2 pF output is a ~340-450 LSB spike decaying in ~3 ns (clear of the 40 ns sample); larger than the old cell's 103 LSB and a spec for the output filter |
+| Other PDKs (device level) | **ihp-sg13g2 closes the carry; sky130 sized at 3.3 V; icsprout55 blocked** | `analog/video/pdk_cell.py` applies the same cell to the other three processes.  IHP 1.8 V lv (PSP103, OSDI): the gf180 sizes fit (8/1 needs Vsg 0.57 V); carry **+0.023 LSB** with the bias flat, full scale **-0.860 LSB** at 100 pF on vcp (that PDK wants more decoupling; 220 pF in the deck).  sky130: the 1.8 V logic PMOS cannot stack two diodes at 16 uA (the replica's vcp goes negative), so the cell runs the 5 V g5v0d10v5 devices at 3.3 V with the gf180 sizes (replica vbp 2.016 / vcp 0.635 V).  icsprout55: **blocked at the models** - the .mdl bins are selected by .param expressions over the instance w/l (`wum = w*1e6`), which ngspice cannot evaluate, and the PDK readme says HSPICE-only.  Layouts stay gf180-only |
 | Digital half | **needs the complementary pair** | `dac_video_dig` supplies 255 one-hot lines; the dump-tail cell needs `d_`/`db_` (510 outputs).  Class C follow-up, like the wrapper |
 
 **Why the cell changed.** The first macro put a 0.5/0.28 PMOS in series with
@@ -507,8 +508,13 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   drives it.  Still open, and class C: the digital macro (the RTL still drives
   255 one-hot lines, not the cell's 510 complementary pair), the wrapper and
   its pin script, the output pad/ESD/cable driver, and placing that 100 pF
-  `vcp` cap.  CML/HBT remains blocked: ihp130 has no installed HBT models or
-  magic tech, so there is no SiGe device to build from.
+  `vcp` cap.  The same cell is now sized for the other three PDKs at the
+  device level (`analog/video/pdk_cell.py`, see 7.5): IHP 1.8 V closes the
+  carry (+0.023 LSB), sky130 moves to the 5 V devices at 3.3 V because the
+  1.8 V PMOS cannot stack two diodes at 16 uA, and icsprout55 is blocked at
+  the models (HSPICE-only).  Their layouts are the next step.  CML/HBT
+  remains blocked: ihp130 has no installed HBT models, so there is no SiGe
+  device to build from.
 
 ## 10. Risks / non-goals
 

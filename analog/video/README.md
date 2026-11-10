@@ -266,6 +266,45 @@ same window seen from the cause; the measured worst is 0.48 mV).  `--selftest` p
 carry with an ideal bias passes and a wrong target is rejected.
 `./signoff.py --stage tran` and `run-analog.sh video gf180 tran` now pass.
 
+### Other PDKs: the same cell, sized per process
+
+`pdk_cell.py` applies the cell to the other PDKs this repo has data for.  The
+topology does not change - mirror + cascode + steering pair, the tail always
+on - but the sizes do, because 16 uA needs a very different Vov per process:
+
+| PDK | supply | devices | mirror | cascode | pair | vbp / vcp | carry | full scale |
+|---|---|---|---|---|---|---|---|---|
+| sky130 | 3.3 V | g5v0d10v5 | 8/0.5 | 8/0.5 | 8/0.5 | 2.192 / 0.843 V | dc only | dc only |
+| ihp-sg13g2 | 1.8 V | lv (PSP103) | 8/1 | 8/0.5 | 4/0.28 | 1.232 / 0.627 V | +0.023 LSB | -0.860 LSB |
+| icsprout55 | 1.2 V | nm1p2/pm1p2 | - | - | - | - | - | **blocked** |
+
+* **ihp-sg13g2** (130 nm, PSP103 OSDI): the gf180 sizes fit unchanged - an 8/1
+  PMOS needs only Vsg 0.57 V at 16 uA.  The carry settles at **+0.023 LSB**
+  with the bias flat; the full-scale step is **-0.86 LSB** with 100 pF on
+  `vcp`, i.e. this PDK would want a larger decoupling cap than gf180's 100 pF
+  (the deck now uses 220 pF).
+* **sky130**: the 1.8 V logic PMOS cannot stack two diodes at 16 uA inside
+  1.8 V - measured, the replica's `vcp` is driven *negative* because the sink
+  pulls harder than the stack can supply - so the cell moves to the 5 V
+  thick-oxide devices at 3.3 V.  Their bins fix the geometry: `l=1.0` and
+  `l=0.28` give "could not find a valid modelname", so all three devices are
+  8/0.5.  The operating point then carries **16 uA/cell** (76.8 mV at code 128
+  into 37.5 ohm) with vbp 2.192 / vcp 0.843 V and the tail at 4 mV; the carry
+  and full-scale transients are the next run.  The 1.8 V variant also has a
+  *startup* trap: the all-off solution is self-consistent (the pair's source
+  floats to vdd and the pair is off), so the bench nodesets the tails - a real
+  bias network would need the same.
+* **icsprout55** (55 nm, 1.2 V): **blocked at the model level**.  The PDK's
+  `.mdl` cards select their bin with `.param` expressions over the *instance*
+  w/l (`wum = w*1e6`, `xbin = f(wum)`), which ngspice cannot evaluate
+  (`Undefined parameter [w]` -> `could not find a valid modelname`), and the
+  PDK's own readme says "for hspice only".  That is a model-porting job, not a
+  sizing one.
+
+Not claimed: layouts.  The macro, the DRC/LVS/PEX/pins stages and the bench
+nets in this leaf stay gf180-only; the per-PDK numbers above are what a
+generator for that PDK would be sized from.
+
 ## Files and how to run
 
 ```
