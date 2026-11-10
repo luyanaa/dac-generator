@@ -39,6 +39,7 @@ P3 measured constants), endpoint fit. All numbers are pre-layout.
 |---|---|---|
 | ideal, zero mismatch (bench check) | 0.000 | 0.000 |
 | binary decode, 1.8 %/cell, seed 0 | -0.176 .. +0.176 | -0.199 .. +0.199 |
+| binary, 37.5 ohm passive load | -0.176 .. +0.176 | -0.198 .. +0.200 |
 | unary decode, same cells, seed 0 | -0.052 .. +0.065 | -0.142 .. +0.097 |
 | binary, 20 seeds (worst) | **0.680** | 0.442 |
 | unary, 20 seeds (worst) | 0.066 | 0.487 |
@@ -50,23 +51,28 @@ in both, as it must be: it is the accumulated cell mismatch, not the decode.
 So at 8 bit a pure binary decoder is a *cheap* decoder, not a linear one -
 either calibrate/trim the MSB bank or take P3's 4+4 + DEM.
 
-**The output impedance still matters at 37.5 ohm.** A passive 37.5 ohm load
-turns the 1.67 kohm array ro (425 kohm per cell / 255) into a code-dependent
-gain: INL +1.517 LSB, a fail. Endpoint calibration removes the constant part
-but not the code dependence. The leaf therefore requires a transimpedance
-(virtual-ground) I-V or a regulated cascode raising the *unit* cell ro to
-about 1.3 Mohm; the 37.5 ohm passive case is kept in the regression as the
-negative result.
+**The load is not the limit; the decoder is.** The cascoded P3 cell measures
+425 Mohm, not the 425 kohm an earlier kOhm/MOhm printout slip carried into
+this leaf (see `../csteer/README.md`). Each active cell gives up `Vout/ro` to
+its own ro, so into 37.5 ohm the array loses 2.2e-5 of its current at full
+scale: a 0.006 LSB gain error whose code dependence is second order, i.e.
+0.001 LSB of INL with perfect cells and 0.200 LSB with 1.8 %/cell mismatch -
+the same as the virtual-ground run (0.199). The regression sweeps
+37.5 / 100 / 300 / 550 ohm, the last being the 2.24 V compliance edge of a
+3.3 V supply at 4.08 mA, and all four sit within 0.02 LSB of each other. ro
+would cost 1 LSB at `R ~ ro_unit/255` = 1.7 Mohm, which needs 7 kV at full
+scale, so no transimpedance stage is required: a resistor into the cable
+driver is enough.
 
 **The binary carry glitch is the timing item.** One code step, each bit slice
 delayed by k x 25 ps, 20 ps edges, 37.5 ohm || 2 pF:
 
 | step | bit skew | glitch outside the envelope | settle to 0.5 LSB |
 |---|---|---|---|
-| 127 -> 128 | 0 ps | 0.0 LSB | 260 ps |
-| 127 -> 128 | 25 ps | **50.8 LSB** | 735 ps |
-| 63 -> 64 | 25 ps | 25.1 LSB | 661 ps |
-| 255 -> 0 | 25 ps | 0.0 LSB (falling only) | 833 ps |
+| 127 -> 128 | 0 ps | 0.0 LSB | 262 ps |
+| 127 -> 128 | 25 ps | **51.4 LSB** | 740 ps |
+| 63 -> 64 | 25 ps | 25.3 LSB | 663 ps |
+| 255 -> 0 | 25 ps | 0.0 LSB (falling only) | 834 ps |
 
 The glitch is large but short: 0.83 ns worst, 2 % of the 40 ns period. It is
 not a linearity error if nothing samples inside it, so the digital half turns
@@ -102,7 +108,7 @@ settling window (`SETTLE_CYCLES`, default 4) during which `stb` is ignored.
 ./run.sh ideal           zero mismatch, the bench must be exactly linear
 ./run.sh dc              binary decode, 1.8 %/cell
 ./run.sh unary           same cells, thermometer decode (control)
-./run.sh riv             binary into the real 37.5 ohm load (negative result)
+./run.sh riv             binary into 37.5/100/300/550 ohm loads (all must pass)
 ./run.sh tran            carries at 0 and 25 ps bit skew
 ./run.sh study           20-seed binary-vs-unary distribution
 
@@ -115,5 +121,5 @@ refusing. The deck is behavioural on purpose - it models the decode and the
 carry timing, while the cell current and ro come from the P3 device bench and
 are copied into `video.yaml` with provenance.
 
-Still open, and not claimed: any layout, DRC/LVS/PEX, the output stage, and a
+Still open, and not claimed: any layout, DRC/LVS/PEX, the cable driver, and a
 post-layout rerun of the carry transients with extracted bit-slice skew.

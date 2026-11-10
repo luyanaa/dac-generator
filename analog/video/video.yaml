@@ -8,8 +8,8 @@
 # devices, and what the binary carries cost.
 #
 # Cell constants are the measured gf180 values from the P3 device bench
-# (`../csteer/build/cell.json`, cascoded PMOS mirror, W/L 8/1 + 8/0.5,
-# tt 25 C, 0.05-1.0 V flat window): I_unit 15.77 uA, ro 425 kOhm.  They are
+# (`../csteer/build/cell_matrix.csv`, cascoded PMOS mirror, W/L 8/1 + 8/0.5,
+# tt 25 C, 0.05-1.0 V flat window): I_unit 15.77 uA, ro 424.9 MOhm.  They are
 # copied here deliberately: this leaf verifies the array/decode, not the
 # device, and must not silently re-invent a cell.
 name: video
@@ -17,13 +17,15 @@ bits: 8
 target_msps: 25
 
 i_unit_ua: 16.0          # rounded from the measured 15.77 uA
-ro_unit: 425000.0        # measured, per unit cell
+ro_unit: 4.249e+8        # measured, per unit cell (cascoded stack, 424.9 MOhm)
 
 # 75 Ohm video line, double terminated at both ends -> 37.5 Ohm at the DAC.
 # 255 * 16 uA * 37.5 Ohm = 153 mV full scale; the cable driver supplies the
-# 1 Vpp gain.  Keeping the array node low-impedance is what makes the finite
-# cell ro harmless: 425 kOhm / 255 in parallel is 1.67 kOhm, i.e. a 2.2 %
-# gain error that endpoint calibration removes.
+# 1 Vpp gain.  The finite cell ro is irrelevant at this load: 425 MOhm per
+# cell means the code-dependent loss is Vout/ro of each active cell, i.e. a
+# 2.2e-5 relative gain error (0.006 LSB), which endpoint calibration absorbs
+# completely.  An earlier revision of this file carried 425 kOhm - a 1000x
+# transcription error out of the P3 bench - and concluded the opposite.
 r_load: 37.5
 c_load_pf: 2.0
 

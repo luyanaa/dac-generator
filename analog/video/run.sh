@@ -42,14 +42,20 @@ unary)
     dc_run unary 0.018 0 build/dc_unary.dat pass
     ;;
 riv)
-    python3 gen_video.py --bench dc --decode binary --mismatch 0.018 \
-        --seed 0 --riv 37.5
-    ngspice -b -o build/ngspice_riv.log build/dc.spice >/dev/null 2>&1
-    mv build/dc.dat build/dc_riv.dat
-    # This is the documented negative result: a passive 37.5 ohm load costs
-    # +1.5 LSB INL, so the bench must fail.  Flipping the expectation would
-    # mean the output stage changed and the README no longer holds.
-    python3 measure.py dc build/dc_riv.dat --expect fail
+    # Passive loads, all of which must stay inside the 8-bit budget: the
+    # cascoded cell ro is 425 MOhm, so even 550 ohm (the 2.24 V compliance
+    # edge of a 3.3 V supply at 4.08 mA) costs only 0.02 LSB.  Endpoint
+    # calibration absorbs the first-order part.  These benches used to be the
+    # leaf's documented negative result; that claim rested on a 1000x
+    # kOhm/MOhm transcription of the P3 ro.
+    for r in 37.5 100 300 550; do
+        python3 gen_video.py --bench dc --decode binary --mismatch 0.018 \
+            --seed 0 --riv "$r"
+        ngspice -b -o build/ngspice_riv.log build/dc.spice >/dev/null 2>&1
+        mv build/dc.dat "build/dc_riv_$r.dat"
+        echo "--- load $r ohm"
+        python3 measure.py dc "build/dc_riv_$r.dat" --expect pass
+    done
     ;;
 tran)
     for spec in "127 128 0" "127 128 25" "63 64 25" "255 0 25"; do

@@ -265,17 +265,17 @@ isolates the tree, is the only honest way to size it.
 
 | Gate | State | Evidence |
 |---|---|---|
-| Device cell | closed (gf180) | cascoded PMOS, 7 corner/temp points: I 15.63-15.87 uA, ro 275-549 kOhm |
+| Device cell | closed (gf180) | cascoded PMOS, 7 corner/temp points: I 15.63-15.87 uA, ro 275-549 MOhm |
 | Mismatch model | closed, deterministic | measured 0.519 %/mV x Pelgrom 3.5 mV = 1.8 %/cell |
 | DC linearity | closed (gf180, ideal cells) | sigma=0 control exact; 1.8 %/unary cell (7.2 %/sqrt(w) binary): DNL -0.89/+0.28, INL -0.48/+1.37 LSB |
 | DEM | closed (model) | 15-state DWA: mean INL +/-0.48, worst sample +/-1.37, 0.39 LSB rms |
 | Digital half | closed | `dac_csteer_dig` 3733/3733 checks, lint clean, hardened config added; also generates the 60 complementary switch levels |
-| Output I-V | **closed by design rule** | passive 1 kOhm costs DNL -0.07 / INL +2.4 LSB on perfectly matched cells (binary field is 16x stiffer than the unary one); active I-V required |
+| Output I-V | **closed: a resistor is enough** | cascoded cell ro is 425 MOhm (not 425 kOhm: the first bench printed `ro/1e3` as kOhm), so 15 unary cells in parallel are 28 MOhm and a 1 kOhm passive I-V at 255 mV output costs 0.002 LSB with perfectly matched cells. The extracted core confirms it: 0.177 / 0.166 LSB with 0 ohm or 1 kOhm at `iout`. An opamp I-V is optional, not a requirement |
 | Switch | **closed pre-layout, drawn (gf180)** | differential NMOS pair W/L 4/0.28 with the tail on the cascode drain: Ron 391 Ohm, compliance 2.26 V, event charge error 8.3 fC, pair charge error 0.3 fC, settle 55 ps; corners 301-553 Ohm / 2.10-2.44 V / 45-85 ps (`run_switch.py`) |
 | Cascode bias | **closed pre-layout (gf180)** | replica of the cell with the cascode drain diode-tied: Iref 16 uA through Mref 8/1 and Mcas 8/0.5 gives vbp/vcp; 15 corner/temp points hold Icell 16.000-16.002 uA, mirror margin >= 0.57 V, cascode margin >= 1.80 V |
 | Layout | **core generator closed; I-V/wrapper/pin placement class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS cells in one row with shared vdd/vbp/vcp rails, the replica cascode bias, and one 4/0.28 NMOS switch pair per cell feeding `iout`/`idump`; each cell exposes `swa_<tag>`/`swb_<tag>` on M2 pads. 15 unary cells are 8/1 (16 uA), all 15 binary cells are 0.5/1 (1 uA) and the 1/2/4/8 weight is the cell count on a gate net, matching the digital fan-out. The digital macro generates all 60 drive levels; the I-V resistor, differential wrapper and the analog-facing pin placement stay hand layout |
 | DRC / LVS / PEX | **closed for the core macro** | `signoff.py`: DRC 0 items, LVS 122 devices (30 cells + 2 bias + 60 switches) / 126 nets (6 rails + 30 tails + 30 internal + 60 gates), PEX 122 instances / 993 C entries; LVS also checks width against weight (8/1 unary, 0.5/1 binary, mirror must match its cascode); `--selftest` fails drop-unit, swap-gate, short-tail, drop-switch, short-drain, wrong-source, bias-gate, bias-source, cell-width, mirror-width |
-| Post-layout core | **closed (gf180, PEX)** | `run_postlayout.py` on the 122-device / 993-cap extraction: dc pair sum error 1e-5 %, Ron 391 Ohm, compliance 2.26 V, event charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, and a 256-code sweep of the extracted array: FS 255.2 uA, unary step 15.99 LSB, DNL 0.177 / INL 0.166 LSB, 0 non-monotonic steps. Gates 1 % / 800 Ohm / 1.5 V / 25 fC / 5 fC / 500 ps / 5 % / 1 LSB / 0.5 LSB / 1 LSB. Deterministic transfer only: mismatch linearity comes from the pre-layout model |
+| Post-layout core | **closed (gf180, PEX)** | `run_postlayout.py` on the 122-device / 993-cap extraction: dc pair sum error 1e-5 %, Ron 391 Ohm, compliance 2.26 V, event charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, and a 256-code sweep of the extracted array: FS 255.2 uA, unary step 15.99 LSB, DNL 0.177 / INL 0.166 LSB, 0 non-monotonic steps. The sweep runs into 0 V and through 1 kOhm and the two must agree to 0.05 LSB INL / 0.5 % FS - they do (0.166 vs 0.166). Gates 1 % / 800 Ohm / 1.5 V / 25 fC / 5 fC / 500 ps / 5 % / 1 LSB / 0.5 LSB / 1 LSB / termination. Deterministic transfer only: mismatch linearity comes from the pre-layout model |
 
 The design point here is the DEM state count: 15 unary cells mean 15 pointer
 states, not 16. Over 15 samples every cell must see the average current, and
@@ -287,9 +287,13 @@ leaf:
   10 seeds); DEM averaging pulls the mean to 0.48 LSB but the instantaneous
   worst sample stays at 1.37 (1.93 over 10 seeds) and adds 0.4-1.0 LSB of
   shaped noise. The ten-seed sweep is in `analog/csteer/README.md`.
-* **A passive I-V is not usable at 8 bit.** 425 kOhm ro across 255 mV gives
-  +8 LSB INL, so the leaf contract requires a virtual-ground (opamp) I-V or a
-  regulated-cascode output; the regression reports both terminations.
+* **A passive I-V is usable at 8 bit.** The cascoded cell ro is 425 MOhm
+  (275-549 MOhm over corners), so 1 kOhm across the 255 mV full scale costs
+  0.002 LSB of INL even with perfect cells; the regression reports both
+  terminations and they are indistinguishable at the mismatch level. The
+  earlier "+8 LSB" figure came from reading a kOhm printout as the ro and
+  entering 425 kOhm in `csteer.yaml` - a 1000x error now fixed at the bench
+  print (`run_cell.py` prints MOhm) and in the yaml.
 
 ### 7.4 P4 (binary CDAC) status
 
@@ -338,12 +342,12 @@ another segmentation study.
 
 | Gate | State | Evidence |
 |---|---|---|
-| Device cell | reused (gf180, measured) | P3 cell: 16 uA, ro 425 kOhm, W/L 8/1 + 8/0.5 um cascoded PMOS mirror |
+| Device cell | reused (gf180, measured) | P3 cell: 16 uA, ro 425 MOhm, W/L 8/1 + 8/0.5 um cascoded PMOS mirror |
 | Array model | closed | 255 identical unit cells grouped 1/2/4/.../128; full scale 4.08 mA |
 | DC, binary decode | **marginal** | seed 0 DNL -0.176/+0.176, INL -0.199/+0.199; 20 seeds worst DNL **0.680**, INL 0.442; 5/20 seeds exceed 0.5 LSB DNL |
 | DC, unary decode (control) | closed | same 255 cells, same seeds: worst DNL 0.066, INL 0.487 |
-| DC, passive 37.5 ohm load | **fails** | INL +1.517 LSB; needs virtual ground or unit ro >= 1.3 MOhm |
-| Binary carry glitch | characterised | 127->128: 50.8 LSB transient with 25 ps bit skew, settles 735 ps (0 LSB / 260 ps at 0 ps skew); 63->64: 25.1 LSB |
+| DC, passive load | **passes; the load is not the limit** | 425 MOhm cell ro makes the 37.5 ohm load a 0.006 LSB gain error: INL -0.198/+0.200 LSB vs -0.199/+0.199 virtual ground, and 37.5/100/300/550 ohm all within 0.02 LSB. 1 LSB would need a 1.7 MOhm load. The earlier "+1.517 LSB fail" came from a 1000x kOhm/MOhm printout slip |
+| Binary carry glitch | characterised | 127->128: 51.4 LSB transient with 25 ps bit skew, settles 740 ps (0 LSB / 262 ps at 0 ps skew); 63->64: 25.3 LSB |
 | Speed | closed | 0.83 ns worst settling vs 40 ns period (48x); array is not the limit |
 | Digital half | closed | `dac_video_dig` 9148 checks, lint clean; one launch register, `ready` guard = SETTLE_CYCLES |
 | Layout / DRC / LVS / PEX | **open, class C** | 255-cell array + binary switch banks + output stage are hand layout; no generator |
@@ -353,10 +357,12 @@ choice**: over 20 seeds the binary array's INL matches the thermometer
 control within 0.05 LSB, but its carry DNL reaches 0.68 LSB and crosses the
 0.5 target in 5 seeds, while the thermometer version stays at 0.066. A pure
 binary decoder is therefore only usable with MSB-group trim/calibration;
-otherwise the answer is P3's 4+4 segmentation + DEM. **The output impedance
-is still the static limit**: 425 kOhm per cell is 1.67 kOhm for the whole
-array, and into 37.5 ohm that is a code-dependent gain worth +1.5 LSB INL, so
-the leaf requires a transimpedance I-V (or a regulated cascode). The carry
+otherwise the answer is P3's 4+4 segmentation + DEM. **The load is not the
+limit; the decoder is**: the P3 cell ro is 425 MOhm (a 1000x kOhm/MOhm
+printout slip had put 425 kOhm here), so 37.5 ohm across the 153 mV full
+scale costs 0.006 LSB of gain error - 0.02 LSB even at the 2.24 V compliance
+edge - and a resistor is a sufficient termination. The static limit is the
+binary carry DNL above. The carry
 glitch is large (51 LSB) but short (0.74 ns), which is why the digital half
 trades it for a settle window instead of trying to remove it in logic.
 
@@ -365,7 +371,7 @@ trades it for a settle window instead of trying to remove it in logic.
 | Target | Best fit | Note |
 |---|---|---|
 | Audio, 16 bit, 48 kHz | existing ΔΣ + RC (A) | no analog leaf needed; 0 dBFS via 1st order |
-| Video, 8 bit, 25 MHz | current-steering (C with trim/segmentation; pure binary decode costs 0.68 LSB DNL) | external 75 Ω, transimpedance I-V |
+| Video, 8 bit, 25 MHz | current-steering (C with trim/segmentation; pure binary decode costs 0.68 LSB DNL) | external 75 Ω line; a resistor output is enough (no transimpedance stage) |
 | General 8–12 bit, low speed | R-2R (B) | smallest area at 8–10 bit |
 | Mid-speed monotonic, 8 bit | resistor string (B, buffered) | 2^N resistors, switch Ron sets DNL; Edwards 8-bit fails its own INL with a follower |
 | High-speed / RF | CML/HBT (C) | ihp130 only |
@@ -406,20 +412,22 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
 - **P3. DONE on gf180 (pre-layout + digital half + array macro).** 8-bit 4+4
   unit-current-steering 8-bit + standard-cell thermometer/DWA, following
   `2AMLogic/gf180-current-dac` for the array and `alinja/skydacmagic` for the
-  cell. Device cell I 15.77 uA, ro 425 kOhm, Vth sensitivity 0.519 %/mV ->
+  cell. Device cell I 15.77 uA, ro 425 MOhm, Vth sensitivity 0.519 %/mV ->
   1.8 %/unary cell (7.2 %/sqrt(w) on binary bit w). Fixed-pointer INL 1.37 LSB;
-  DEM mean 0.48 LSB at 0.39 LSB rms. Requires an active I-V: a 1 kOhm passive
-  I-V costs +2.4 LSB INL even with perfect cells. The core is generated and
+  DEM mean 0.48 LSB at 0.39 LSB rms. A 1 kOhm passive I-V is enough: 0.002 LSB
+  of INL with perfect cells, and the extracted core measures the same transfer
+  into 0 ohm and 1 kOhm. The core is generated and
   signed off (`analog/csteer/gen_gds.py`: 15 unary 8/1 cells, 15 binary 0.5/1
   cells, replica cascode bias, 60 steering switches; DRC 0, LVS 122 devices /
   126 nets with a width-vs-weight check, PEX 122 instances). The switch gates
   and a 256-code sweep re-pass on the extracted core (`run_postlayout.py`:
   FS 255.2 uA, DNL 0.18 / INL 0.17 LSB, monotonic) - that sweep is what caught
   and closed the earlier all-16-uA array, which transferred a sawtooth. The
-  digital macro generates all 60 complementary switch levels; the I-V, the
+  digital macro generates all 60 complementary switch levels; the
   differential wrapper and the analog-facing pin placement stay class C hand
-  layout, so `run-analog.sh csteer gf180 gds` builds the core macro only and no
-  post-layout *mismatch* linearity is claimed.
+  layout (the I-V is now just a 1 kOhm resistor), so `run-analog.sh csteer
+  gf180 gds` builds the core macro only and no post-layout *mismatch*
+  linearity is claimed.
 - **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs
@@ -438,8 +446,10 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   25 MS/s video-rate binary current steering, 255 parallel unit cells decoded
   1/2/4/.../128. Binary decode is INL-neutral but costs carry DNL: 0.680
   worst vs 0.066 for the same cells with a thermometer decoder (5/20 seeds
-  over 0.5 LSB). A passive 37.5 ohm load fails at +1.517 LSB INL, so the leaf
-  requires a transimpedance I-V; the 25 ps bit-skew carry glitch is 50.8 LSB
+  over 0.5 LSB). A passive 37.5 ohm load is fine: the P3 cell ro is 425 MOhm,
+  so it costs 0.006 LSB of gain error (0.02 LSB at the 2.24 V compliance
+  edge) and the leaf needs no transimpedance stage; the 25 ps bit-skew carry
+  glitch is 50.8 LSB
   but settles in 735 ps, which the digital half converts into a `ready`
   settle window. Class C: no array GDS, `run-analog.sh video gf180 gds`
   refuses. CML/HBT remains blocked: ihp130 has no installed HBT models or
