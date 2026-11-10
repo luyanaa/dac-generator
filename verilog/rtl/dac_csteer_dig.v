@@ -23,6 +23,21 @@
 //   ptr   : current DWA pointer (0..14), advanced on the strobe for the *next*
 //           sample.  `th`/`b` correspond to the pre-advance pointer.
 //
+// The switch drive is also generated here, because the analog core exposes one
+// gate pad per steering switch and the complementary phase must not be left to
+// the wrapper: `swa_*` is the selected cell's high side and `swb_*` its
+// complement, both registered with `th`/`b` so a switch pair never sees an
+// asynchronous code.  The names match the analog macro's pads:
+//
+//   swa_u[j]      -> swa_u<j>        swb_u[j]      -> swb_u<j>      (j 0..14)
+//   swa_b1_0      -> swa_b1_0        swb_b1_0      -> swb_b1_0
+//   swa_b2[j]     -> swa_b2_<j>      swb_b2[j]     -> swb_b2_<j>    (j 0..1)
+//   swa_b4[j]     -> swa_b4_<j>      swb_b4[j]     -> swb_b4_<j>    (j 0..3)
+//   swa_b8[j]     -> swa_b8_<j>      swb_b8[j]     -> swb_b8_<j>    (j 0..7)
+//
+// A binary bit drives all of its cells from one register bit, so the weight is
+// the number of cells on that net (1/2/4/8), not a separate decode.
+//
 // The pointer is advanced by the unary cell count of the incoming sample,
 // which is what makes 15 consecutive samples tile the 15 cells exactly once
 // for n_act = 1 and n_act times each in general.  Both `th` and `b` are
@@ -39,7 +54,17 @@ module dac_csteer_dig (
     output reg  [3:0]  b,
     output reg  [3:0]  ptr,
     output reg         valid,
-    output wire [7:0]  code_q
+    output wire [7:0]  code_q,
+    output wire [14:0] swa_u,
+    output wire [14:0] swb_u,
+    output wire        swa_b1_0,
+    output wire        swb_b1_0,
+    output wire [1:0]  swa_b2,
+    output wire [1:0]  swb_b2,
+    output wire [3:0]  swa_b4,
+    output wire [3:0]  swb_b4,
+    output wire [7:0]  swa_b8,
+    output wire [7:0]  swb_b8
 );
 
     localparam N_UNARY = 15;
@@ -66,6 +91,19 @@ module dac_csteer_dig (
             assign th_dec[j] = (diff < {1'b0, n_act});
         end
     endgenerate
+
+    // Steering-switch drive.  `th` is already indexed by physical cell, so the
+    // unary phase is a straight fan-out; each binary bit feeds all its cells.
+    assign swa_u    = th;
+    assign swb_u    = ~th;
+    assign swa_b1_0 = b[0];
+    assign swb_b1_0 = ~b[0];
+    assign swa_b2   = {2{b[1]}};
+    assign swb_b2   = ~{2{b[1]}};
+    assign swa_b4   = {4{b[2]}};
+    assign swb_b4   = ~{4{b[2]}};
+    assign swa_b8   = {8{b[3]}};
+    assign swb_b8   = ~{8{b[3]}};
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin

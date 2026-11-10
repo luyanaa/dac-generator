@@ -24,6 +24,11 @@ module dac_csteer_dig_tb;
 	wire [3:0]	ptr;
 	wire		valid;
 	wire [7:0]	code_q;
+	wire [14:0]	swa_u, swb_u;
+	wire		swa_b1_0, swb_b1_0;
+	wire [1:0]	swa_b2, swb_b2;
+	wire [3:0]	swa_b4, swb_b4;
+	wire [7:0]	swa_b8, swb_b8;
 
 	integer checks = 0;
 	integer fails  = 0;
@@ -39,7 +44,17 @@ module dac_csteer_dig_tb;
 		.b     (b),
 		.ptr   (ptr),
 		.valid (valid),
-		.code_q(code_q)
+		.code_q(code_q),
+		.swa_u (swa_u),
+		.swb_u (swb_u),
+		.swa_b1_0(swa_b1_0),
+		.swb_b1_0(swb_b1_0),
+		.swa_b2(swa_b2),
+		.swb_b2(swb_b2),
+		.swa_b4(swa_b4),
+		.swb_b4(swb_b4),
+		.swa_b8(swa_b8),
+		.swb_b8(swb_b8)
 	);
 
 	always #1 clk = ~clk;   // 20 ns period
@@ -113,6 +128,18 @@ module dac_csteer_dig_tb;
 			check(code_q, c, "latched code");
 			check(ptr, next_ptr(p0, c[7:4]), "DWA pointer advance");
 			check(popcount(th), c[7:4], "thermometer cell count");
+			// Switch drive: the unary phase is the reference decode, each
+			// binary bit is replicated onto its cells, and every pair is
+			// complementary (the wrapper adds no inversion).
+			check({swa_u, swa_b1_0, swa_b2, swa_b4, swa_b8},
+			      {want_th, c[0], {2{c[1]}}, {4{c[2]}}, {8{c[3]}}},
+			      "switch drive fan-out");
+			// `~` is context-determined, so mask to the 30 drive bits
+			// instead of letting the 64-bit task argument widen it.
+			check({swb_u, swb_b1_0, swb_b2, swb_b4, swb_b8},
+			      (~{swa_u, swa_b1_0, swa_b2, swa_b4, swa_b8})
+			      & 64'h0000_0000_3FFF_FFFF,
+			      "switch drive is complementary");
 			@(posedge clk);
 			#0.1;
 			check(valid, 0, "valid is one cycle");
@@ -129,6 +156,10 @@ module dac_csteer_dig_tb;
 		check(b, 4'h0, "b after reset");
 		check(ptr, 4'd0, "ptr after reset");
 		check(valid, 0, "valid after reset");
+		check({swa_u, swa_b1_0, swa_b2, swa_b4, swa_b8}, 30'b0,
+		      "switch drive low after reset");
+		check({swb_u, swb_b1_0, swb_b2, swb_b4, swb_b8}, {30{1'b1}},
+		      "switch drive complemented after reset");
 
 		rst_n = 1;
 		@(posedge clk);

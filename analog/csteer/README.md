@@ -3,10 +3,11 @@
 Third analog leaf (roadmap P3). Mixed: the 30-cell current-source array (the
 15 unary cells plus the 1/2/4/8 binary cells), its replica cascode bias and the
 60 steering switches are generated and signed off (`gen_gds.py`,
-`signoff.py`); the complementary gate drive, the I-V resistor and the
-differential wrapper are class **C** hand layout. The digital half
-(`verilog/rtl/dac_csteer_dig.v`) is a generated standard-cell macro. No
-OpenROAD P&R near the analog core.
+`signoff.py`) and checked again on the extracted netlist
+(`run_postlayout.py`); the digital half (`verilog/rtl/dac_csteer_dig.v`, which
+also generates the 60 steering levels) is a standard-cell macro. The I-V
+resistor, the differential wrapper and the analog-facing pin placement are
+class **C** hand layout. No OpenROAD P&R near the analog core.
 
 ## Topology
 
@@ -204,7 +205,7 @@ replica bias generator at the right end, and one steering switch pair per cell:
   along x: row A (`swa_<tag>`) drains into `iout`, row B (`swb_<tag>`) into
   `idump`, both sources on `cd_<tag>` and both bulks on `vss`. Since each cell
   carries its own switch, the binary weight is a count of cells sharing a gate
-  net, and the complementary drive is a wrapper connection. Row A exits its
+  net, and the complementary drive comes from the digital macro. Row A exits its
   gate on the same y band; row B's gate poly climbs over the `idump` bus
   because the next cell's gate poly blocks that band. Each of the 60 gates ends
   on its own M2 pad at the top edge.
@@ -221,9 +222,10 @@ rejects drop-unit, swap-gate, short-tail, drop-switch, short-drain,
 wrong-source, and two bias mutations (lift the cascode source off `vbp`, move
 the mirror gate to `vcp`).
 
-Not in this macro: the complementary gate drive, the I-V resistor and the
-differential wrapper (class C hand layout), and any post-layout linearity
-claim, which needs the switches in a full-DAC context.
+Not in this macro: the gate drive itself (the digital macro generates both
+phases; the wrapper only routes them to these pads), the I-V resistor and the
+differential wrapper, and any post-layout linearity claim, which needs the
+switches in a full-DAC context.
 
 ## Post-layout (`run_postlayout.py`)
 
@@ -262,14 +264,27 @@ running a stale netlist.
 pointer advanced by the incoming unary count modulo 15, registered `th`/`b` so
 the analog switches never see the asynchronous code bus.
 
+The same module generates the steering drive: `swa_u[14:0]`/`swb_u[14:0]` and
+`swa_b1_0`/`swa_b2`/`swa_b4`/`swa_b8` (with their complements), wired so the
+vector index is the physical cell and the port names match the analog pads
+(`swa_b4[j]` -> `swa_b4_<j>`). A binary bit drives all its cells from one
+register bit, so the weight is the cell count (1/2/4/8) and no second decode
+exists. Both phases come from the same register, so the pair is complementary
+by construction; the wrapper adds no inversion, only the physical connection.
+What is still hand work is the pin placement on the analog-facing edge: the 60
+switch pins have to land on the 5.5 um cell pitch that `gen_gds.py` uses for the
+control pads.
+
 DWA has **15 pointer states**, not 16: there are 15 unary cells. Over 15
 consecutive samples of a constant code with `k` unary cells, every physical
 cell is selected exactly `k` times, which is what equalises the per-cell gain
 error.
 
-`dac_csteer_dig_tb.v`: 3007 checks - reset, all 256 codes against a reference
+`dac_csteer_dig_tb.v`: 3733 checks - reset, all 256 codes against a reference
 rotated-thermometer model, pointer recurrence, full-scale, one-cycle `valid`,
-and the `k`-of-15 fairness property for `k = 1..7`. Verilator lint clean.
+the `k`-of-15 fairness property for `k = 1..7`, and the switch drive against
+the reference decode (fan-out, binary replication, complementary phase).
+Verilator lint clean.
 
 ## Run
 
@@ -304,11 +319,11 @@ Not verified / not done:
   switches / 126 nets, PEX 122 instances / 993 C entries; `--selftest` fails
   drop-unit, swap-gate, short-tail, drop-switch, short-drain, wrong-source,
   bias-gate and bias-source.
-* **The switch pair is drawn, the drive is not.** `run_switch.py` closes the
-  device sizing (Ron, charge, settling) and the layout places both NFETs of
-  every pair; the complementary `swa`/`swb` levels, the I-V and the
-  differential wrapper stay class C hand layout, so the two control pads per
-  cell are the macro boundary.
+* **Switch drive is generated, not placed.** `run_switch.py` closes the device
+  sizing (Ron, charge, settling), the layout places both NFETs of every pair,
+  and `dac_csteer_dig` now generates all 60 `swa`/`swb` levels (3733 checks).
+  Still hand work: the analog-facing pin placement at the 5.5 um cell pitch,
+  the I-V resistor and the differential wrapper.
 * **No full-DAC post-layout.** The core macro is extracted and re-checked on
   the PEX netlist (`run_postlayout.py`: Ron 391 Ohm, compliance 2.26 V, event
   charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, all gates PASS), but
