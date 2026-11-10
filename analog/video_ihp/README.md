@@ -3,7 +3,8 @@
 The P5 cell on IHP SG13G2, built from the PDK's own `SG13_dev` PCells:
 255 cells + the diode-connected replica, **1022 devices** (512 pmos, 510
 nmos), 510 met2 pads on the 3.75 um grid.  Signoff: **DRC 0**, **LVS walk
-passes on all 255 cells**, **510 pins**.
+passes on all 255 cells**, **510 pins**, **PEX 1022 instances / 2.57 pF**,
+**extracted DC 4.0815 mA at vbp/vcp 1.2318/0.6271 V**.
 
 ## Device source: the PDK PCells work headless
 
@@ -58,6 +59,8 @@ The first DRC rounds were via rules: **Via1/Via2 are 0.19 um (min=max)**, not
 | build | `gen_gds.py` under KLayout with the sg13g2 technology; the generator's same-layer short check |
 | drc | PDK `tech/drc/ihp-sg13g2.drc`: **0 items** on the full 1918.5 x 26.6 um array |
 | lvs | PDK `tech/lvs/run_lvs.py --net_only --disable_tap_extraction`, then the pad-pair walk: **1022 devices (512 pmos / 510 nmos), 516 ports, all pmos bulks vdd, all nmos bulks vss, 255 cell mirrors + 1 replica mirror/cascode** |
+| pex | magic hierarchical extraction, cthresh/rthresh 0: **1022 instances, 8421 caps, 2.57 pF, no floating node** |
+| dc | extracted array, 16 uA at vcp, all 255 cells to iout: **4.0815 mA** (+0.036 %), **vbp 1.2318 V / vcp 0.6271 V** - the study's 1.232/0.627 V |
 | pins | 510 met2 pads on the 3.75 um grid, 516 labels (10/25) |
 
 The LVS runner needs KLayout >= 0.30.7 for its version gate and the
@@ -70,10 +73,11 @@ the schematic comparison; the layout's ntap/ptap still tie the wells.
 `--selftest` rejects 3/3 netlist mutations (duplicate pad gate, open tail,
 pmos bulk off vdd).
 
-## Not done: PEX and benches
+## Not done: mismatch and transient benches
 
-The PDK has no KLayout PEX deck; a magic tech exists
-(`libs.tech/magic`), but its device extractor has not been validated against
-these PCell devices, so the leaf stops at DRC/LVS/pins.  The ngspice models
-are present (`libs.tech/ngspice/models`), so once an extracted netlist
-exists the DC/mismatch/transient benches are a model port, not a blocker.
+PEX is magic's (`libs.tech/magic`, `cthresh/rthresh 0`): 1022 instances and
+8421 capacitors.  The extracted DC uses the PDK's `cornerMOSlv.lib` (PSP103,
+OSDI loaded by the PDK `.spiceinit` with `PDK_ROOT`/`PDK`) and reproduces the
+study's bias to four digits.  The mismatch Monte Carlo and the carry
+transient are not ported yet; they are a bench port on the same netlist, not
+a layout or model blocker.

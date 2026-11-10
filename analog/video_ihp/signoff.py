@@ -314,6 +314,100 @@ def lvs(pdk: Path) -> dict:
             "netlist": str(cir)}
 
 
+def pex(pdk: Path) -> dict:
+    """Magic hierarchical extraction: 1022 devices + the per-net capacitance."""
+    spice = BUILD / "pex.spice"
+    tcl = BUILD / "extract_pex.tcl"
+    tcl.write_text(
+        f"gds read {GDS.with_suffix('')}\n"
+        f"load {TOP}\n"
+        "select top cell\n"
+        "port makeall\n"
+        "extract\n"
+        "ext2spice hierarchy on\n"
+        "ext2spice cthresh 0\n"
+        "ext2spice rthresh 0\n"
+        f"ext2spice -o {spice}\n"
+        "puts PEX_DONE\n"
+        "quit -noprompt\n")
+    env = dict(os.environ)
+    env["PDK_ROOT"] = str(pdk)
+    env["MAGIC_TECH_PATH"] = str(pdk / "libs.tech/magic")
+    p = run(["magic", "-dnull", "-noconsole", "-rcfile",
+             pdk / "libs.tech/magic/ihp-sg13g2.magicrc", tcl],
+            cwd=BUILD, env=env, timeout=7200)
+    (BUILD / "pex.log").write_text(p.stdout + p.stderr)
+    if p.returncode or "PEX_DONE" not in p.stdout or not spice.is_file():
+        die("magic PEX did not finish (build/pex.log)")
+    txt = spice.read_text()
+    xs = [ln for ln in txt.splitlines() if ln.startswith("X")]
+    cs = [ln for ln in txt.splitlines() if ln.startswith("C")]
+    floating = [ln for ln in txt.splitlines() if "**FLOATING" in ln]
+    total = 0.0
+    for ln in cs:
+        f = ln.split()
+        try:
+            m = re.match(r"^([-+0-9.eE]+)([fpnumk]?)", f[3])
+            total += float(m.group(1)) * {"f": 1e-15, "p": 1e-12,
+                                          "n": 1e-9, "u": 1e-6,
+                                          "m": 1e-3, "": 1}[m.group(2)]
+        except Exception:
+            pass
+    ok = len(xs) == 1022 and not floating
+    return {"ok": ok, "instances": len(xs), "caps": len(cs),
+            "cap_ff": round(total * 1e15, 1), "floating": len(floating),
+            "spice": str(spice), "log": str(BUILD / "pex.log")}
+
+
+def dc(pdk: Path) -> dict:
+    """Extracted DC: 255 cells to iout, 16 uA at vcp; gate full scale."""
+    pex = BUILD / "pex.spice"
+    if not pex.is_file():
+        die("no build/pex.spice; run --stage pex first")
+    if pex.stat().st_mtime < GDS.stat().st_mtime:
+        die("pex.spice is older than the GDS; rerun --stage pex")
+    lib = pdk / "libs.tech/ngspice/models/cornerMOSlv.lib"
+    if not lib.is_file():
+        hits = sorted((Path.home() / ".ciel/ciel/ihp-sg13/versions").glob(
+            "*/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib"))
+        if not hits:
+            die(f"no ihp ngspice model library under {pdk}")
+        lib = hits[-1]
+    body = [ln for ln in pex.read_text().splitlines()
+            if not ln.strip().startswith((".subckt", ".ends"))]
+    out = ["* ihp extracted array DC: all 255 cells to iout",
+           f'.lib "{lib}" mos_tt', ""] + body
+    out += ["", "Vdd vdd 0 1.8", "Vss vss 0 0", "Iref vcp 0 16u",
+            "Viout iout 0 0", "Vdump idump 0 0"]
+    for tag in cell_tags():
+        out += [f"Vd_{tag} d_{tag} 0 1.8", f"Vdb_{tag} db_{tag} 0 0"]
+    out += [".op", ".control", "run", "print i(Viout)", "print v(vbp) v(vcp)",
+            ".endc", ".end"]
+    deck = BUILD / "dc_transfer.spice"
+    deck.write_text("\n".join(out) + "\n")
+    env = dict(os.environ)
+    env["PDK_ROOT"] = str(pdk.parent)
+    env["PDK"] = pdk.name
+    p = run(["ngspice", "-b", deck], cwd=BUILD, env=env, timeout=3600)
+    (BUILD / "dc_transfer.log").write_text(p.stdout + p.stderr)
+    txt = p.stdout + p.stderr
+    m = re.search(r"i\(viout\)\s*=\s*([-+0-9.eE]+)", txt, re.I)
+    vb = re.search(r"v\(vbp\)\s*=\s*([-+0-9.eE]+)", txt, re.I)
+    vc = re.search(r"v\(vcp\)\s*=\s*([-+0-9.eE]+)", txt, re.I)
+    if not (m and vb and vc):
+        die("ngspice produced no iout/vbp/vcp (see build/dc_transfer.log)")
+    iout = abs(float(m.group(1)))
+    vbp, vcp = float(vb.group(1)), float(vc.group(1))
+    want = N_CELLS * 16e-6
+    ok = (abs(iout / want - 1) < 0.02 and 1.0 < vbp < 1.5
+          and 0.4 < vcp < 0.9)
+    return {"ok": ok, "iout_full_scale_mA": round(iout * 1e3, 4),
+            "iout_error_pct": round((iout / want - 1) * 100, 3),
+            "vbp_V": round(vbp, 4), "vcp_V": round(vcp, 4),
+            "want_mA": round(want * 1e3, 3),
+            "netlist": str(deck), "log": str(BUILD / "dc_transfer.log")}
+
+
 def pins() -> dict:
     out = BUILD / "pinplan.json"
     p = run([KLAYOUT, "-b", "-r", ROOT / "pinplan.py",
@@ -400,18 +494,19 @@ def selftest() -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", default="all",
-                    choices=["all", "build", "drc", "lvs", "pins"])
+                    choices=["all", "build", "drc", "lvs", "pex", "dc", "pins"])
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
     pdk = find_pdk()
     report = {}
-    stages = (["build", "drc", "lvs", "pins"] if a.stage == "all"
+    stages = (["build", "drc", "lvs", "pex", "dc", "pins"] if a.stage == "all"
               else [a.stage])
     rc = 0
     for st in stages:
-        fn = {"build": build, "drc": drc, "lvs": lvs, "pins": pins}[st]
+        fn = {"build": build, "drc": drc, "lvs": lvs, "pex": pex,
+              "dc": dc, "pins": pins}[st]
         try:
             res = build(pdk) if st == "build" else (
                 pins() if st == "pins" else fn(pdk))

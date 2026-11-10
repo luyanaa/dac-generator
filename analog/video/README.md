@@ -335,8 +335,10 @@ signoff is `analog/video_sky130/signoff.py` (build/drc/lvs/pins/pex).
   ports, all pmos bulks vdd / nmos bulks vss, and the pad-pair walk passes
   all 255 cells (replica 1/1, selftest 3/3).  Key routing: cd on met3 to
   cross the buses, vbp on met2 / vcp on met1 (a met2 vcp riser shorts to
-  vbp), and the 0.19 um via rules.  PEX/benches remain: no KLayout PEX deck
-  and the magic tech's device extractor is unvalidated for these PCells.
+  vbp), and the 0.19 um via rules.  PEX is magic's: **1022 instances, 8421
+  caps, 2.57 pF**; the extracted DC gives **4.0815 mA (+0.036 %)** at
+  **vbp/vcp 1.2318/0.6271 V** (the study's 1.232/0.627 V).  Mismatch/transient
+  benches remain a bench port on the same netlist.
 * **icsprout55**.  The KLayout cell
   `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
   its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC

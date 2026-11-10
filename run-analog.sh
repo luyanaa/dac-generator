@@ -95,7 +95,7 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky1
     drc) "$SIGN" --stage drc ;;
     lvs) "$SIGN" --stage lvs ;;
     pex)
-        if [ "$PDK" = gf180 ] || [ "$PDK" = sky130 ]; then
+        if [ "$PDK" = gf180 ] || [ "$PDK" = sky130 ] || [ "$PDK" = ihp-sg13g2 ]; then
             "$SIGN" --stage pex
         else
             echo "error: video/$PDK has no PEX stage yet" >&2
@@ -104,7 +104,7 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky1
         ;;
     pins) "$SIGN" --stage pins ;;
     dc)
-        if [ "$TOP:$PDK" = video:sky130 ]; then
+        if [ "$TOP:$PDK" = video:sky130 ] || [ "$TOP:$PDK" = video:ihp-sg13g2 ]; then
             "$SIGN" --stage dc
         else
             echo "error: $TOP/$PDK has no DC stage yet" >&2
