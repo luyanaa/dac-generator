@@ -12,10 +12,10 @@
 #
 # gds/drc/lvs/pex are implemented for the leaves that have a device-level
 # macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
-# its TG tree is class C), csteer (gf180, the 30-cell current-source array
-# only; switches/bias/output stay class C) and cdac (sky130).  Every other
-# leaf is class C and the stage exits 2 instead of reporting a run that did
-# not happen.
+# its TG tree is class C), csteer (gf180, the 30-cell array + replica bias +
+# 60 steering switches; the complementary drive, I-V and wrapper are class C)
+# and cdac (sky130).  Every other leaf is class C and the stage exits 2
+# instead of reporting a run that did not happen.
 #
 # Unlike the digital `run.sh`, this flow is fail-closed: a missing PEX,
 # corner, or DRC result is an error rather than a skipped view.  Class A/B/C
@@ -62,9 +62,9 @@ fi
 # GDS stage.  Only leaves with a device generator get here, and they route
 # every layout stage through their own signoff.py (see below).  The parts a
 # generator does not cover - the string's TG tree/follower, the current-
-# steering switch matrix/bias/I-V - are class C (hand layout), so for a leaf
-# with no generator at all there is nothing to emit and refusing beats
-# pretending otherwise.
+# steering switch drive/I-V - are class C (hand layout), so for a leaf with no
+# generator at all there is nothing to emit and refusing beats pretending
+# otherwise.
 gds() {
     echo "error: no GDS generator for $TOP on $PDK" >&2
     echo "       $TOP is class C: hand layout, see" >&2

@@ -184,10 +184,16 @@ def main() -> int:
 
     gate_ext_cas = []
     out_pads = {}
+    cd_pads = []
 
     for k, (name, wgt) in enumerate(cells):
         x = k * PITCH
-        out_net = ("oU%d" % k) if k < n_unary else ("oB%d" % wgt)
+        # The cascode drain leaves the cell through the pad at the top and is
+        # now the switch tail (cd), not an output.  The net name carries the
+        # cell's segmentation tag, so LVS can re-derive the 1-2-4-8 weighting
+        # from the netlist alone.
+        tag = name.lower()
+        out_net = "cd_" + tag
         top.insert(pya.CellInstArray(pcell_mir.cell_index(),
                                      pya.Trans(int(x * 1000), 0)))
         top.insert(pya.CellInstArray(pcell_cas.cell_index(),
@@ -228,7 +234,9 @@ def main() -> int:
             x + CAS_DX + rt_c[1], Y_PAD[0], out_net)                 # out riser
         add(m1, x + CAS_DX + rt_c[0], Y_PAD[0],
             x + CAS_DX + rt_c[1], Y_PAD[1], out_net)                 # out pad
-        out_pads[name] = (x + CAS_DX + rt_c[0], x + CAS_DX + rt_c[1])
+        cd_pads.append((tag, x))
+        label(x + CAS_DX + rt_c[0] + 0.1, (Y_PAD[0] + Y_PAD[1]) / 2,
+              out_net)
 
         g = gate_span(MIR_L)
         add(poly, x + g[0], W + 0.22, x + g[1], Y_RB_A[1], "vbp")
@@ -309,23 +317,117 @@ def main() -> int:
         x_b + CAS_DX + rt[1], Y_RB_B[0], "vcp")
     label(x_b + CAS_DX + rt[1] + 0.1, 9.75, "vcp")
 
-    # ---------- binary output straps -------------------------------------
-    off = n_unary
-    for w, start, end in bin_blocks:
-        lo = out_pads[cells[start][0]][0]
-        hi = out_pads[cells[end][0]][1]
-        net = "oB%d" % w
-        add(m1, lo, Y_STRAP[0], hi, Y_STRAP[1], net)
-        label((lo + hi) / 2, (Y_STRAP[0] + Y_STRAP[1]) / 2, net)
-    for k, (name, _w) in enumerate(cells[:n_unary]):
-        lo, hi = out_pads[name]
-        label((lo + hi) / 2, (Y_PAD[0] + Y_PAD[1]) / 2, "oU%d" % k)
+    # ---------- steering switches ----------------------------------------
+    # One differential NMOS pair per cell, folded into two rows above the
+    # current sources: row A steers the cell into `iout`, row B into `idump`.
+    # Both rows take their tail from the same cascode drain (cd_<tag>), which is
+    # picked off the output pad, carried up on M2 and fanned into the two
+    # source strips.  Each switch gate is brought out on its own M2 pad; the
+    # complementary drive is the digital macro's job.
+    #
+    # Rotated nfet (W along x), origin (X, Y), W=4 L=0.28:
+    #   comp        X-4.0 .. X       , Y      .. Y+1.16
+    #   src M1      X-4.0 .. X       , Y-0.01 .. Y+0.37
+    #   drain M1    X-4.0 .. X       , Y+0.79 .. Y+1.17
+    #   gate poly   X-4.22 .. X+0.22 , Y+0.44 .. Y+0.72
+    #   bulk tie    X-4.0 .. X       , Y-0.76 .. Y-0.32
+    # The gate paddle starts at x+0.62: it overlaps the last 0.10 of the gate
+    # poly (so the two shapes really merge) and still keeps 0.12 to the active
+    # edge (PL.5a wants 0.10).
+    sw_l = float(cfg.get("sw_l", 0.28))
+    sw_w = float(cfg.get("sw_w", 4.0))
+    pcell_n = ly.create_cell("nfet", lib.name(),
+                             {"l": sw_l, "w": sw_w, "ld": LD, "nf": 1,
+                              "bulk": "Bulk Tie", "volt": "3.3V"})
+    y_a, y_b = 12.0, 16.0
+    y_iout = y_a + 1.17
+    y_idump = y_b + 1.17
+    y_ctrl_a, y_ctrl_b = 18.00, 18.75
+
+    def nfet(X, Y, tag, row, gate):
+        top.insert(pya.CellInstArray(
+            pcell_n.cell_index(),
+            pya.Trans(pya.Trans.R90, int(round(X * 1000)),
+                      int(round(Y * 1000)))))
+        regions.setdefault((m1, "cd_" + tag), pya.Region()).insert(
+            box(X - 4.0, Y - 0.01, X, Y + 0.37))
+        regions.setdefault((m1, row), pya.Region()).insert(
+            box(X - 4.0, Y + 0.79, X, Y + 1.17))
+        regions.setdefault((poly, gate), pya.Region()).insert(
+            box(X - 4.22, Y + 0.44, X + 0.22, Y + 0.72))
+        regions.setdefault((m1, "vss"), pya.Region()).insert(
+            box(X - 4.0, Y - 0.76, X, Y - 0.32))
+
+    # iout / idump buses: M1 bars that merge with every drain strip.  The 0.02
+    # of overlap is enough because the extractor merges overlapping metal; the
+    # LVS gate then proves every switch drain really landed on its bus.
+    add(m1, -0.76, y_iout - 0.02, x_b + 1.0, y_iout + 0.30, "iout")
+    label(0.5, y_iout + 0.14, "iout")
+    add(m1, -0.76, y_idump - 0.02, x_b + 1.0, y_idump + 0.30, "idump")
+    label(0.5, y_idump + 0.14, "idump")
+    # Bulk-tie rails: one M1 bar per row, strapped together on M2 at the far
+    # right (needs 0.06 of M2 around each via1).
+    add(m1, -0.76, y_a - 0.78, x_b + 1.0, y_a - 0.30, "vss")
+    add(m1, -0.76, y_b - 0.78, x_b + 1.0, y_b - 0.30, "vss")
+    label(0.5, y_a - 0.54, "vss")
+    xs = x_last + 2.33
+    add(m2, xs, y_a - 0.76, xs + 0.40, y_b - 0.32, "vss")
+    top.shapes(via1).insert(box(xs + 0.07, y_a - 0.70,
+                                xs + 0.33, y_a - 0.44))
+    top.shapes(via1).insert(box(xs + 0.07, y_b - 0.64,
+                                xs + 0.33, y_b - 0.38))
+
+    for tag, x in cd_pads:
+        X = x + 0.5
+        swa, swb = "swa_" + tag, "swb_" + tag
+        nfet(X, y_a, tag, "iout", swa)
+        nfet(X, y_b, tag, "idump", swb)
+
+        # cd: output pad -> M1 riser clear of the vbp M2 rail -> via1 ->
+        # M2 up and left -> vertical drop between the two gates -> via1 into
+        # each source strip.  Every via1 gets 0.06 of metal on all sides.
+        add(m1, x + 3.99, Y_PAD[0], x + 4.37, 10.12, "cd_" + tag)
+        top.shapes(via1).insert(box(x + 4.05, 9.80, x + 4.31, 10.06))
+        add(m2, x + 3.99, 9.74, x + 4.37, 10.30, "cd_" + tag)
+        add(m2, x + 0.06, 10.00, x + 4.37, 10.30, "cd_" + tag)
+        add(m2, x + 0.06, 10.00, x + 0.44, y_a + 0.05, "cd_" + tag)
+        top.shapes(via1).insert(box(x + 0.12, y_a + 0.05,
+                                    x + 0.38, y_a + 0.31))
+        add(m2, x + 0.06, y_a + 0.05, x + 0.44, y_b + 0.37, "cd_" + tag)
+        top.shapes(via1).insert(box(x + 0.12, y_b + 0.05,
+                                    x + 0.38, y_b + 0.31))
+
+        # Row A gate: poly paddle -> contact -> M1 landing -> via1 -> M2
+        # riser to the control pad.  The riser is the pad's only layer, so
+        # the digital macro connects on M2.
+        add(poly, x + 0.62, y_a + 0.34, x + 1.26, y_a + 0.82, "swa_" + tag)
+        top.shapes(cont).insert(box(x + 0.86, y_a + 0.46,
+                                    x + 1.08, y_a + 0.68))
+        add(m1, x + 0.80, y_a + 0.40, x + 1.20, y_a + 0.80, "swa_" + tag)
+        top.shapes(via1).insert(box(x + 0.87, y_a + 0.48,
+                                    x + 1.13, y_a + 0.74))
+        add(m2, x + 0.80, y_a + 0.42, x + 1.20, y_ctrl_a + 0.35, "swa_" + tag)
+        label(x + 1.00, y_ctrl_a + 0.17, "swa_" + tag, m2_lbl)
+
+        # Row B gate: the same y band is blocked by the next cell's gate poly
+        # (it starts at x+1.78), so the poly climbs over the idump bus and
+        # takes its contact in the clear band above it.  That also lets the
+        # two M2 risers keep 0.28 of spacing.
+        add(poly, x + 0.62, y_b + 0.44, x + 1.00, 18.14, "swb_" + tag)
+        add(poly, x + 0.62, 17.74, x + 1.90, 18.14, "swb_" + tag)
+        top.shapes(cont).insert(box(x + 1.60, 17.82, x + 1.82, 18.04))
+        add(m1, x + 1.53, 17.75, x + 1.93, 18.15, "swb_" + tag)
+        top.shapes(via1).insert(box(x + 1.60, 17.81, x + 1.86, 18.07))
+        add(m2, x + 1.53, 17.75, x + 1.93, y_ctrl_b + 0.35, "swb_" + tag)
+        label(x + 1.73, y_ctrl_b + 0.17, "swb_" + tag, m2_lbl)
 
     # ---------- self-check ------------------------------------------------
     problems = []
     if do_check:
-        # two devices per cell plus the two-device replica bias generator
+        # two PFETs per cell, plus the two-device replica bias generator,
+        # plus the two steering NFETs per cell
         want_dev = 2 * len(cells) + 2
+        want_sw = 2 * len(cells)
         want_cells = dbg if dbg else n_unary + unary_w
         if len(cells) != want_cells:
             problems.append(f"{len(cells)} unit cells, want {n_unary + unary_w}")
@@ -342,9 +444,10 @@ def main() -> int:
                         f"SHORT {keys[i][1]} <-> {keys[j][1]} at "
                         f"({bb.left / 1000:.2f},{bb.bottom / 1000:.2f})")
         print(f"devices    : {want_dev} pfet "
-              f"({len(cells)} cascode pairs + replica bias)")
-        print(f"terminals  : {sum(1 for b in bin_blocks)} binary groups + "
-              f"{min(n_unary, len(cells))} unary pads, 3 rails, iref on vcp")
+              f"({len(cells)} cascode pairs + replica bias) + "
+              f"{want_sw} nfet switches")
+        print(f"terminals  : iout/idump buses, vss, "
+              f"{want_sw} switch gates, 3 bias rails, iref on vcp")
         for p in problems:
             print("  " + p)
     if problems:

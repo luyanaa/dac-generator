@@ -1,32 +1,39 @@
 #!/usr/bin/env python3
-"""Signoff for the unit-current-source array (gf180mcuA): DRC, LVS, PEX.
+"""Signoff for the unit-current-steering core (gf180mcuA): DRC, LVS, PEX.
 
     ./signoff.py                 # build + drc + lvs + pex, gate on all three
     ./signoff.py --stage drc
     ./signoff.py --selftest      # prove the LVS gate rejects mutations
 
-This is the P3 counterpart of `../string/signoff.py`.  Only the *device array*
-is generated (`gen_gds.py`): 30 cascoded-PMOS unit cells with shared vdd/vbp/
-vcp rails and per-output pads, plus the two-device replica cascode bias
-generator at the right end.  The switch matrix, the I-V resistor and the
-differential wrapper stay class C (hand layout), so the gates below sign off
-the current-source macro with its bias, not the whole DAC, and they say so.
+This is the P3 counterpart of `../string/signoff.py`.  `gen_gds.py` generates
+the analog core: 30 cascoded-PMOS unit cells on shared vdd/vbp/vcp rails, the
+two-device replica cascode bias generator at the right end, and one
+differential NMOS switch pair per cell steering that cell's cascode current
+into `iout` or `idump`.  The I-V resistor, the complementary gate drive and
+the differential wrapper stay class C (hand layout), so the gates below sign
+off the core, not the whole DAC, and they say so.
 
   drc  Magic `drc check` / `drc catchup` / `drc count total`, same fail-closed
        path as P1/P2.  gf180 has no KLayout deck in this install.
 
   lvs  Flat Magic netlist.  The contract is written independently of the
-       generator's placement: 30 unit cells (one mirror + one cascode each),
-       every mirror s=vdd/g=vbp/d=internal, every cascode s=internal/g=vcp/
-       d=output, bulk=vdd, 30 internal nodes, and the 4+4 segmentation's output
-       fan-out (1 unary device per oU*, and 1/2/4/8 devices on oB1/oB2/oB4/oB8).
-       Plus the replica bias: one 8/1 diode vdd->vbp and one 8/0.5 diode
-       vbp->vcp, so vcp sits one cascode Vgs below the mirror gate.
+       generator's placement, from the config alone:
+         * 30 unit cells, one mirror (s=vdd/g=vbp/d=internal) and one cascode
+           (s=internal/g=vcp/d=cd_tag) each, bulk=vdd, 30 internal nodes;
+         * the segmentation tags re-derive the 4+4 weights: 15 unary `u*`
+           cells plus `w` cells tagged `b{w}_*` for w = 1/2/4/8;
+         * 30 NMOS switches 4/0.28, bulk=vss, gate swa_tag/swb_tag, source
+           cd_tag, drain iout/idump: one `swa` pair member to `iout` and one
+           `swb` member to `idump` per cell, so every tail node has exactly
+           two switch sources and every gate is a distinct net;
+         * the replica bias: one 8/1 diode vdd->vbp and one 8/0.5 diode
+           vbp->vcp, so vcp sits one cascode Vgs below the mirror gate.
 
-  pex  hierarchical extraction, cthresh/rthresh 0; 62 instances and the per-net
-       geometric capacitance, kept as evidence.
+  pex  hierarchical extraction, cthresh/rthresh 0; 122 instances and the
+       per-net geometric capacitance, kept as evidence.
 
-Not claimed: the switches, bias, output resistor, post-layout linearity.
+Not claimed: the complementary gate drive, the I-V, the differential
+wrapper, or any post-layout linearity of the DAC.
 """
 from __future__ import annotations
 
@@ -195,76 +202,118 @@ def parse_flat(txt: str):
     return devs, scale
 
 
-def check(devs, scale, cfg) -> list[str]:
-    problems: list[str] = []
+def cell_tags(cfg) -> list[tuple[str, int]]:
+    """Segmentation tags and weights, derived from the config only."""
     ub = int(cfg.get("unary_bits", 4))
     bb = int(cfg.get("binary_bits", 4))
-    n_unary = 2 ** ub - 1
-    weights = [2 ** i for i in range(bb)]
-    n_cells = n_unary + sum(weights)
+    tags = [(f"u{i}", 1) for i in range(2 ** ub - 1)]
+    for w in (2 ** i for i in range(bb)):
+        tags += [(f"b{w}_{i}", w) for i in range(w)]
+    return tags
 
-    out_ports = {f"oU{i}" for i in range(n_unary)} | {f"oB{w}" for w in weights}
-    ports = {"vdd", "vbp", "vcp"} | out_ports
+
+NETCOUNT = 0
+
+
+def check(devs, scale, cfg) -> list[str]:
+    global NETCOUNT
+    problems: list[str] = []
+    tags = cell_tags(cfg)
+    n_cells = len(tags)
+    n_unary = 2 ** int(cfg.get("unary_bits", 4)) - 1
+    weights = [2 ** i for i in range(int(cfg.get("binary_bits", 4)))]
+    unary_tags = [t for t, _ in tags if t.startswith("u")]
+
+    rails = {"vdd", "vbp", "vcp", "iout", "idump", "vss"}
+    cd_nets = {"cd_" + t for t, _ in tags}
+    gate_nets = {"swa_" + t for t, _ in tags} | {"swb_" + t for t, _ in tags}
+    sw_w = float(cfg.get("sw_w", 4.0))
+    sw_l = float(cfg.get("sw_l", 0.28))
 
     def um(tok: str) -> float:
         return spice_val(tok) * scale * 1e6
 
-    mirrors = []   # (name, d, s, L)
-    cascodes = []  # (name, d, s, L)
+    mirrors = []        # (name, d, s, L)
+    cascodes = []       # (name, d, s, L)
     bias_mirrors = []
     bias_cascodes = []
+    sw = []             # (name, d, g, s)
     allnets: set[str] = set()
     for name, nets, sub, params in devs:
         d, g, s, b = nets
         allnets.update(nets)
-        if not sub.startswith("pfet"):
-            problems.append(f"{name}: unexpected device {sub}")
-            continue
         if "l" not in params or "w" not in params:
             problems.append(f"{name}: missing l/w")
             continue
         L, W = um(params["l"]), um(params["w"])
-        if abs(W - EXPECTED_W_UM) > 1e-6:
-            problems.append(f"{name}: w {W:.3f} um, want {EXPECTED_W_UM:.3f}")
-        if b != "vdd":
-            problems.append(f"{name}: bulk {b}, want vdd")
-        if g == "vbp" and d == "vbp":
-            # Replica bias mirror: diode-connected from vdd to vbp.
-            if abs(L - MIR_L_UM) > 1e-6:
-                problems.append(f"{name}: bias mirror l {L:.3f}, want {MIR_L_UM}")
-            if s != "vdd":
-                problems.append(f"{name}: bias mirror source {s}, want vdd")
-            bias_mirrors.append((name, d, s, L))
-        elif g == "vcp" and d == "vcp":
-            # Replica bias cascode: diode-connected from vbp to vcp.  Its
-            # source must be vbp, i.e. the mirror diode it stacks on.
-            if abs(L - CAS_L_UM) > 1e-6:
-                problems.append(f"{name}: bias cascode l {L:.3f}, want {CAS_L_UM}")
-            if s != "vbp":
-                problems.append(f"{name}: bias cascode source {s}, want vbp")
-            bias_cascodes.append((name, d, s, L))
-        elif g == "vbp":
-            if abs(L - MIR_L_UM) > 1e-6:
-                problems.append(f"{name}: mirror l {L:.3f}, want {MIR_L_UM}")
-            if s != "vdd":
-                problems.append(f"{name}: mirror source {s}, want vdd")
-            if d in ports:
-                problems.append(f"{name}: mirror drain {d} is a port")
-            mirrors.append((name, d, s, L))
-        elif g == "vcp":
-            if abs(L - CAS_L_UM) > 1e-6:
-                problems.append(f"{name}: cascode l {L:.3f}, want {CAS_L_UM}")
-            if s in ports:
-                problems.append(f"{name}: cascode source {s} is a port")
-            if d not in out_ports:
-                problems.append(f"{name}: cascode drain {d} not an output")
-            cascodes.append((name, d, s, L))
-        else:
-            problems.append(f"{name}: gate net {g}, want vbp or vcp")
 
-    if len(devs) != 2 * n_cells + 2:
-        problems.append(f"{len(devs)} devices, want {2 * n_cells + 2} "
-                        f"(2 per cell + replica bias)")
+        if sub.startswith("pfet"):
+            if abs(W - EXPECTED_W_UM) > 1e-6:
+                problems.append(f"{name}: w {W:.3f} um, want {EXPECTED_W_UM:.3f}")
+            if b != "vdd":
+                problems.append(f"{name}: bulk {b}, want vdd")
+            if g == "vbp" and d == "vbp":
+                # Replica bias mirror: diode-connected from vdd to vbp.
+                if abs(L - MIR_L_UM) > 1e-6:
+                    problems.append(f"{name}: bias mirror l {L:.3f}, "
+                                    f"want {MIR_L_UM}")
+                if s != "vdd":
+                    problems.append(f"{name}: bias mirror source {s}, want vdd")
+                bias_mirrors.append((name, d, s, L))
+            elif g == "vcp" and d == "vcp":
+                # Replica bias cascode: diode-connected from vbp to vcp, on
+                # the mirror diode it stacks on.
+                if abs(L - CAS_L_UM) > 1e-6:
+                    problems.append(f"{name}: bias cascode l {L:.3f}, "
+                                    f"want {CAS_L_UM}")
+                if s != "vbp":
+                    problems.append(f"{name}: bias cascode source {s}, want vbp")
+                bias_cascodes.append((name, d, s, L))
+            elif g == "vbp":
+                if abs(L - MIR_L_UM) > 1e-6:
+                    problems.append(f"{name}: mirror l {L:.3f}, want {MIR_L_UM}")
+                if s != "vdd":
+                    problems.append(f"{name}: mirror source {s}, want vdd")
+                if d in rails:
+                    problems.append(f"{name}: mirror drain {d} is a port")
+                mirrors.append((name, d, s, L))
+            elif g == "vcp":
+                if abs(L - CAS_L_UM) > 1e-6:
+                    problems.append(f"{name}: cascode l {L:.3f}, "
+                                    f"want {CAS_L_UM}")
+                if s in rails:
+                    problems.append(f"{name}: cascode source {s} is a port")
+                if d not in cd_nets:
+                    problems.append(f"{name}: cascode drain {d} is not a "
+                                    f"segmentation tail")
+                cascodes.append((name, d, s, L))
+            else:
+                problems.append(f"{name}: gate net {g}, want vbp or vcp")
+        elif sub.startswith("nfet"):
+            if abs(W - sw_w) > 1e-6:
+                problems.append(f"{name}: switch w {W:.3f}, want {sw_w:.3f}")
+            if abs(L - sw_l) > 1e-6:
+                problems.append(f"{name}: switch l {L:.3f}, want {sw_l:.3f}")
+            if b != "vss":
+                problems.append(f"{name}: switch bulk {b}, want vss")
+            if g not in gate_nets:
+                problems.append(f"{name}: switch gate {g} not swa_*/swb_*")
+                continue
+            tag = g[4:]
+            if s != "cd_" + tag:
+                problems.append(f"{name}: switch source {s}, want cd_{tag}")
+            want_d = "iout" if g.startswith("swa_") else "idump"
+            if d != want_d:
+                problems.append(f"{name}: {g} drain {d}, want {want_d}")
+            sw.append((name, d, g, s))
+        else:
+            problems.append(f"{name}: unexpected device {sub}")
+
+    n_p = 2 * n_cells + 2
+    n_n = 2 * n_cells
+    if len(devs) != n_p + n_n:
+        problems.append(f"{len(devs)} devices, want {n_p + n_n} "
+                        f"({n_p} pfet + {n_n} nfet)")
     if len(mirrors) != n_cells:
         problems.append(f"{len(mirrors)} mirrors, want {n_cells}")
     if len(cascodes) != n_cells:
@@ -273,14 +322,17 @@ def check(devs, scale, cfg) -> list[str]:
         problems.append(f"{len(bias_mirrors)} bias mirrors, want 1")
     if len(bias_cascodes) != 1:
         problems.append(f"{len(bias_cascodes)} bias cascodes, want 1")
+    if len(sw) != n_n:
+        problems.append(f"{len(sw)} switches, want {n_n}")
 
+    # Every unit cell is one mirror stacked on one cascode, and the tail each
+    # switch draws from is the cascode drain of the same tag.
     m_int = Counter(d for _, d, _, _ in mirrors)
     c_int = Counter(s for _, _, s, _ in cascodes)
     if set(m_int) != set(c_int):
-        only_m = sorted(set(m_int) - set(c_int))
-        only_c = sorted(set(c_int) - set(m_int))
-        problems.append(f"internal nodes differ: mirror-only {only_m}, "
-                        f"cascode-only {only_c}")
+        problems.append(f"internal nodes differ: mirror-only "
+                        f"{sorted(set(m_int) - set(c_int))}, cascode-only "
+                        f"{sorted(set(c_int) - set(m_int))}")
     for n, k in m_int.items():
         if k != 1:
             problems.append(f"{n}: {k} mirror drains")
@@ -290,15 +342,41 @@ def check(devs, scale, cfg) -> list[str]:
     if len(m_int) != n_cells:
         problems.append(f"{len(m_int)} internal nodes, want {n_cells}")
 
-    fan = Counter(d for _, d, _, _ in cascodes)
-    for i in range(n_unary):
-        if fan.get(f"oU{i}", 0) != 1:
-            problems.append(f"oU{i}: {fan.get(f'oU{i}', 0)} devices, want 1")
-    for w in weights:
-        if fan.get(f"oB{w}", 0) != w:
-            problems.append(f"oB{w}: {fan.get(f'oB{w}', 0)} devices, want {w}")
+    # Each tail: exactly one cascode drain and exactly two switch sources,
+    # one per switch of the pair.  Each drain of the pair lands on its bus.
+    tail_fan = Counter(d for _, d, _, _ in cascodes)
+    src_fan = Counter(s for _, _, _, s in sw)
+    if set(tail_fan) != cd_nets:
+        problems.append(f"cascode drains {sorted(set(tail_fan) ^ cd_nets)} "
+                        f"differ from the tag set")
+    for t in sorted(cd_nets):
+        if tail_fan.get(t, 0) != 1:
+            problems.append(f"{t}: {tail_fan.get(t, 0)} cascode drains, want 1")
+        if src_fan.get(t, 0) != 2:
+            problems.append(f"{t}: {src_fan.get(t, 0)} switch sources, want 2")
+    gates = Counter(g for _, _, g, _ in sw)
+    if len(gates) != n_n:
+        dup = sorted(g for g, k in gates.items() if k > 1)
+        problems.append(f"{len(gates)} distinct gates, want {n_n} (dups {dup})")
+    for tag, _ in tags:
+        for pfx in ("swa_", "swb_"):
+            if gates.get(pfx + tag, 0) != 1:
+                problems.append(f"{pfx}{tag}: {gates.get(pfx + tag, 0)} "
+                                f"devices, want 1")
 
-    want_nets = 3 + n_cells + n_unary + len(weights)
+    # Weighting: the 4+4 segmentation has to be visible in the tag set alone,
+    # so the unary cells are exactly the `u*` tags and bit w owns w cells.
+    if len(unary_tags) != n_unary:
+        problems.append(f"{len(unary_tags)} unary cells, want {n_unary}")
+    for w in weights:
+        got = sum(1 for t, _ in tags if t.startswith(f"b{w}_"))
+        if got != w:
+            problems.append(f"weight {w}: {got} cells, want {w}")
+    if len({t for t, _ in tags}) != n_cells:
+        problems.append("duplicate segmentation tags")
+
+    want_nets = len(rails) + n_cells + n_cells + n_n
+    NETCOUNT = len(allnets)
     if len(allnets) != want_nets:
         problems.append(f"{len(allnets)} nets, want {want_nets}")
 
@@ -327,7 +405,8 @@ def lvs(pdk: Path) -> dict:
     bb = int(cfg.get("binary_bits", 4))
     n_cells = 2 ** ub - 1 + sum(2 ** i for i in range(bb))
     return {"ok": not problems, "devices": len(devs), "cells": n_cells,
-            "bias": 2, "scale_nm": round(scale * 1e9, 3),
+            "switches": 2 * n_cells, "bias": 2, "nets": NETCOUNT,
+            "scale_nm": round(scale * 1e9, 3),
             "problems": problems, "netlist": str(spice)}
 
 
@@ -377,22 +456,51 @@ def selftest() -> int:
     print(f"selftest swap-gate : {'FAIL' if p2 else 'PASS (bad!)'} ({len(p2)})")
     ok &= bool(p2)
 
-    # Short two outputs: oU0's cascode is renamed onto oU1.
-    cas_idx = [i for i, d in enumerate(devs) if d[1][1] == "vcp"]
-    done = False
+    # Short two tails: u0's cascode drain is renamed onto u1's, so one tail
+    # carries two cascodes and the other none.
     mut2 = list(devs)
-    for i in cas_idx:
-        name, nets, sub, params = mut2[i]
-        if nets[0] == "oU0":
-            mut2[i] = (name, ["oU1", nets[1], nets[2], nets[3]], sub, params)
+    done = False
+    for i, d in enumerate(devs):
+        if d[1][1] == "vcp" and d[1][0] == "cd_u0":
+            name, nets, sub, params = mut2[i]
+            mut2[i] = (name, ["cd_u1", nets[1], nets[2], nets[3]], sub, params)
             done = True
             break
-    if not done:
-        p3 = ["oU0 not found"]
-    else:
-        p3 = check(mut2, scale, cfg)
-    print(f"selftest short-out : {'FAIL' if p3 else 'PASS (bad!)'} ({len(p3)})")
+    p3 = check(mut2, scale, cfg) if done else ["cd_u0 not found"]
+    print(f"selftest short-tail: {'FAIL' if p3 else 'PASS (bad!)'} ({len(p3)})")
     ok &= bool(p3)
+
+    # Switch matrix: drop one switch, short one pair member onto the other
+    # bus, and move one source onto a neighbouring tail.
+    swd = [i for i, d in enumerate(devs) if d[2].startswith("nfet")]
+    if len(swd) != 2 * len(cell_tags(cfg)):
+        p6 = p7 = p8 = ["wrong switch count"]
+        ok = False
+    else:
+        mut5 = [d for i, d in enumerate(devs) if i != swd[len(swd) // 2]]
+        p6 = check(mut5, scale, cfg)
+
+        mut6 = list(devs)
+        i = swd[0]
+        name, nets, sub, params = mut6[i]
+        other = "idump" if nets[0] == "iout" else "iout"
+        mut6[i] = (name, [other, nets[1], nets[2], nets[3]], sub, params)
+        p7 = check(mut6, scale, cfg)
+
+        mut7 = list(devs)
+        i = swd[-1]
+        name, nets, sub, params = mut7[i]
+        src = nets[2]
+        tag = src[3:]
+        other = "cd_b3_0" if tag != "b3_0" else "cd_b3_1"
+        mut7[i] = (name, [nets[0], nets[1], other, nets[3]], sub, params)
+        p8 = check(mut7, scale, cfg)
+    print(f"selftest drop-sw   : {'FAIL' if p6 else 'PASS (bad!)'} ({len(p6)})")
+    ok &= bool(p6)
+    print(f"selftest short-drain: {'FAIL' if p7 else 'PASS (bad!)'} ({len(p7)})")
+    ok &= bool(p7)
+    print(f"selftest wrong-src : {'FAIL' if p8 else 'PASS (bad!)'} ({len(p8)})")
+    ok &= bool(p8)
 
     # Bias diode stack: break the mirror diode and lift the cascode's source
     # off vbp.  Both must be rejected on the bias class checks alone.
@@ -439,9 +547,9 @@ def pex(pdk: Path) -> dict:
     txt = spice.read_text()
     body = _top_body(txt)
     insts = [ln.split() for ln in body if ln.strip().startswith("X")]
-    devs = sum(1 for f in insts if f[-1].startswith("pfet"))
-    if devs != 62:
-        die(f"PEX netlist instantiates {devs} devices, want 62")
+    devs = sum(1 for f in insts if f[-1].startswith(("pfet", "nfet")))
+    if devs != 122:
+        die(f"PEX netlist instantiates {devs} devices, want 122")
     caps = sum(1 for ln in body if ln.strip().startswith("C"))
     if caps == 0:
         die("PEX top subckt has no capacitance; extraction did not run")
@@ -454,12 +562,15 @@ def pex(pdk: Path) -> dict:
         tot[mm.group(1)] += v
         tot[mm.group(2)] += v
     cfg = load_cfg()
-    ub = int(cfg.get("unary_bits", 4))
-    bb = int(cfg.get("binary_bits", 4))
-    names = ["vdd", "vbp", "vcp"]
-    names += [f"oU{i}" for i in range(2 ** ub - 1)]
-    names += [f"oB{w}" for w in (2 ** i for i in range(bb))]
+    # Rails and the two output buses carry the switch charge; the 60 gate
+    # nets and 30 tails are reported in aggregate because they are symmetric.
+    names = ["vdd", "vbp", "vcp", "iout", "idump", "vss"]
     net_cap = {n: round(tot.get(n, 0.0) * 1e15, 3) for n in names}
+    tails = sum(v for n, v in tot.items() if n.startswith("cd_"))
+    gates = sum(v for n, v in tot.items()
+                if n.startswith(("swa_", "swb_")))
+    net_cap["cd_* (30 tails)"] = round(tails * 1e15, 3)
+    net_cap["swa_*/swb_* (60 gates)"] = round(gates * 1e15, 3)
     return {"ok": True, "netlist": str(spice), "bytes": spice.stat().st_size,
             "instances": devs, "caps": caps, "net_cap_ff": net_cap}
 
@@ -489,8 +600,9 @@ def main(argv=None) -> int:
         rep["steps"]["lvs"] = r
         if not r["ok"]:
             failed.append("lvs")
-        print(f"lvs  {'PASS' if r['ok'] else 'FAIL'}  {r['devices']} devices, "
-              f"{r['cells']} cells, scale {r['scale_nm']:g} nm")
+        print(f"lvs  {'PASS' if r['ok'] else 'FAIL'}  {r['devices']} devices "
+              f"({r['cells']} cells + {r['switches']} switches + bias), "
+              f"{r['nets']} nets, scale {r['scale_nm']:g} nm")
         for p in r["problems"]:
             print(f"     {p}")
     if a.stage in ("all", "pex"):

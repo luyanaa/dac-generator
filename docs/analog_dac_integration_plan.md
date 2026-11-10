@@ -271,10 +271,10 @@ isolates the tree, is the only honest way to size it.
 | DEM | closed (model) | 15-state DWA: mean INL +/-0.48, worst sample +/-1.37, 0.39 LSB rms |
 | Digital half | closed | `dac_csteer_dig` 3007/3007 checks, lint clean, hardened config added |
 | Output I-V | **closed by design rule** | passive 1 kOhm costs DNL +6.8 / INL +8.1 LSB; active I-V required |
-| Switch | **closed pre-layout (gf180)** | differential NMOS pair W/L 4/0.28 with the tail on the cascode drain: Ron 391 Ohm, compliance 2.26 V, event charge error 8.3 fC, pair charge error 0.3 fC, settle 55 ps; corners 301-553 Ohm / 2.10-2.44 V / 45-85 ps (`run_switch.py`) |
+| Switch | **closed pre-layout, drawn (gf180)** | differential NMOS pair W/L 4/0.28 with the tail on the cascode drain: Ron 391 Ohm, compliance 2.26 V, event charge error 8.3 fC, pair charge error 0.3 fC, settle 55 ps; corners 301-553 Ohm / 2.10-2.44 V / 45-85 ps (`run_switch.py`) |
 | Cascode bias | **closed pre-layout (gf180)** | replica of the cell with the cascode drain diode-tied: Iref 16 uA through Mref 8/1 and Mcas 8/0.5 gives vbp/vcp; 15 corner/temp points hold Icell 16.000-16.002 uA, mirror margin >= 0.57 V, cascode margin >= 1.80 V |
-| Layout | **array generator closed; switches/bias/I-V class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS unit cells in one row with shared vdd/vbp/vcp rails and `oU0..oU14`/`oB1..oB8` pads; the switch matrix, cascode bias, I-V resistor and differential wrapper stay hand layout |
-| DRC / LVS / PEX | **closed for the current-source array** | `signoff.py`: DRC 0 items, LVS 60 devices / 30 cells / 52 nets / segmentation fan-out 1-2-4-8, PEX 60 instances / 268 C entries; `--selftest` fails drop-unit, swap-gate, short-out |
+| Layout | **core generator closed; drive/I-V/wrapper class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS unit cells in one row with shared vdd/vbp/vcp rails, the replica cascode bias, and one 4/0.28 NMOS switch pair per cell feeding `iout`/`idump`; each cell exposes `swa_<tag>`/`swb_<tag>` on M2 pads. The complementary drive, I-V resistor and differential wrapper stay hand layout |
+| DRC / LVS / PEX | **closed for the core macro** | `signoff.py`: DRC 0 items, LVS 122 devices (30 cells + 2 bias + 60 switches) / 126 nets (6 rails + 30 tails + 30 internal + 60 gates), PEX 122 instances / 993 C entries; `--selftest` fails drop-unit, swap-gate, short-tail, drop-switch, short-drain, wrong-source, bias-gate, bias-source |
 
 The design point here is the DEM state count: 15 unary cells mean 15 pointer
 states, not 16. Over 15 samples every cell must see the average current, and
@@ -407,12 +407,12 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   `2AMLogic/gf180-current-dac` for the array and `alinja/skydacmagic` for the
   cell. Device cell I 15.77 uA, ro 425 kOhm, Vth sensitivity 0.519 %/mV ->
   1.8 %/cell. Fixed-pointer INL 1.37 LSB; DEM mean 0.48 LSB at 0.39 LSB rms.
-  Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. The 30-cell
-  current-source array with its replica cascode bias is generated and signed
-  off (`analog/csteer/gen_gds.py`, DRC 0, LVS 62 devices / 30 cells, PEX 62
-  instances); the switch matrix, I-V and differential wrapper stay class C
-  hand layout, so `run-analog.sh csteer gf180 gds` builds the array+bias macro
-  only.
+  Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. The core is
+  generated and signed off (`analog/csteer/gen_gds.py`: 30 cells, replica
+  cascode bias, 60 steering switches; DRC 0, LVS 122 devices / 126 nets, PEX
+  122 instances); the complementary switch drive, I-V and differential wrapper
+  stay class C hand layout, so `run-analog.sh csteer gf180 gds` builds the core
+  macro only and no post-layout linearity is claimed.
 - **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs
