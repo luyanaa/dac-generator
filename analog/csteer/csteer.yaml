@@ -31,14 +31,16 @@ r_iv: 1000.0
 load_c_pf: 7.0
 
 # Cell output resistance, measured by the device bench (cascoded PMOS mirror,
-# flat window 0.05-1.0 V): 425 kOhm at 15.76 uA in saturation.  Binary cells
-# are w parallel unit cells, so their ro is ro_unit/w.
+# flat window 0.05-1.0 V): 425 kOhm at 15.76 uA in saturation.  A 1 LSB device
+# carries 1/16 of that current at the same L, so its ro is 16x higher; a
+# binary bit of weight w is w such devices in parallel.
 ro_unit: 425000.0
 
 # Per-cell current sigma (relative).  Default is the Pelgrom estimate for the
 # unit cell sized below at V_ov = 0.2 V: sigma_VT = 10 mV*um / sqrt(8*1 um^2)
-# = 3.5 mV -> 1.75 %, rounded to 1.8 %.  Binary cells are sized in proportion
-# to their weight, so their sigma is scaled up by sqrt(weight) as well.
+# = 3.5 mV -> 1.75 %, rounded to 1.8 %.  A 1 LSB cell is 16x smaller, so its
+# sigma is 4x larger; a binary bit of weight w averages w of them, so
+# sigma = 1.8 % * sqrt(16/w).
 cell_sigma: 0.018
 binary_sigma_scale: true
 

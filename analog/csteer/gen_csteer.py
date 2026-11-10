@@ -104,10 +104,17 @@ def cells(cfg, mismatch: float, seed: int, pointer: int) -> tuple[list[str], dic
             f"Bu{j} 0 out I = ({i:.12g}*v(su{j})/{vdd})"
             f" - (v(out)/{ro_u}*v(su{j})/{vdd})")
 
+    i_ratio = i_unit / i_lsb
     for k in range(nb):
         w = 2 ** k
-        ro_b = ro_u / w
-        sig = mismatch * (w ** 0.5) if (mismatch and cfg["binary_sigma_scale"]) else mismatch
+        # A binary bit of weight w is w parallel 1 LSB devices (W = 0.5 um
+        # each), not one wide device: ro ~ 1/I at fixed L, so each 1 LSB
+        # device has i_ratio times the ro of the 16 uA unit cell and the group
+        # of w divides that by w.  Mismatch goes the other way: area is w
+        # times a 1 LSB device, so sigma = sigma_unit*sqrt(i_ratio/w).
+        ro_b = ro_u * i_ratio / w
+        sig = (mismatch * (i_ratio / w) ** 0.5
+               if (mismatch and cfg["binary_sigma_scale"]) else mismatch)
         e = rng.gauss(0.0, sig) if mismatch else 0.0
         errs["binary"].append(e)
         out.append(

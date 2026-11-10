@@ -57,10 +57,21 @@ KLAYOUT_BUILD = "/usr/bin/klayout"
 TOP = "dac_csteer_ana"
 YAML = ROOT / "csteer.yaml"
 
-# Device geometry the generator is expected to produce (um).
+# Device geometry the generator is expected to produce (um).  One unary cell is
+# the full 16 LSB device; every binary cell is a single 1 LSB device and the
+# 1/2/4/8 weight is the number of cells on the gate net.
 EXPECTED_W_UM = 8.0
 MIR_L_UM = 1.0
 CAS_L_UM = 0.5
+
+
+def expected_w(tag: str, cfg) -> float:
+    """Drawn PMOS width for one cell, from its segmentation tag."""
+    unit = float(cfg.get("cell_w", EXPECTED_W_UM))
+    if tag.startswith("u"):
+        return unit
+    return unit * float(cfg.get("i_lsb_ua", 1.0)) / float(
+        cfg.get("i_unit_ua", 16.0))
 
 
 def die(msg: str) -> None:
@@ -230,6 +241,7 @@ def check(devs, scale, cfg) -> list[str]:
     gate_nets = {"swa_" + t for t, _ in tags} | {"swb_" + t for t, _ in tags}
     sw_w = float(cfg.get("sw_w", 4.0))
     sw_l = float(cfg.get("sw_l", 0.28))
+    want_w = {t: expected_w(t, cfg) for t, _ in tags}
 
     def um(tok: str) -> float:
         return spice_val(tok) * scale * 1e6
@@ -239,6 +251,8 @@ def check(devs, scale, cfg) -> list[str]:
     bias_mirrors = []
     bias_cascodes = []
     sw = []             # (name, d, g, s)
+    mirror_w: dict[str, float] = {}          # internal net -> mirror W
+    casc_w: dict[str, tuple[float, str]] = {}  # internal net -> (cascode W, tag)
     allnets: set[str] = set()
     for name, nets, sub, params in devs:
         d, g, s, b = nets
@@ -249,12 +263,17 @@ def check(devs, scale, cfg) -> list[str]:
         L, W = um(params["l"]), um(params["w"])
 
         if sub.startswith("pfet"):
-            if abs(W - EXPECTED_W_UM) > 1e-6:
-                problems.append(f"{name}: w {W:.3f} um, want {EXPECTED_W_UM:.3f}")
+            # Width is checked where the tag is visible: the cascode drain is
+            # the labelled `cd_<tag>` pad, so that device pins the cell's
+            # weight; the mirror of the same cell must then be the same width
+            # (the shared internal net links them, whatever Magic names it).
             if b != "vdd":
                 problems.append(f"{name}: bulk {b}, want vdd")
             if g == "vbp" and d == "vbp":
                 # Replica bias mirror: diode-connected from vdd to vbp.
+                if abs(W - EXPECTED_W_UM) > 1e-6:
+                    problems.append(f"{name}: bias mirror w {W:.3f} um, "
+                                    f"want {EXPECTED_W_UM:.3f}")
                 if abs(L - MIR_L_UM) > 1e-6:
                     problems.append(f"{name}: bias mirror l {L:.3f}, "
                                     f"want {MIR_L_UM}")
@@ -264,6 +283,9 @@ def check(devs, scale, cfg) -> list[str]:
             elif g == "vcp" and d == "vcp":
                 # Replica bias cascode: diode-connected from vbp to vcp, on
                 # the mirror diode it stacks on.
+                if abs(W - EXPECTED_W_UM) > 1e-6:
+                    problems.append(f"{name}: bias cascode w {W:.3f} um, "
+                                    f"want {EXPECTED_W_UM:.3f}")
                 if abs(L - CAS_L_UM) > 1e-6:
                     problems.append(f"{name}: bias cascode l {L:.3f}, "
                                     f"want {CAS_L_UM}")
@@ -278,6 +300,7 @@ def check(devs, scale, cfg) -> list[str]:
                 if d in rails:
                     problems.append(f"{name}: mirror drain {d} is a port")
                 mirrors.append((name, d, s, L))
+                mirror_w[d] = W
             elif g == "vcp":
                 if abs(L - CAS_L_UM) > 1e-6:
                     problems.append(f"{name}: cascode l {L:.3f}, "
@@ -287,6 +310,12 @@ def check(devs, scale, cfg) -> list[str]:
                 if d not in cd_nets:
                     problems.append(f"{name}: cascode drain {d} is not a "
                                     f"segmentation tail")
+                else:
+                    tag = d[3:]
+                    if abs(W - want_w[tag]) > 1e-6:
+                        problems.append(f"{name}: cell {tag} w {W:.3f} um, "
+                                        f"want {want_w[tag]:.3f}")
+                    casc_w[s] = (W, tag)
                 cascodes.append((name, d, s, L))
             else:
                 problems.append(f"{name}: gate net {g}, want vbp or vcp")
@@ -342,6 +371,15 @@ def check(devs, scale, cfg) -> list[str]:
             problems.append(f"{n}: {k} cascode sources")
     if len(m_int) != n_cells:
         problems.append(f"{len(m_int)} internal nodes, want {n_cells}")
+    # One cell = one mirror on one cascode, same width.  The cascode carries the
+    # tag (its drain is the `cd_` pad), so this closes the width contract
+    # without needing labels on the internal nodes.
+    for n, w in mirror_w.items():
+        if n not in casc_w:
+            problems.append(f"mirror drain {n} has no cascode source")
+        elif abs(w - casc_w[n][0]) > 1e-6:
+            problems.append(f"cell {casc_w[n][1]}: mirror w {w:.3f}, "
+                            f"cascode w {casc_w[n][0]:.3f}")
 
     # Each tail: exactly one cascode drain and exactly two switch sources,
     # one per switch of the pair.  Each drain of the pair lands on its bus.
@@ -524,6 +562,32 @@ def selftest() -> int:
     ok &= bool(p4)
     print(f"selftest bias-src  : {'FAIL' if p5 else 'PASS (bad!)'} ({len(p5)})")
     ok &= bool(p5)
+
+    # Width contract: a binary cell must be 0.5/1, not a 16 LSB device.  Widen
+    # one binary cascode (tag side) and one binary mirror (pair side).
+    cw_idx = [i for i, d in enumerate(devs)
+              if d[1][1] == "vcp" and d[1][0].startswith("cd_b")]
+    bin_int = {devs[i][1][2] for i in cw_idx}
+    mw_idx = [i for i, d in enumerate(devs)
+              if d[1][1] == "vbp" and d[1][0] in bin_int]
+    if cw_idx:
+        mut8 = list(devs)
+        name, nets, sub, params = mut8[cw_idx[0]]
+        mut8[cw_idx[0]] = (name, nets, sub, dict(params, w="8u"))
+        p9 = check(mut8, scale, cfg)
+    else:
+        p9 = ["no binary cascode found"]
+    if mw_idx:
+        mut9 = list(devs)
+        name, nets, sub, params = mut9[mw_idx[-1]]
+        mut9[mw_idx[-1]] = (name, nets, sub, dict(params, w="8u"))
+        p10 = check(mut9, scale, cfg)
+    else:
+        p10 = ["no cell mirror found"]
+    print(f"selftest cell-width : {'FAIL' if p9 else 'PASS (bad!)'} ({len(p9)})")
+    ok &= bool(p9)
+    print(f"selftest mirror-w   : {'FAIL' if p10 else 'PASS (bad!)'} ({len(p10)})")
+    ok &= bool(p10)
 
     print("selftest " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1

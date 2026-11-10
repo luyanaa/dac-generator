@@ -18,6 +18,10 @@ the same gates, so pre- and post-layout numbers are comparable:
         event charge error on `iout`, pair charge error, peak displacement and
         settling to +-0.5 LSB.
 
+  code  0..255 with all 60 gates driven the way the digital macro drives them:
+        full scale, the unary step, DNL/INL and monotonicity on the extracted
+        core.  This is the gate that a mis-sized binary field cannot pass.
+
 The difference to the pre-layout bench is exactly the layout: the switching
 node now carries its extracted tail capacitance instead of a guessed 10 fF,
 and `iout`/`idump` carry the extracted bus plus all 60 switch drain caps.
@@ -235,6 +239,70 @@ def bench_tran(cfg, pdk: str, root: Path, pts: list[str]) -> dict:
             "settle": settle, "sweep": str(out)}
 
 
+def bench_transfer(cfg, pdk: str, root: Path, pts: list[str]) -> dict:
+    """All 256 codes on the extracted core: the DAC transfer curve.
+
+    This is the check the layout did not have: every switch gate is driven the
+    way `dac_csteer_dig` drives it (thermometer on the MSBs, one register bit
+    fanned to all cells of a binary weight), the output is a virtual ground,
+    and the code is swept end to end.  The DWA pointer only permutes which
+    unary cell is on, so it cannot change the sum and the bench uses pointer 0.
+    """
+    out = BUILD / "post_transfer.dat"
+    vdd = float(cfg["vdd"])
+    ub = int(cfg["unary_bits"])
+    bb = int(cfg["binary_bits"])
+    bits = int(cfg["bits"])
+
+    conds: dict[str, str] = {}
+    for j in range(2 ** ub - 1):
+        conds[f"u{j}"] = f"(floor(v(code)/{2 ** bb}) > {j + 0.5})"
+    for k in range(bb):
+        w = 2 ** k
+        bit = f"(floor(v(code)/{w})-2*floor(v(code)/{2 * w}))"
+        for i in range(w):
+            conds[f"b{w}_{i}"] = f"({bit} > 0.5)"
+
+    lines = netlist_head(cfg, pdk, root, PEX, pts)
+    lines.append("Vcode code 0 0")
+    want = {p for p in pts if p.startswith(("swa_", "swb_"))}
+    got = {pfx + t for t in conds for pfx in ("swa_", "swb_")}
+    if got != want:
+        die(f"transfer drive covers {len(got)} gates, netlist has {len(want)}")
+    for tag, cond in conds.items():
+        lines.append(f"Bswa_{tag} swa_{tag} 0 V = {vdd:.3f}*{cond}")
+        lines.append(f"Bswb_{tag} swb_{tag} 0 V = {vdd:.3f}*(1-{cond})")
+    lines += [
+        "Vmi iout 0 0",
+        "Vmn idump 0 0",
+        ".control", "set wr_singlescale", "set wr_vecnames",
+        f"dc Vcode 0 {2 ** bits - 1} 1",
+        f"wrdata {out} v(code) i(Vmi) i(Vmn)",
+        ".endc", ".end",
+    ]
+    nl = BUILD / "post_transfer.spice"
+    nl.write_text("\n".join(lines) + "\n")
+    ngspice(nl)
+    rows = wrdata(out)
+    if len(rows) < 2 ** bits:
+        die(f"transfer sweep produced {len(rows)} rows, want {2 ** bits}")
+
+    i = [r[2] for r in rows]                 # iout, the I-V virtual ground
+    i0 = i[0]
+    fs = i[-1] - i0
+    if fs <= 0:
+        die(f"full scale {fs * 1e6:.3f} uA; is the output grounded?")
+    lsb = fs / (2 ** bits - 1)
+    steps = [i[c] - i[c - 1] for c in range(1, len(i))]
+    dnl = max(abs(s / lsb - 1.0) for s in steps)
+    inl = max(abs((i[c] - i0) / lsb - c) for c in range(len(i)))
+    bad = [c for c, s in enumerate(steps, 1) if s < -0.05 * lsb]
+    return {"fs": fs, "lsb": lsb, "dnl": dnl, "inl": inl,
+            "nonmono": len(bad), "first_bad": bad[:5],
+            "unary_step": (i[2 ** bb] - i0) / lsb,
+            "sweep": str(out)}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--brief", action="store_true")
@@ -256,6 +324,8 @@ def main(argv=None) -> int:
 
     dc = bench_dc(cfg, a.pdk, root, pts)
     tr = bench_tran(cfg, a.pdk, root, pts)
+    tf = bench_transfer(cfg, a.pdk, root, pts)
+    want_fs = (2 ** int(cfg["bits"]) - 1) * float(cfg["i_lsb_ua"])
 
     checks = [
         ("dc sum error", dc["sum_err"] < 0.01,
@@ -269,6 +339,13 @@ def main(argv=None) -> int:
          f"{tr['qsum'] * 1e15:.1f} fC"),
         ("settle to 0.5 LSB", tr["settle"] < SETTLE_MAX,
          f"{tr['settle'] * 1e12:.0f} ps"),
+        ("full scale", abs(tf["fs"] * 1e6 - want_fs) < 0.05 * want_fs,
+         f"{tf['fs'] * 1e6:.1f} uA"),
+        ("unary step 16 LSB", abs(tf["unary_step"] - 16.0) < 1.0,
+         f"{tf['unary_step']:.2f} LSB"),
+        ("transfer DNL", tf["dnl"] < 0.5, f"{tf['dnl']:.3f} LSB"),
+        ("transfer INL", tf["inl"] < 1.0, f"{tf['inl']:.3f} LSB"),
+        ("monotonic", tf["nonmono"] == 0, f"{tf['nonmono']} bad steps"),
     ]
     ok = True
     if not a.brief:
@@ -276,6 +353,9 @@ def main(argv=None) -> int:
               f"Icell {dc['icell'] * 1e6:.3f} uA)")
         print(f"  peak displacement   : {tr['peak'] * 1e6:.1f} uA")
         print(f"  cascode drain swing : {tr['cd_exc'] * 1e3:.1f} mV")
+        print(f"  transfer            : FS {tf['fs'] * 1e6:.1f} uA "
+              f"(want {want_fs:.1f}), LSB {tf['lsb'] * 1e6:.3f} uA, "
+              f"unary step {tf['unary_step']:.2f} LSB")
     for name, good, val in checks:
         ok &= good
         if a.brief:
@@ -285,7 +365,7 @@ def main(argv=None) -> int:
     print(f"post-layout {'PASS' if ok else 'FAIL'}")
     (BUILD / "postlayout.json").write_text(json.dumps(
         {"ok": ok, "pdk": a.pdk, "pex": str(PEX), "ports": len(pts),
-         "dc": dc, "tran": tr}, indent=1) + "\n")
+         "dc": dc, "tran": tr, "transfer": tf}, indent=1) + "\n")
     return 0 if ok else 1
 
 

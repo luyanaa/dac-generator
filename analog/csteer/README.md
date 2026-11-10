@@ -24,27 +24,36 @@ class **C** hand layout. No OpenROAD P&R near the analog core.
 * `I_LSB = 1 uA`, full scale 255 uA. Into an ideal I-V (virtual ground) that
   is 255 mV at 1 kOhm.
 * 4 MSBs unary so DEM has something to rotate where linearity matters (the
-  major carries); 4 LSBs binary so the cell count stays at 15+4 instead of 63.
-* Each cell is a cascoded PMOS mirror (`W/L = 8/1 um` mirror, `8/0.5 um`
-  cascode) with a separate 16 uA reference branch.
+  major carries); 4 LSBs binary. The binary field is **15 identical 1 LSB
+  cells**, not four wide devices: bit 1 is one cell, bit 2 two, bit 4 four and
+  bit 8 eight, all on one gate net. 30 cells total instead of 63, with every
+  binary cell the same device (better matching, one PCell geometry).
+* A unary cell is a cascoded PMOS mirror `W/L = 8/1 um` (cascode `8/0.5 um`)
+  carrying 16 uA; a binary cell is the same stack at `0.5/1 um` carrying 1 uA,
+  so the whole 8-bit field is one device flavour at two widths.
 
 ## Why virtual ground
 
 A current DAC is characterised into **0 V**, which is what an opamp I-V (or a
 shorted input) presents. With a passive I-V resistor the cell output
-conductance becomes a code-dependent gain error: the 425 kOhm cell ro across a
-255 mV full-scale output costs **DNL +6.8 / INL +8.1 LSB** at `R = 1 kOhm`.
-The leaf therefore specifies an active I-V (or a much higher-impedance /
+conductance becomes a code-dependent gain error: the 425 kOhm unary-cell ro
+across the 255 mV full-scale output costs **DNL -0.07 / INL +2.4 LSB** at
+`R = 1 kOhm` even with perfectly matched cells (the binary field is 16x
+stiffer, so it no longer dominates this term). 2.4 LSB is still far outside an
+8-bit budget, so the leaf specifies an active I-V (or a much higher-impedance /
 regulated-cascode output) and the regression reports both:
 
 | bench | DNL (LSB) | INL (LSB) |
 |---|---|---|
 | virtual ground, sigma = 0 (control) | 0.000 | 0.000 |
-| virtual ground, 1.8 %/cell | -0.886 .. +0.320 | -0.479 .. +1.370 |
-| passive 1 kOhm I-V, 1.8 %/cell | -0.837 .. +6.786 | 0.000 .. +8.125 |
+| passive 1 kOhm I-V, sigma = 0 | -0.067 .. +0.061 | 0.000 .. +2.383 |
+| virtual ground, 1.8 %/unit cell | -0.890 .. +0.275 | -0.483 .. +1.373 |
+| passive 1 kOhm I-V, 1.8 %/unit cell | -0.890 .. +0.321 | -0.215 .. +3.260 |
 
 The control run is exact, so the error is the injected cell mismatch, not the
-measurement path.
+measurement path. The passive-I-V penalty is smaller than it used to be because
+the binary cells are now 1 uA devices with 16x the ro of a 16 uA cell: only the
+unary field still sees the full 425 kOhm.
 
 ## Device cell (`run_cell.py`)
 
@@ -76,9 +85,11 @@ Gate-referred sensitivity at tt/25 C:
 | 20 mV | -10.263 % | -0.513 %/mV |
 
 so `dI/I = -0.519 %/mV`. With Pelgrom `A_VT = 10 mV*um` and
-`W*L = 8*1 um^2`, `sigma_VT = 3.5 mV`, hence `sigma_I/I = 1.8 %` per unit
-cell - the number the dc bench injects. Binary cells are `2^k` parallel unit
-cells, so their sigma is scaled by `sqrt(2^k)`.
+`W*L = 8*1 um^2`, `sigma_VT = 3.5 mV`, hence `sigma_I/I = 1.8 %` per unary
+cell - the number the dc bench injects. A 1 LSB cell is 16x smaller, so its
+`sigma_VT` is 4x larger and `sigma_I/I = 7.2 %`; a binary bit of weight `w`
+averages `w` of them, so `sigma = 7.2 %/sqrt(w)`. Binary mismatch is therefore
+worst on bit 1, which is exactly where it costs the least DNL.
 
 ## Switch and replica cascode bias (`run_switch.py`)
 
@@ -136,33 +147,34 @@ event.
 
 ## Pre-layout linearity and DEM
 
-Static INL/DNL over 256 codes, tt/25 C, 1.8 %/unit cell gain error. `dem_mean`
-is the average over the 15 DWA pointer positions (what a low-frequency
-measurement or a decimating load sees); `dem_worst` is any single sample.
+Static INL/DNL over 256 codes, tt/25 C, 1.8 %/unary cell gain error (7.2 %/sqrt(w)
+on binary bit `w`). `dem_mean` is the average over the 15 DWA pointer positions
+(what a low-frequency measurement or a decimating load sees); `dem_worst` is any
+single sample.
 
 | view | DNL (LSB) | INL (LSB) |
 |---|---|---|
-| fixed pointer (no DEM) | -0.886 .. +0.320 | -0.479 .. +1.370 |
-| DEM mean | -0.511 .. +0.320 | -0.479 .. +0.479 |
-| DEM worst sample | -0.886 .. +0.320 | -1.370 .. +1.370 |
+| fixed pointer (no DEM) | -0.890 .. +0.275 | -0.483 .. +1.373 |
+| DEM mean | -0.515 .. +0.275 | -0.483 .. +0.483 |
+| DEM worst sample | -0.890 .. +0.275 | -1.373 .. +1.373 |
 
 DEM removes the first-order unary error from the averaged transfer (INL
-1.370 -> 0.479 LSB) and turns it into shaped noise: 0.39 LSB rms over codes,
+1.373 -> 0.483 LSB) and turns it into shaped noise: 0.39 LSB rms over codes,
 0.48 LSB at the worst code. At a single sample the worst INL is not better
 (1.37 LSB) - DEM trades instantaneous accuracy for spectral purity, which is
 the point.
 
-Ten-seed sweep (same sigma):
+Ten-seed sweep (same sigma; extremes over the seeds):
 
 | quantity | worst | mean |
 |---|---|---|
-| \|DNL\| fixed pointer | 1.501 | 0.74 |
-| \|INL\| fixed pointer | 1.375 | 1.193 |
-| \|INL\| DEM mean | 0.966 | 0.510 |
-| \|INL\| DEM worst sample | 1.928 | 1.409 |
+| \|DNL\| fixed pointer | 1.259 | - |
+| \|INL\| fixed pointer | 1.412 | 1.145 |
+| \|INL\| DEM mean | 0.740 | 0.404 |
+| \|INL\| DEM worst sample | 1.710 | 1.346 |
 | DEM rms at worst code | 1.003 | 0.600 |
 
-At 8 bit and 1.8 %/cell the unary field is the DNL limit; DEM recovers about
+At 8 bit and 1.8 %/unit cell the unary field is the DNL limit; DEM recovers about
 half the static INL. Trimming or larger cells is the next step if a tighter
 DNL is required.
 
@@ -175,7 +187,7 @@ DNL is required.
 | `measure.py` | endpoint-fit DNL/INL plus the analytic DEM mean/worst/noise |
 | `run_cell.py` | device cell across corners/temperature and the Vth sensitivity |
 | `run_switch.py` | replica bias matrix + one steering event (Ron, compliance, charge, settling) |
-| `run_postlayout.py` | the same switch gates re-run on the extracted core (PEX netlist) |
+| `run_postlayout.py` | the switch gates and the 256-code transfer re-run on the extracted core (PEX netlist) |
 | `run_mismatch.py` | per-cell mismatch seed sweep |
 | `run.sh` | one-command pre-layout regression |
 
@@ -186,9 +198,10 @@ to 1e-6 LSB).
 
 ## Core layout (`gen_gds.py`, `signoff.py`)
 
-One row of 30 identical cascoded-PMOS cells (mirror left, cascode right, M1
-bridge over the n-well tie), shared `vdd` on M1 and `vbp`/`vcp` on poly/M2, the
-replica bias generator at the right end, and one steering switch pair per cell:
+One row of 30 cascoded-PMOS cells (15 at 8/1 unary, 15 at 0.5/1 binary, mirror
+left, cascode right, M1 bridge over the n-well tie), shared `vdd` on M1 and
+`vbp`/`vcp` on poly/M2, the replica bias generator at the right end, and one
+steering switch pair per cell:
 
 * **Current sources.** `Mref` 8/1 from vdd to `vbp`, gate tied to its drain, and
   `Mcas` 8/0.5 from `vbp` to `vcp`, gate tied to its drain. The reference
@@ -217,15 +230,19 @@ Gates: Magic DRC 0 items, LVS 122 devices (30 cells + 2 bias + 60 switches) /
 993 C entries. The LVS contract is written from `csteer.yaml` only and checks
 the tail fan-out (one cascode drain and exactly two switch sources per
 `cd_<tag>`), the drain split (one `iout`, one `idump` per cell), 60 distinct
-gate nets, the 1-2-4-8 tag weights, and every device's W/L/bulk. `--selftest`
-rejects drop-unit, swap-gate, short-tail, drop-switch, short-drain,
-wrong-source, and two bias mutations (lift the cascode source off `vbp`, move
-the mirror gate to `vcp`).
+gate nets, the 1-2-4-8 tag weights, and every device's W/L/bulk. Width is
+weight: the cascode that owns a `cd_<tag>` must be 8/1 for a `u*` tag and 0.5/1
+for a `b*` tag, and the mirror on the same internal node must match it - so a
+binary cell silently drawn at 16 LSB fails LVS instead of merely shifting the
+transfer curve. `--selftest` rejects drop-unit, swap-gate, short-tail,
+drop-switch, short-drain, wrong-source, two bias mutations, a widened binary
+cascode and a widened binary mirror.
 
 Not in this macro: the gate drive itself (the digital macro generates both
 phases; the wrapper only routes them to these pads), the I-V resistor and the
-differential wrapper, and any post-layout linearity claim, which needs the
-switches in a full-DAC context.
+differential wrapper. The 256-code sweep below is a *deterministic* transfer
+check; mismatch INL/DNL, the I-V and the analog-facing pin placement remain
+open.
 
 ## Post-layout (`run_postlayout.py`)
 
@@ -243,6 +260,22 @@ post-layout are directly comparable:
 | event charge error | 8.3 fC | 8.9 fC | < 25 fC |
 | pair charge error | 0.3 fC | 1.1 fC | < 5 fC |
 | settle to 0.5 LSB | 55 ps | 47 ps | < 500 ps |
+| full scale (code 255) | 255 uA | 255.2 uA | 255 +- 5 % |
+| unary step (code 16) | 16 LSB | 15.99 LSB | 16 +- 1 LSB |
+| transfer DNL | exact | 0.177 LSB | < 0.5 LSB |
+| transfer INL | exact | 0.166 LSB | < 1 LSB |
+| monotonic steps | - | 0 bad | 0 |
+
+The last five rows are a **256-code sweep of the extracted core**: every gate
+is driven the way `dac_csteer_dig` drives it (thermometer on the MSBs, one
+register bit fanned to all cells of a binary weight), the output is a virtual
+ground, and the code steps 0..255. This is the check the layout did not have
+before: it is what catches a binary field that is not actually 1 LSB per cell
+(the earlier 30 x 16 uA array swept a sawtooth with 15 non-monotonic steps and
+a 480 uA full scale). The residual DNL is one step at code 16 (-0.18 LSB): a
+0.5 um device carries 1.2 % more current than 1/16 of the 8 um device, so the
+binary LSB is 1.012 uA against a unary LSB of 1.000 uA. That offset is a drawn
+width ratio, not mismatch, and is trimmable in the cell width if needed.
 
 Only cell `u0` switches; the other 29 are parked on `idump`, so every metric is
 u0's own current after subtracting the parked contribution. The change from
@@ -252,10 +285,13 @@ bus caps (7.8 / 8.8 fF), the 60 gate nets 0.7 fF each and the 30 tails 1.4 fF
 each. Peak displacement is 86.5 uA and the tail swings 15.4 mV.
 
 This is a core-level result: the drawn switches behave, the charge numbers are
-real, and the layout adds nothing fatal. It is **not** a linearity claim — that
-needs the wrapper, the I-V and the switch drive in one netlist. The stage is
-fail-closed: no PEX, or a PEX older than `csteer.gds`, exits 2 instead of
-running a stale netlist.
+real, the 256-code transfer is monotonic with the right segmentation, and the
+layout adds nothing fatal. It is **not** a mismatch linearity claim: the PEX
+netlist has one deterministic model for all 30 cells, so static INL/DNL under
+process mismatch still comes from the pre-layout Pelgrom model above, and the
+I-V, the wrapper and the analog-facing pin placement are still missing. The
+stage is fail-closed: no PEX, or a PEX older than `csteer.gds`, exits 2 instead
+of running a stale netlist.
 
 
 ## Digital half

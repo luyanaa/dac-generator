@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 r"""Generate the unit-current-source array for the current-steering DAC (P3).
 
-This is the reusable *device* generator for P3: 30 identical cascoded-PMOS unit
-cells, placed in one row with the bias and supply rails that the array shares.
-It does not draw transistor geometry: every device is the PDK `pfet` PCell, and
-the script only adds the M1/poly straps and the terminal pads.
+This is the reusable *device* generator for P3: 30 cascoded-PMOS cells (15
+unary at 16 LSB, 15 binary at 1 LSB each), placed in one row with the bias and
+supply rails that the array shares.  It does not draw transistor geometry:
+every device is the PDK `pfet` PCell, and the script only adds the M1/poly
+straps and the terminal pads.
+
+The 1/2/4/8 binary weight is the *cell count* on each gate net, not the device
+width: all 15 binary cells are identical 0.5/1 um devices, which is what the
+digital macro drives (`swa_b8[7:0]` fans one register bit to eight cells).
 
 What it does not contain (class C, hand layout, see README):
 
@@ -29,9 +34,10 @@ cascode on the right, sharing one M1 node in the middle:
   * mirror gates go to the lower poly rail (vbp, y=8.5..8.85), cascode gates to
     the upper one (vcp, y=9.45..9.85).  The lower rail is notched around each
     cascode gate extension: a poly rail that crossed one would short vbp to vcp.
-  * every unary cell gets its own output pad `oU<n>`; the four binary cells are
-    built from 1/2/4/8 parallel unit cells and their pads are strapped into
-    `oB1`, `oB2`, `oB4`, `oB8`.
+  * every cell gets its own cascode-drain pad `cd_<tag>` at y=9.0..9.4; the
+    steering switches pick the tail off that pad on M2.  The tag carries the
+    segmentation (`u7`, `b8_3`), so LVS re-derives the weighting from the
+    netlist.
 
 Usage (KLayout's interpreter, not system python3):
     klayout -b -r gen_gds.py [-rd out=build/csteer.gds] [-rd check=true]
@@ -175,12 +181,25 @@ def main() -> int:
         cells = cells[:dbg]
         bin_blocks = [b for b in bin_blocks if b[2] < dbg]
 
-    pcell_mir = ly.create_cell("pfet", lib.name(),
-                               {"l": MIR_L, "w": W, "ld": LD, "nf": 1,
-                                "bulk": "Bulk Tie", "volt": "3.3V"})
-    pcell_cas = ly.create_cell("pfet", lib.name(),
-                               {"l": CAS_L, "w": W, "ld": LD, "nf": 1,
-                                "bulk": "Bulk Tie", "volt": "3.3V"})
+    # Cell width carries the weight: one unary cell is the full 16 LSB device,
+    # every binary cell is a single 1 LSB device and the 1/2/4/8 weight is the
+    # *number* of cells on that gate net, not a wider device.  That keeps all
+    # 15 binary cells identical (better matching) and is exactly what the
+    # digital macro drives (see dac_csteer_dig.v).
+    i_unit = float(cfg.get("i_unit_ua", 16.0))
+    i_lsb = float(cfg.get("i_lsb_ua", 1.0))
+    w_bin = W * i_lsb / i_unit
+
+    pcell_cache: dict[tuple[float, float], object] = {}
+
+    def pfet_pcell(l, w):
+        key = (round(l, 6), round(w, 6))
+        if key not in pcell_cache:
+            pcell_cache[key] = ly.create_cell(
+                "pfet", lib.name(),
+                {"l": l, "w": w, "ld": LD, "nf": 1,
+                 "bulk": "Bulk Tie", "volt": "3.3V"})
+        return pcell_cache[key]
 
     gate_ext_cas = []
     out_pads = {}
@@ -194,9 +213,10 @@ def main() -> int:
         # from the netlist alone.
         tag = name.lower()
         out_net = "cd_" + tag
-        top.insert(pya.CellInstArray(pcell_mir.cell_index(),
+        wc = W if tag.startswith("u") else w_bin
+        top.insert(pya.CellInstArray(pfet_pcell(MIR_L, wc).cell_index(),
                                      pya.Trans(int(x * 1000), 0)))
-        top.insert(pya.CellInstArray(pcell_cas.cell_index(),
+        top.insert(pya.CellInstArray(pfet_pcell(CAS_L, wc).cell_index(),
                                      pya.Trans(int((x + CAS_DX) * 1000), 0)))
         # PCell terminal geometry, for the self-check only.
         lt = left_term()
@@ -204,33 +224,33 @@ def main() -> int:
         rt_c = right_term(CAS_L)
         tie = tie_span()
         regions.setdefault((m1, "vdd"), pya.Region()).insert(
-            box(x + lt[0], -0.01, x + lt[1], W + 0.01))       # mirror source
+            box(x + lt[0], -0.01, x + lt[1], wc + 0.01))      # mirror source
         regions.setdefault((m1, "vdd"), pya.Region()).insert(
-            box(x + tie[0], 0.0, x + tie[1], W))              # mirror tie
+            box(x + tie[0], 0.0, x + tie[1], wc))             # mirror tie
         regions.setdefault((m1, "vdd"), pya.Region()).insert(
-            box(x + CAS_DX + tie[0], 0.0, x + CAS_DX + tie[1], W))
-        node = "N%d" % k
+            box(x + CAS_DX + tie[0], 0.0, x + CAS_DX + tie[1], wc))
+        node = "n_" + tag
         regions.setdefault((m1, node), pya.Region()).insert(
-            box(x + rt_m[0], -0.01, x + rt_m[1], W + 0.01))   # mirror drain
+            box(x + rt_m[0], -0.01, x + rt_m[1], wc + 0.01))  # mirror drain
         regions.setdefault((m1, node), pya.Region()).insert(
-            box(x + CAS_DX + lt[0], -0.01, x + CAS_DX + lt[1], W + 0.01))
+            box(x + CAS_DX + lt[0], -0.01, x + CAS_DX + lt[1], wc + 0.01))
         g = gate_span(MIR_L)
         regions.setdefault((poly, "vbp"), pya.Region()).insert(
-            box(x + g[0], -0.22, x + g[1], W + 0.22))
+            box(x + g[0], -0.22, x + g[1], wc + 0.22))
         g = gate_span(CAS_L)
         regions.setdefault((poly, "vcp"), pya.Region()).insert(
-            box(x + CAS_DX + g[0], -0.22, x + CAS_DX + g[1], W + 0.22))
+            box(x + CAS_DX + g[0], -0.22, x + CAS_DX + g[1], wc + 0.22))
 
         # --- straps -------------------------------------------------------
         add(m1, x - 0.01, Y_VDD[0], x + 0.37, -0.01, "vdd")          # source
         add(m1, x - 0.76, Y_VDD[0], x - 0.32, 0.0, "vdd")            # tie
         add(m1, x + CAS_DX - 0.76, Y_VDD[0], x + CAS_DX - 0.32, 0.0, "vdd")
 
-        add(m1, x + rt_m[0], W + 0.01, x + rt_m[1], 8.55, node)      # riser
-        add(m1, x + CAS_DX + lt[0], W + 0.01,
+        add(m1, x + rt_m[0], wc + 0.01, x + rt_m[1], 8.55, node)     # riser
+        add(m1, x + CAS_DX + lt[0], wc + 0.01,
             x + CAS_DX + lt[1], 8.55, node)                           # cas riser
         add(m1, x + rt_m[0], 8.25, x + CAS_DX + 0.33, 8.55, node)    # bridge
-        add(m1, x + CAS_DX + rt_c[0], W + 0.01,
+        add(m1, x + CAS_DX + rt_c[0], wc + 0.01,
             x + CAS_DX + rt_c[1], Y_PAD[0], out_net)                 # out riser
         add(m1, x + CAS_DX + rt_c[0], Y_PAD[0],
             x + CAS_DX + rt_c[1], Y_PAD[1], out_net)                 # out pad
@@ -239,7 +259,7 @@ def main() -> int:
               out_net)
 
         g = gate_span(MIR_L)
-        add(poly, x + g[0], W + 0.22, x + g[1], Y_RB_A[1], "vbp")
+        add(poly, x + g[0], wc + 0.22, x + g[1], Y_RB_A[1], "vbp")
         # vbp pickup, mirror gate -> poly contact -> M1 pad -> via1 -> M2 rail.
         # Both bias rails cannot live on poly: the cascode gate extension has
         # to cross the mirror-gate rail band, so vbp is carried on metal2 and
@@ -248,13 +268,15 @@ def main() -> int:
         top.shapes(cont).insert(box(x + 0.58, 8.52, x + 0.80, 8.74))
         top.shapes(via1).insert(box(x + 0.90, 8.50, x + 1.16, 8.76))
         g = gate_span(CAS_L)
-        add(poly, x + CAS_DX + g[0], W + 0.22,
+        add(poly, x + CAS_DX + g[0], wc + 0.22,
             x + CAS_DX + g[1], Y_RB_B[1], "vcp")
         gate_ext_cas.append((x + CAS_DX + g[0], x + CAS_DX + g[1]))
 
     x_last = (len(cells) - 1) * PITCH
     # The replica bias generator sits to the right of the vcp pad.
     x_b = x_last + 6.5
+    pcell_mir = pfet_pcell(MIR_L, W)
+    pcell_cas = pfet_pcell(CAS_L, W)
 
     # ---------- shared rails ---------------------------------------------
     add(m1, -0.76, Y_VDD[0], x_b + 1.0, Y_VDD[1], "vdd")
@@ -446,6 +468,8 @@ def main() -> int:
         print(f"devices    : {want_dev} pfet "
               f"({len(cells)} cascode pairs + replica bias) + "
               f"{want_sw} nfet switches")
+        print(f"cell widths: unary {W:.3f} um, binary {w_bin:.3f} um "
+              f"({len(cells) - n_unary} binary cells at 1 LSB each)")
         print(f"terminals  : iout/idump buses, vss, "
               f"{want_sw} switch gates, 3 bias rails, iref on vcp")
         for p in problems:

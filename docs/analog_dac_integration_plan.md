@@ -267,15 +267,15 @@ isolates the tree, is the only honest way to size it.
 |---|---|---|
 | Device cell | closed (gf180) | cascoded PMOS, 7 corner/temp points: I 15.63-15.87 uA, ro 275-549 kOhm |
 | Mismatch model | closed, deterministic | measured 0.519 %/mV x Pelgrom 3.5 mV = 1.8 %/cell |
-| DC linearity | closed (gf180, ideal cells) | sigma=0 control exact; 1.8 %/cell: DNL -0.89/+0.32, INL -0.48/+1.37 LSB |
+| DC linearity | closed (gf180, ideal cells) | sigma=0 control exact; 1.8 %/unary cell (7.2 %/sqrt(w) binary): DNL -0.89/+0.28, INL -0.48/+1.37 LSB |
 | DEM | closed (model) | 15-state DWA: mean INL +/-0.48, worst sample +/-1.37, 0.39 LSB rms |
 | Digital half | closed | `dac_csteer_dig` 3733/3733 checks, lint clean, hardened config added; also generates the 60 complementary switch levels |
-| Output I-V | **closed by design rule** | passive 1 kOhm costs DNL +6.8 / INL +8.1 LSB; active I-V required |
+| Output I-V | **closed by design rule** | passive 1 kOhm costs DNL -0.07 / INL +2.4 LSB on perfectly matched cells (binary field is 16x stiffer than the unary one); active I-V required |
 | Switch | **closed pre-layout, drawn (gf180)** | differential NMOS pair W/L 4/0.28 with the tail on the cascode drain: Ron 391 Ohm, compliance 2.26 V, event charge error 8.3 fC, pair charge error 0.3 fC, settle 55 ps; corners 301-553 Ohm / 2.10-2.44 V / 45-85 ps (`run_switch.py`) |
 | Cascode bias | **closed pre-layout (gf180)** | replica of the cell with the cascode drain diode-tied: Iref 16 uA through Mref 8/1 and Mcas 8/0.5 gives vbp/vcp; 15 corner/temp points hold Icell 16.000-16.002 uA, mirror margin >= 0.57 V, cascode margin >= 1.80 V |
-| Layout | **core generator closed; I-V/wrapper/pin placement class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS unit cells in one row with shared vdd/vbp/vcp rails, the replica cascode bias, and one 4/0.28 NMOS switch pair per cell feeding `iout`/`idump`; each cell exposes `swa_<tag>`/`swb_<tag>` on M2 pads. The digital macro generates all 60 drive levels; the I-V resistor, differential wrapper and the analog-facing pin placement stay hand layout |
-| DRC / LVS / PEX | **closed for the core macro** | `signoff.py`: DRC 0 items, LVS 122 devices (30 cells + 2 bias + 60 switches) / 126 nets (6 rails + 30 tails + 30 internal + 60 gates), PEX 122 instances / 993 C entries; `--selftest` fails drop-unit, swap-gate, short-tail, drop-switch, short-drain, wrong-source, bias-gate, bias-source |
-| Post-layout core | **closed (gf180, PEX)** | `run_postlayout.py` on the 122-device / 993-cap extraction: dc pair sum error 1e-5 %, Ron 391 Ohm, compliance 2.26 V, event charge 8.9 fC, pair charge 1.1 fC, settle 47 ps; gates 1 % / 800 Ohm / 1.5 V / 25 fC / 5 fC / 500 ps, same as `run_switch.py`. Switch metrics only: no DAC linearity claim |
+| Layout | **core generator closed; I-V/wrapper/pin placement class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS cells in one row with shared vdd/vbp/vcp rails, the replica cascode bias, and one 4/0.28 NMOS switch pair per cell feeding `iout`/`idump`; each cell exposes `swa_<tag>`/`swb_<tag>` on M2 pads. 15 unary cells are 8/1 (16 uA), all 15 binary cells are 0.5/1 (1 uA) and the 1/2/4/8 weight is the cell count on a gate net, matching the digital fan-out. The digital macro generates all 60 drive levels; the I-V resistor, differential wrapper and the analog-facing pin placement stay hand layout |
+| DRC / LVS / PEX | **closed for the core macro** | `signoff.py`: DRC 0 items, LVS 122 devices (30 cells + 2 bias + 60 switches) / 126 nets (6 rails + 30 tails + 30 internal + 60 gates), PEX 122 instances / 993 C entries; LVS also checks width against weight (8/1 unary, 0.5/1 binary, mirror must match its cascode); `--selftest` fails drop-unit, swap-gate, short-tail, drop-switch, short-drain, wrong-source, bias-gate, bias-source, cell-width, mirror-width |
+| Post-layout core | **closed (gf180, PEX)** | `run_postlayout.py` on the 122-device / 993-cap extraction: dc pair sum error 1e-5 %, Ron 391 Ohm, compliance 2.26 V, event charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, and a 256-code sweep of the extracted array: FS 255.2 uA, unary step 15.99 LSB, DNL 0.177 / INL 0.166 LSB, 0 non-monotonic steps. Gates 1 % / 800 Ohm / 1.5 V / 25 fC / 5 fC / 500 ps / 5 % / 1 LSB / 0.5 LSB / 1 LSB. Deterministic transfer only: mismatch linearity comes from the pre-layout model |
 
 The design point here is the DEM state count: 15 unary cells mean 15 pointer
 states, not 16. Over 15 samples every cell must see the average current, and
@@ -407,15 +407,19 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   unit-current-steering 8-bit + standard-cell thermometer/DWA, following
   `2AMLogic/gf180-current-dac` for the array and `alinja/skydacmagic` for the
   cell. Device cell I 15.77 uA, ro 425 kOhm, Vth sensitivity 0.519 %/mV ->
-  1.8 %/cell. Fixed-pointer INL 1.37 LSB; DEM mean 0.48 LSB at 0.39 LSB rms.
-  Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. The core is
-  generated and signed off (`analog/csteer/gen_gds.py`: 30 cells, replica
-  cascode bias, 60 steering switches; DRC 0, LVS 122 devices / 126 nets, PEX
-  122 instances) and the switch gates re-pass on the extracted core
-  (`run_postlayout.py`). The digital macro generates all 60 complementary
-  switch levels; the I-V, the differential wrapper and the analog-facing pin
-  placement stay class C hand layout, so `run-analog.sh csteer gf180 gds`
-  builds the core macro only and no post-layout linearity is claimed.
+  1.8 %/unary cell (7.2 %/sqrt(w) on binary bit w). Fixed-pointer INL 1.37 LSB;
+  DEM mean 0.48 LSB at 0.39 LSB rms. Requires an active I-V: a 1 kOhm passive
+  I-V costs +2.4 LSB INL even with perfect cells. The core is generated and
+  signed off (`analog/csteer/gen_gds.py`: 15 unary 8/1 cells, 15 binary 0.5/1
+  cells, replica cascode bias, 60 steering switches; DRC 0, LVS 122 devices /
+  126 nets with a width-vs-weight check, PEX 122 instances). The switch gates
+  and a 256-code sweep re-pass on the extracted core (`run_postlayout.py`:
+  FS 255.2 uA, DNL 0.18 / INL 0.17 LSB, monotonic) - that sweep is what caught
+  and closed the earlier all-16-uA array, which transferred a sawtooth. The
+  digital macro generates all 60 complementary switch levels; the I-V, the
+  differential wrapper and the analog-facing pin placement stay class C hand
+  layout, so `run-analog.sh csteer gf180 gds` builds the core macro only and no
+  post-layout *mismatch* linearity is claimed.
 - **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs
