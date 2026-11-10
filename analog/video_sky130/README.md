@@ -67,7 +67,7 @@ and draws the rails:
 | drc | KLayout `sky130A_mr.drc`, feol+beol, top `dac_video_ana`, **0 items** |
 | lvs | magic flat extraction, pad-pair walk (1022 devices, 512 pfet / 510 nfet, all bulks vdd/vss) |
 | pins | the 510 met2 pads measured on the drawn GDS on the 3.75 um grid |
-| pex | magic hierarchical extraction, cthresh/rthresh 0 |
+| pex | magic hierarchical extraction, cthresh/rthresh 0: **1022 instances, 7150 caps, 7.94 pF, no floating node** |
 
 The 100 pF on vcp is a **wrapper** requirement (the benches model it with
 `--vcp-cap-pf`); it is not part of this macro.
