@@ -368,6 +368,7 @@ scaled devices - the decoder cost question, not another segmentation study.
 | Post-layout mismatch | **closed (PDK area law)** | `run_mismatch_pex.py`: `delvto`/`mulu0` drawn per extracted device from `par_vth`/`par_k` of `pfet_03v3_dss` (the wrapper itself is not used - it adds diffusion R the extraction has, and draws once per subckt), 16 samples of a 255-point selector sweep. Cell spread **0.720 %** vs the law's 0.727 % (mirror Vth 0.454 %, switch Vth 0.449 %, switch beta 0.345 % in quadrature); fixed DNL **0.035..0.174** LSB, INL 0.028..0.124, 16/16 monotonic; the zero-draw reconstruction reproduces the bench transfer to 0.0004 LSB. `--selftest` rejects a single shared draw (0.0000 %), half-sigma draws (0.345 %) and mirror-only draws (0.489 %) |
 | Post-layout carry, binary | **FAIL** | `run_transient_pex.py`: extracted netlist *with its capacitance*, 20 ps edges, 25 ps bit skew, 25 MS/s. 127->128 settles to **118.503 LSB at 40 ns (-9.497)** and never enters the 0.5 LSB window; 128->127 -8.590, 63->64 -2.440. `vbp` +31.8 mV / `vcp` +46.1 mV (2 mV is 0.5 LSB at code 128). Converged: 2 ps and 20 ps timesteps agree to 0.007 LSB, so it is not numerical |
 | Post-layout carry, ideal bias | cell and output path close; the bias does not | the same carry with `vbp`/`vcp` forced: 128.266 LSB (+0.266), 0.5 LSB at **24.4 ns** of the 40 ns window, glitch 99.9 LSB, and a full-scale 0->255 step at **3.0 ns**. Every step size closes on the cell and output path; the ~50 ns bias pole is the whole deficit |
+| Carry with the switch at the mirror drain (rewired PEX, prediction) | **FAIL, 4x better** | same extraction, mirror source on vdd and the switch between the mirror's drain and the cascode's source (replica rewired, dc unchanged: 16.000 uA/cell, `vbp` 2.170 V): 127->128 **-2.295 LSB**, 0->255 **+54.058 LSB**, neither settles. The 255 mirror gates' charge still has to change ~10 fC/cell - Cgd x 2.45 V instead of Cgs x 0.59 V |
 | Post-layout carry, thermometer | one cell per step passes, full scale fails worse | `--decode thermo`: 127->128 -0.432 LSB / 18.3 ns / 0.6 LSB glitch, but 0->255 (every cell on at once) is **81.721 LSB (-173.279)** with `vbp` +313 mV, `vcp` +431 mV. Thermometer decode buys DNL (0.680 -> 0.066 at the pre-layout sigma; binary is 0.174 at the PDK law) and one-cell carries, not 25 MS/s operation |
 
 Two extraction findings, both caught by a gate rather than by reading the
@@ -423,6 +424,16 @@ scale (8x the bias buys 2.7x), so a replica large enough for full scale is not
 credible; a 16x *single* device is not even simulable, because the PDK's
 binned models stop at W = 100.01 um and ngspice silently picks no bin (the run
 came back at 2x current with `vcp` negative).
+Moving the switch is not enough, and charge conservation says why. Rewired
+on the same extraction with the switch between the mirror's drain and the
+cascode's source (mirror source on vdd, replica rewired, dc point unchanged),
+the carry improves from -9.50 to **-2.30 LSB** and full scale from -173 to
+**+54.1 LSB** - 4x better, neither settling. The 255 mirror gates' charge has
+to change by ~10 fC per cell whichever terminal the switch interrupts (today
+Cgs x 0.59 V, in the variant Cgd x 2.45 V), so only a cell whose mirror keeps
+both Vgs and Vds constant avoids it: a steering pair with a dump tail (P3's
+cell), at 2x current, +1 device and +1 pin per cell.
+
 The fix is a buffer on the bias pins. Modelled as an ideal unity-gain buffer
 with a series output resistance on a split net (the replica's diode node in,
 the array's bars out, the bars' extracted caps on the array side), 300 Ohm
@@ -557,7 +568,11 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   switch moves each mirror source 0.59 V, the 255 gates load the bias lines
   with ~8 pF, and the one-cell replica drives them at 1/gm ~ 6-7 kOhm, a
   50-80 ns pole. The pre-layout "51 LSB glitch, 0.74 ns settle" claim is
-  superseded. The fix is a bias buffer, not a bigger replica: an 8x scaled
+  superseded. Moving the series switch to the mirror's drain is not enough
+  either (rewired PEX: -2.30 LSB carry, +54.1 LSB full scale - 4x better and
+  still failing; the mirror's gate charge has to change either way), so only a
+  dump-tail steering cell would keep the mirror quiet, at 2x current and one
+  more pin per cell. The fix is a bias buffer, not a bigger replica: an 8x scaled
   replica (128 uA, same current density) still misses at -1.13 LSB on the
   carry and -63 LSB on full scale, a 16x single device is not even simulable
   (the PDK bins stop at W = 100.01 um), and the array needs a few hundred Ohm

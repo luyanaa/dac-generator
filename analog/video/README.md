@@ -282,6 +282,21 @@ also hits the PDK's binned models, which stop at W = 100.01 um: a 16x replica
 (128 um) silently simulated at twice the current with `vcp` negative - a trap
 worth remembering, since it is a wrong answer, not an error.
 
+Moving the switch does not fix it, and charge conservation says why. The same
+extraction rewired with the switch between the mirror's *drain* and the
+cascode's source (mirror source on vdd, replica rewired to match, same three
+devices, dc point unchanged at 16.000 uA/cell / `vbp` 2.170 V) improves the
+carry from -9.50 to **-2.30 LSB** and the full-scale step from -173 to
+**+54.1 LSB**: 4x better and still 5x/100x outside the window, with neither
+case settling. The bias moves because the 255 mirror gates' charge has to
+change, and it changes by ~10 fC per cell whichever terminal the switch is on:
+today Cgs x 0.59 V, in the variant Cgd x 2.45 V (the mirror's drain has to rise
+to vdd when the cell is off). A single series switch anywhere in the cell
+interrupts the current and moves one of the mirror's terminals. Only a cell
+whose mirror keeps *both* Vgs and Vds constant - a steering pair with a dump
+tail, i.e. P3's cell - avoids the charge, and that costs 2x supply current,
+one more device and one more pin per cell.
+
 What the array needs is a low-impedance bias drive. Modelled on the same
 extraction as an ideal unity-gain buffer with a series output resistance (the
 replica's diode node as input, the array's bars as output, the bars' extracted
