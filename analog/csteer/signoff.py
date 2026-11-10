@@ -3,6 +3,7 @@
 
     ./signoff.py                 # build + drc + lvs + pex, gate on all three
     ./signoff.py --stage drc
+    ./signoff.py --stage postlayout   # delegate to the PEX bench
     ./signoff.py --selftest      # prove the LVS gate rejects mutations
 
 This is the P3 counterpart of `../string/signoff.py`.  `gen_gds.py` generates
@@ -578,11 +579,19 @@ def pex(pdk: Path) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--stage", default="all",
-                    choices=["all", "build", "drc", "lvs", "pex"])
+                    choices=["all", "build", "drc", "lvs", "pex", "postlayout"])
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--brief", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
+    if a.stage == "postlayout":
+        # One post-layout path: the PEX bench owns the netlist, the gates and
+        # the report, so this stage cannot drift from what `postlayout` means.
+        cmd = [sys.executable, str(ROOT / "run_postlayout.py")]
+        if a.brief:
+            cmd.append("--brief")
+        return subprocess.run(cmd).returncode
 
     pdk = find_pdk()
     rep: dict = {"pdk": str(pdk), "top": TOP, "steps": {}}

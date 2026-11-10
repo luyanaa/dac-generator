@@ -275,6 +275,7 @@ isolates the tree, is the only honest way to size it.
 | Cascode bias | **closed pre-layout (gf180)** | replica of the cell with the cascode drain diode-tied: Iref 16 uA through Mref 8/1 and Mcas 8/0.5 gives vbp/vcp; 15 corner/temp points hold Icell 16.000-16.002 uA, mirror margin >= 0.57 V, cascode margin >= 1.80 V |
 | Layout | **core generator closed; drive/I-V/wrapper class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS unit cells in one row with shared vdd/vbp/vcp rails, the replica cascode bias, and one 4/0.28 NMOS switch pair per cell feeding `iout`/`idump`; each cell exposes `swa_<tag>`/`swb_<tag>` on M2 pads. The complementary drive, I-V resistor and differential wrapper stay hand layout |
 | DRC / LVS / PEX | **closed for the core macro** | `signoff.py`: DRC 0 items, LVS 122 devices (30 cells + 2 bias + 60 switches) / 126 nets (6 rails + 30 tails + 30 internal + 60 gates), PEX 122 instances / 993 C entries; `--selftest` fails drop-unit, swap-gate, short-tail, drop-switch, short-drain, wrong-source, bias-gate, bias-source |
+| Post-layout core | **closed (gf180, PEX)** | `run_postlayout.py` on the 122-device / 993-cap extraction: dc pair sum error 1e-5 %, Ron 391 Ohm, compliance 2.26 V, event charge 8.9 fC, pair charge 1.1 fC, settle 47 ps; gates 1 % / 800 Ohm / 1.5 V / 25 fC / 5 fC / 500 ps, same as `run_switch.py`. Switch metrics only: no DAC linearity claim |
 
 The design point here is the DEM state count: 15 unary cells mean 15 pointer
 states, not 16. Over 15 samples every cell must see the average current, and
@@ -410,9 +411,10 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. The core is
   generated and signed off (`analog/csteer/gen_gds.py`: 30 cells, replica
   cascode bias, 60 steering switches; DRC 0, LVS 122 devices / 126 nets, PEX
-  122 instances); the complementary switch drive, I-V and differential wrapper
-  stay class C hand layout, so `run-analog.sh csteer gf180 gds` builds the core
-  macro only and no post-layout linearity is claimed.
+  122 instances) and the switch gates re-pass on the extracted core
+  (`run_postlayout.py`); the complementary switch drive, I-V and differential
+  wrapper stay class C hand layout, so `run-analog.sh csteer gf180 gds` builds
+  the core macro only and no post-layout linearity is claimed.
 - **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs

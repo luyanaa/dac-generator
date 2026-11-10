@@ -174,6 +174,7 @@ DNL is required.
 | `measure.py` | endpoint-fit DNL/INL plus the analytic DEM mean/worst/noise |
 | `run_cell.py` | device cell across corners/temperature and the Vth sensitivity |
 | `run_switch.py` | replica bias matrix + one steering event (Ron, compliance, charge, settling) |
+| `run_postlayout.py` | the same switch gates re-run on the extracted core (PEX netlist) |
 | `run_mismatch.py` | per-cell mismatch seed sweep |
 | `run.sh` | one-command pre-layout regression |
 
@@ -224,6 +225,37 @@ Not in this macro: the complementary gate drive, the I-V resistor and the
 differential wrapper (class C hand layout), and any post-layout linearity
 claim, which needs the switches in a full-DAC context.
 
+## Post-layout (`run_postlayout.py`)
+
+`run-analog.sh csteer gf180 postlayout` (equivalently `./signoff.py --stage
+postlayout`) instantiates the hierarchical PEX of the whole core — 122 devices
+plus 993 coupling capacitors over 96 ports — and re-runs the two
+`run_switch.py` measurements against the same thresholds, so pre- and
+post-layout are directly comparable:
+
+| metric | pre-layout | post-layout (PEX) | gate |
+|---|---|---|---|
+| dc pair sum error | exact | 1e-5 % | < 1 % |
+| switch Ron | 391 Ohm | 391 Ohm | < 800 Ohm |
+| output compliance | 2.26 V | 2.26 V | > 1.5 V |
+| event charge error | 8.3 fC | 8.9 fC | < 25 fC |
+| pair charge error | 0.3 fC | 1.1 fC | < 5 fC |
+| settle to 0.5 LSB | 55 ps | 47 ps | < 500 ps |
+
+Only cell `u0` switches; the other 29 are parked on `idump`, so every metric is
+u0's own current after subtracting the parked contribution. The change from
+the pre-layout bench is exactly the layout: the switching node carries its
+extracted capacitance instead of a guessed 10 fF, `iout`/`idump` carry their
+bus caps (7.8 / 8.8 fF), the 60 gate nets 0.7 fF each and the 30 tails 1.4 fF
+each. Peak displacement is 86.5 uA and the tail swings 15.4 mV.
+
+This is a core-level result: the drawn switches behave, the charge numbers are
+real, and the layout adds nothing fatal. It is **not** a linearity claim — that
+needs the wrapper, the I-V and the switch drive in one netlist. The stage is
+fail-closed: no PEX, or a PEX older than `csteer.gds`, exits 2 instead of
+running a stale netlist.
+
+
 ## Digital half
 
 `verilog/rtl/dac_csteer_dig.v`: 4-to-15 rotated thermometer decode, DWA
@@ -251,6 +283,7 @@ and the `k`-of-15 fairness property for `k = 1..7`. Verilator lint clean.
 ../../run-analog.sh csteer gf180 prelayout
 ../../run-analog.sh csteer gf180 all      # array macro: DRC/LVS/PEX
 ../../run-analog.sh csteer gf180 gds
+../../run-analog.sh csteer gf180 postlayout  # same switch gates on the PEX core
 make -C ../../verilog/tb dac_csteer_dig
 ```
 
@@ -260,7 +293,8 @@ Verified: device cell current and ro over 7 corner/temperature points, the Vth
 sensitivity that justifies the 1.8 % sigma, the replica cascode bias over the
 full 15-point corner/temperature matrix, one steering event (Ron, compliance,
 charge and settling), dc linearity with and without DEM, the passive-I-V
-penalty, and the digital half.
+penalty, the digital half, and the switch metrics again on the extracted core
+(`run_postlayout.py`).
 
 Not verified / not done:
 
@@ -275,7 +309,9 @@ Not verified / not done:
   every pair; the complementary `swa`/`swb` levels, the I-V and the
   differential wrapper stay class C hand layout, so the two control pads per
   cell are the macro boundary.
-* **No full-DAC post-layout.** The core macro is extracted and checked, but
+* **No full-DAC post-layout.** The core macro is extracted and re-checked on
+  the PEX netlist (`run_postlayout.py`: Ron 391 Ohm, compliance 2.26 V, event
+  charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, all gates PASS), but
   post-layout linearity of the leaf is not claimed: that needs the wrapper,
   the output resistor and the switch drive in one netlist.
 * **Switch drivers are assumed.** The event bench drives the pair with ideal

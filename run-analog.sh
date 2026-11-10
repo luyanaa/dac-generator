@@ -8,7 +8,7 @@
 #   topology   r2r | string | csteer | cdac | video
 #   pdk        gf180 | sky130
 #   stage      prelayout (default) | gds | drc | lvs | pex | all
-#              postlayout (r2r only: poly R-C reconstruction + DC/transient)
+#              postlayout (r2r: poly R-C reconstruction; csteer: PEX core)
 #
 # gds/drc/lvs/pex are implemented for the leaves that have a device-level
 # macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
@@ -87,12 +87,7 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180)
     lvs) "$SIGN" --stage lvs ;;
     pex) "$SIGN" --stage pex ;;
     postlayout)
-        if [ "$TOP" = r2r ]; then
-            "$SIGN" --stage postlayout
-        else
-            echo "error: postlayout bench exists for r2r only" >&2
-            exit 2
-        fi
+        "$SIGN" --stage postlayout
         ;;
     all)
         PDK="$PDK" "$DIR/run.sh" all
