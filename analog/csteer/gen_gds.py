@@ -245,15 +245,17 @@ def main() -> int:
         gate_ext_cas.append((x + CAS_DX + g[0], x + CAS_DX + g[1]))
 
     x_last = (len(cells) - 1) * PITCH
+    # The replica bias generator sits to the right of the vcp pad.
+    x_b = x_last + 6.5
 
     # ---------- shared rails ---------------------------------------------
-    add(m1, -0.76, Y_VDD[0], x_last + 1.0, Y_VDD[1], "vdd")
+    add(m1, -0.76, Y_VDD[0], x_b + 1.0, Y_VDD[1], "vdd")
     label(0.0, (Y_VDD[0] + Y_VDD[1]) / 2, "vdd")
 
     # vbp rail on metal2.  It crosses the cascode gate extensions and the
     # output risers (both on M1) without a via, so it is one net end to end;
     # each cell reaches it through its own contact/via1 stack.
-    add(m2, -1.36, 8.44, x_last + 1.24, 8.80, "vbp")
+    add(m2, -1.36, 8.44, x_b + CAS_DX + 1.24, 8.80, "vbp")
     label(x_last / 2, 8.62, "vbp", m2_lbl)
 
     # vcp rail: straight bar, nothing else rises through its band.
@@ -262,10 +264,50 @@ def main() -> int:
     # The vcp pad goes to the right of the last output pad, not above it:
     # overhead would break M1.2a against the pad (0.05 um).
     xc = x_last + CAS_DX + 1.39 + 0.30
-    add(poly, gate_ext_cas[-1][1], Y_RB_B[0], xc + 0.5, Y_RB_B[1], "vcp")
+    add(poly, gate_ext_cas[-1][1], Y_RB_B[0],
+        x_b + CAS_DX + 1.40, Y_RB_B[1], "vcp")
     top.shapes(cont).insert(box(xc + 0.09, 9.53, xc + 0.31, 9.75))
     add(m1, xc, 9.45, xc + 0.6, 10.05, "vcp")
     label(xc + 0.3, 9.75, "vcp")
+
+    # ---------- replica cascode bias -------------------------------------
+    # One 16 uA reference injected at the vcp pad drives the stack
+    #   Mref (8/1)   vdd -> vbp, gate = drain = vbp
+    #   Mcas (8/0.5) vbp -> vcp, gate = drain = vcp
+    # so vbp is the mirror gate and vcp one cascode Vgs below it: exactly the
+    # bias the 30 cells use.  No extra pad, the vcp pad is the iref node.
+    top.insert(pya.CellInstArray(pcell_mir.cell_index(),
+                                 pya.Trans(int(x_b * 1000), 0)))
+    top.insert(pya.CellInstArray(pcell_cas.cell_index(),
+                                 pya.Trans(int((x_b + CAS_DX) * 1000), 0)))
+    # Mref: source and bulk to vdd, gate+drain to vbp.  Use the same pickup
+    # as a mirror cell (poly riser -> contact -> M1 pad -> via1), kept above
+    # the source terminal so the M1 pad cannot crowd it.
+    g = gate_span(MIR_L)                      # 0.44..1.44 for the 8/1 device
+    rt = right_term(MIR_L)                    # 1.51..1.89
+    add(m1, x_b - 0.01, Y_VDD[0], x_b + 0.37, -0.01, "vdd")
+    add(m1, x_b - 0.76, Y_VDD[0], x_b - 0.32, 0.0, "vdd")
+    add(poly, x_b + g[0], W + 0.22, x_b + g[1], Y_RB_A[1], "vbp")
+    add(m1, x_b + 0.50, 8.44, x_b + rt[1], 8.80, "vbp")
+    top.shapes(cont).insert(box(x_b + 0.58, 8.52, x_b + 0.80, 8.74))
+    add(m1, x_b + rt[0], 8.01, x_b + rt[1], 8.44, "vbp")
+    top.shapes(via1).insert(box(x_b + 0.90, 8.50, x_b + 1.16, 8.76))
+    # Mcas: source to vbp, bulk to vdd, gate+drain to vcp
+    g = gate_span(CAS_L)                      # 0.44..0.94 for the 8/0.5 device
+    rt = right_term(CAS_L)                    # 0.79..1.17
+    add(m1, x_b + CAS_DX - 0.01, 8.01, x_b + CAS_DX + 0.37, 8.80, "vbp")
+    top.shapes(via1).insert(box(x_b + CAS_DX + 0.05, 8.46,
+                                x_b + CAS_DX + 0.31, 8.72))
+    add(m1, x_b + CAS_DX - 0.76, Y_VDD[0], x_b + CAS_DX - 0.32, 0.0, "vdd")
+    add(poly, x_b + CAS_DX + g[0], W + 0.22,
+        x_b + CAS_DX + g[1], Y_RB_B[1], "vcp")
+    add(m1, x_b + CAS_DX + 0.50, Y_RB_B[0],
+        x_b + CAS_DX + rt[1] + 0.35, 10.05, "vcp")
+    top.shapes(cont).insert(box(x_b + CAS_DX + 0.58, 9.53,
+                                x_b + CAS_DX + 0.80, 9.75))
+    add(m1, x_b + CAS_DX + rt[0], 8.01,
+        x_b + CAS_DX + rt[1], Y_RB_B[0], "vcp")
+    label(x_b + CAS_DX + rt[1] + 0.1, 9.75, "vcp")
 
     # ---------- binary output straps -------------------------------------
     off = n_unary
@@ -282,7 +324,8 @@ def main() -> int:
     # ---------- self-check ------------------------------------------------
     problems = []
     if do_check:
-        want_dev = 2 * len(cells)
+        # two devices per cell plus the two-device replica bias generator
+        want_dev = 2 * len(cells) + 2
         want_cells = dbg if dbg else n_unary + unary_w
         if len(cells) != want_cells:
             problems.append(f"{len(cells)} unit cells, want {n_unary + unary_w}")
@@ -298,9 +341,10 @@ def main() -> int:
                     problems.append(
                         f"SHORT {keys[i][1]} <-> {keys[j][1]} at "
                         f"({bb.left / 1000:.2f},{bb.bottom / 1000:.2f})")
-        print(f"devices    : {want_dev} pfet ({len(cells)} cascode pairs)")
+        print(f"devices    : {want_dev} pfet "
+              f"({len(cells)} cascode pairs + replica bias)")
         print(f"terminals  : {sum(1 for b in bin_blocks)} binary groups + "
-              f"{min(n_unary, len(cells))} unary pads, 3 rails")
+              f"{min(n_unary, len(cells))} unary pads, 3 rails, iref on vcp")
         for p in problems:
             print("  " + p)
     if problems:

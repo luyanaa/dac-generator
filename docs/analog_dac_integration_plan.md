@@ -408,10 +408,11 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   cell. Device cell I 15.77 uA, ro 425 kOhm, Vth sensitivity 0.519 %/mV ->
   1.8 %/cell. Fixed-pointer INL 1.37 LSB; DEM mean 0.48 LSB at 0.39 LSB rms.
   Requires an active I-V: a 1 kOhm passive I-V costs +8 LSB INL. The 30-cell
-  current-source array is generated and signed off (`analog/csteer/gen_gds.py`,
-  DRC 0, LVS 60 devices / 30 cells, PEX 60 instances); the switch matrix,
-  wide-swing cascode bias, I-V and differential wrapper stay class C hand
-  layout, so `run-analog.sh csteer gf180 gds` builds the array macro only.
+  current-source array with its replica cascode bias is generated and signed
+  off (`analog/csteer/gen_gds.py`, DRC 0, LVS 62 devices / 30 cells, PEX 62
+  instances); the switch matrix, I-V and differential wrapper stay class C
+  hand layout, so `run-analog.sh csteer gf180 gds` builds the array+bias macro
+  only.
 - **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs

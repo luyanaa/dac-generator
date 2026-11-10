@@ -1,9 +1,9 @@
 # Unit-current-steering DAC leaf
 
 Third analog leaf (roadmap P3). Mixed: the 30-cell current-source array (the
-15 unary cells plus the 1/2/4/8 binary cells) is generated and signed off
-(`gen_gds.py`, `signoff.py`); the switch matrix, the wide-swing cascode bias,
-the I-V resistor and the differential wrapper are class **C** hand layout. The
+15 unary cells plus the 1/2/4/8 binary cells) with its replica cascode bias is
+generated and signed off (`gen_gds.py`, `signoff.py`); the switch matrix, the
+I-V resistor and the differential wrapper are class **C** hand layout. The
 digital half (`verilog/rtl/dac_csteer_dig.v`) is a generated standard-cell
 macro. No OpenROAD P&R near the analog core.
 
@@ -181,6 +181,28 @@ the analytic DEM numbers in `measure.py` and the ngspice transfer at pointer 0
 agree by construction (that equality is checked: both give the same worst INL
 to 1e-6 LSB).
 
+## Array and bias layout (`gen_gds.py`, `signoff.py`)
+
+One row of 30 identical cascoded-PMOS cells (mirror left, cascode right, M1
+bridge over the n-well tie), shared `vdd` on M1 and `vbp`/`vcp` on poly/M2, and
+the replica bias generator at the right end:
+
+* `Mref` 8/1 from vdd to `vbp`, gate tied to its drain, and `Mcas` 8/0.5 from
+  `vbp` to `vcp`, gate tied to its drain. The reference current enters at the
+  `vcp` pad, so `vcp` is both the bias output and `iref`; no extra pin.
+* Both bias devices use the same terminal spans as the cells they replicate,
+  which is why the layout is two PCell instances plus the gate/drain pickups.
+
+Gates: Magic DRC 0 items, LVS 62 devices (30 cells + 2 bias) / 30 internal
+nodes / 52 nets / segmentation fan-out 1-2-4-8, PEX 62 instances. `--selftest`
+rejects drop-unit, swap-gate, short-out, and two bias mutations (lift the
+cascode source off `vbp`, move the mirror gate to `vcp`).
+
+The switch matrix is **not** in this macro: the cell output pad stops at the
+cascode drain, and the 30 differential NMOS pairs, `iout`/`idump` buses and
+complementary gate drive are the next generator step (their device-level design
+is closed by `run_switch.py`).
+
 ## Digital half
 
 `verilog/rtl/dac_csteer_dig.v`: 4-to-15 rotated thermometer decode, DWA
@@ -221,17 +243,18 @@ penalty, and the digital half.
 
 Not verified / not done:
 
-* **Current-source array macro generated.** `run-analog.sh csteer gf180
-  gds|drc|lvs|pex|all` builds the 30-cell array through `signoff.py`: Magic DRC
-  0 items, LVS 60 devices / 30 cells / 52 nets / fan-out 1-2-4-8, PEX 60
-  instances / 268 C entries; `--selftest` fails drop-unit, swap-gate and
-  short-out.
+* **Current-source array + bias macro generated.** `run-analog.sh csteer gf180
+  gds|drc|lvs|pex|all` builds the 30-cell array and the replica bias through
+  `signoff.py`: Magic DRC 0 items, LVS 62 devices / 30 cells / 52 nets /
+  fan-out 1-2-4-8, PEX 62 instances / 268 C entries; `--selftest` fails
+  drop-unit, swap-gate, short-out, bias-gate and bias-source.
 * **Switch and bias are pre-layout only.** `run_switch.py` closes the design
   (sizes, bias, charge, settling); drawing the 30 switch pairs, the local
   complementary drive and the `iout`/`idump` buses is the next generator step.
-  The I-V and the differential wrapper stay class C.
-* **No full-DAC post-layout.** The array macro is extracted and checked, but
-  there is no switch/bias layout, so post-layout linearity of the leaf is not
+  The bias *generator* is drawn; the switch matrix, I-V and the differential
+  wrapper stay class C.
+* **No full-DAC post-layout.** The array+bias macro is extracted and checked,
+  but there is no switch layout, so post-layout linearity of the leaf is not
   claimed.
 * **Switch drivers are assumed.** The event bench drives the pair with ideal
   0..3.3 V edges and a 30 ps overlap. A real standard-cell inverter adds

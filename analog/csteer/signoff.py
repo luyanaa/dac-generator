@@ -7,10 +7,10 @@
 
 This is the P3 counterpart of `../string/signoff.py`.  Only the *device array*
 is generated (`gen_gds.py`): 30 cascoded-PMOS unit cells with shared vdd/vbp/
-vcp rails and per-output pads.  The switch matrix, the cascode bias generator,
-the I-V resistor and the differential wrapper stay class C (hand layout), so
-the gates below sign off the current-source macro, not the whole DAC, and they
-say so.
+vcp rails and per-output pads, plus the two-device replica cascode bias
+generator at the right end.  The switch matrix, the I-V resistor and the
+differential wrapper stay class C (hand layout), so the gates below sign off
+the current-source macro with its bias, not the whole DAC, and they say so.
 
   drc  Magic `drc check` / `drc catchup` / `drc count total`, same fail-closed
        path as P1/P2.  gf180 has no KLayout deck in this install.
@@ -20,8 +20,10 @@ say so.
        every mirror s=vdd/g=vbp/d=internal, every cascode s=internal/g=vcp/
        d=output, bulk=vdd, 30 internal nodes, and the 4+4 segmentation's output
        fan-out (1 unary device per oU*, and 1/2/4/8 devices on oB1/oB2/oB4/oB8).
+       Plus the replica bias: one 8/1 diode vdd->vbp and one 8/0.5 diode
+       vbp->vcp, so vcp sits one cascode Vgs below the mirror gate.
 
-  pex  hierarchical extraction, cthresh/rthresh 0; 60 instances and the per-net
+  pex  hierarchical extraction, cthresh/rthresh 0; 62 instances and the per-net
        geometric capacitance, kept as evidence.
 
 Not claimed: the switches, bias, output resistor, post-layout linearity.
@@ -209,6 +211,8 @@ def check(devs, scale, cfg) -> list[str]:
 
     mirrors = []   # (name, d, s, L)
     cascodes = []  # (name, d, s, L)
+    bias_mirrors = []
+    bias_cascodes = []
     allnets: set[str] = set()
     for name, nets, sub, params in devs:
         d, g, s, b = nets
@@ -224,7 +228,22 @@ def check(devs, scale, cfg) -> list[str]:
             problems.append(f"{name}: w {W:.3f} um, want {EXPECTED_W_UM:.3f}")
         if b != "vdd":
             problems.append(f"{name}: bulk {b}, want vdd")
-        if g == "vbp":
+        if g == "vbp" and d == "vbp":
+            # Replica bias mirror: diode-connected from vdd to vbp.
+            if abs(L - MIR_L_UM) > 1e-6:
+                problems.append(f"{name}: bias mirror l {L:.3f}, want {MIR_L_UM}")
+            if s != "vdd":
+                problems.append(f"{name}: bias mirror source {s}, want vdd")
+            bias_mirrors.append((name, d, s, L))
+        elif g == "vcp" and d == "vcp":
+            # Replica bias cascode: diode-connected from vbp to vcp.  Its
+            # source must be vbp, i.e. the mirror diode it stacks on.
+            if abs(L - CAS_L_UM) > 1e-6:
+                problems.append(f"{name}: bias cascode l {L:.3f}, want {CAS_L_UM}")
+            if s != "vbp":
+                problems.append(f"{name}: bias cascode source {s}, want vbp")
+            bias_cascodes.append((name, d, s, L))
+        elif g == "vbp":
             if abs(L - MIR_L_UM) > 1e-6:
                 problems.append(f"{name}: mirror l {L:.3f}, want {MIR_L_UM}")
             if s != "vdd":
@@ -243,12 +262,17 @@ def check(devs, scale, cfg) -> list[str]:
         else:
             problems.append(f"{name}: gate net {g}, want vbp or vcp")
 
-    if len(devs) != 2 * n_cells:
-        problems.append(f"{len(devs)} devices, want {2 * n_cells}")
+    if len(devs) != 2 * n_cells + 2:
+        problems.append(f"{len(devs)} devices, want {2 * n_cells + 2} "
+                        f"(2 per cell + replica bias)")
     if len(mirrors) != n_cells:
         problems.append(f"{len(mirrors)} mirrors, want {n_cells}")
     if len(cascodes) != n_cells:
         problems.append(f"{len(cascodes)} cascodes, want {n_cells}")
+    if len(bias_mirrors) != 1:
+        problems.append(f"{len(bias_mirrors)} bias mirrors, want 1")
+    if len(bias_cascodes) != 1:
+        problems.append(f"{len(bias_cascodes)} bias cascodes, want 1")
 
     m_int = Counter(d for _, d, _, _ in mirrors)
     c_int = Counter(s for _, _, s, _ in cascodes)
@@ -303,8 +327,8 @@ def lvs(pdk: Path) -> dict:
     bb = int(cfg.get("binary_bits", 4))
     n_cells = 2 ** ub - 1 + sum(2 ** i for i in range(bb))
     return {"ok": not problems, "devices": len(devs), "cells": n_cells,
-            "scale_nm": round(scale * 1e9, 3), "problems": problems,
-            "netlist": str(spice)}
+            "bias": 2, "scale_nm": round(scale * 1e9, 3),
+            "problems": problems, "netlist": str(spice)}
 
 
 def _top_body(txt: str):
@@ -334,7 +358,9 @@ def selftest() -> int:
     ok &= not p
 
     # Drop the middle mirror: the cell count and the internal-node match break.
-    mir_idx = [i for i, d in enumerate(devs) if d[1][1] == "vbp"]
+    # Cell mirrors only (g=vbp, d!=vbp); the bias mirror is a separate class.
+    mir_idx = [i for i, d in enumerate(devs)
+               if d[1][1] == "vbp" and d[1][0] != "vbp"]
     if not mir_idx:
         die("no vbp-gated devices in the extracted netlist")
     drop = [d for i, d in enumerate(devs) if i != mir_idx[len(mir_idx) // 2]]
@@ -368,6 +394,28 @@ def selftest() -> int:
     print(f"selftest short-out : {'FAIL' if p3 else 'PASS (bad!)'} ({len(p3)})")
     ok &= bool(p3)
 
+    # Bias diode stack: break the mirror diode and lift the cascode's source
+    # off vbp.  Both must be rejected on the bias class checks alone.
+    bm = [i for i, d in enumerate(devs)
+          if d[1][1] == "vbp" and d[1][0] == "vbp"]
+    bc = [i for i, d in enumerate(devs)
+          if d[1][1] == "vcp" and d[1][0] == "vcp"]
+    if bm and bc:
+        mut3 = list(devs)
+        name, nets, sub, params = mut3[bm[0]]
+        mut3[bm[0]] = (name, [nets[0], "vcp", nets[2], nets[3]], sub, params)
+        p4 = check(mut3, scale, cfg)
+        mut4 = list(devs)
+        name, nets, sub, params = mut4[bc[0]]
+        mut4[bc[0]] = (name, [nets[0], nets[1], "vdd", nets[3]], sub, params)
+        p5 = check(mut4, scale, cfg)
+    else:
+        p4 = p5 = ["no bias devices found"]
+    print(f"selftest bias-gate : {'FAIL' if p4 else 'PASS (bad!)'} ({len(p4)})")
+    ok &= bool(p4)
+    print(f"selftest bias-src  : {'FAIL' if p5 else 'PASS (bad!)'} ({len(p5)})")
+    ok &= bool(p5)
+
     print("selftest " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
@@ -392,8 +440,8 @@ def pex(pdk: Path) -> dict:
     body = _top_body(txt)
     insts = [ln.split() for ln in body if ln.strip().startswith("X")]
     devs = sum(1 for f in insts if f[-1].startswith("pfet"))
-    if devs != 60:
-        die(f"PEX netlist instantiates {devs} devices, want 60")
+    if devs != 62:
+        die(f"PEX netlist instantiates {devs} devices, want 62")
     caps = sum(1 for ln in body if ln.strip().startswith("C"))
     if caps == 0:
         die("PEX top subckt has no capacitance; extraction did not run")
