@@ -324,8 +324,21 @@ planes, met1 vss rail), and it is where the closure stops:
   enclosures, not the bars a gf180-style router draws.
 * **ihp-sg13g2**.  The tooling is complete - KLayout `sg13g2_pycell_lib`,
   `tech/drc/run_drc.py`, `tech/lvs/run_lvs.py`, and a magic tech - but the
-  repo has no ihp generator/drawer to start from: the cell geometry (device
-  terminals, rails, 510 pads) has to be written and DRC'd from scratch.
+  *device layouts* are not: `libs.ref/sg13g2_pr/gds/sg13g2_pr.gds` holds only
+  fixed PCM cells (`pmos`/`nmos` are 0.87 x 0.41 um - a characterisation
+  device, not a 16 uA cell), and the pycell library is the `cni`/`PCellWrapper`
+  framework, which needs KLayout's PCell host rather than the plain
+  `create_cell(...)` API gf180's macro uses.  A generator therefore starts
+  with a device drawer (act/poly/li1/contacts/nwell/implants) and a DRC loop.
+* **sky130 device sources** (checked, because the drawer problem decides the
+  closure): `libs.ref/sky130_fd_pr/gds/sky130_fd_pr.gds` has *foundry* RF
+  layouts for the 1.8 V pfet/nfet (`rf_pfet_01v8_aM04W3p00L0p15` ...) and for
+  the **5 V nfet**, but **no 5 V pfet** - and the array needs the 5 V pair at
+  3.3 V because the 1.8 V stack cannot carry 16 uA.  `pya_draw` is the only
+  drawing path for it and its W=8 output is not DRC-clean (`licon.1` /
+  `ct.1_b` 44 each on a single device; the drawer's 8 um-wide source/drain
+  contact stacks are the problem), so the sky130 closure needs a 5 V pfet
+  device drawer before the cell can be iterated.
 * **icsprout55**.  The KLayout cell
   `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
   its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC

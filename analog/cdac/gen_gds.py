@@ -110,12 +110,19 @@ def label(cell, lpair, text, x, y):
 # unit cells, ported from ../saradc_auto/gen/analog/layout_{cap,tg}.py
 # --------------------------------------------------------------------------
 
-SERDES = "/opt/OpenSERDES/verification/analog"
+SERDES = "/grid/OpenSERDES/verification/analog"
+SERDES_ALT = "/opt/OpenSERDES/verification/analog"   # older install
 
 
 def _pya_draw():
-    if SERDES not in sys.path:
-        sys.path.insert(0, SERDES)
+    for root in (SERDES, SERDES_ALT):
+        if Path(root, "pya_draw").is_dir():
+            if root not in sys.path:
+                sys.path.insert(0, root)
+            break
+    else:
+        raise SystemExit(f"error: pya_draw not found under {SERDES} or "
+                         f"{SERDES_ALT}")
     try:
         from pya_draw import shim  # noqa: F401
         from pya_draw.draw_fet import draw_nfet, draw_pfet

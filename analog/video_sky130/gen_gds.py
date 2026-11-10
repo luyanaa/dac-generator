@@ -63,7 +63,13 @@ PAD_Y = (-11.60, -11.20)
 
 
 def _draw_fet():
-    sys.path.insert(0, "/opt/OpenSERDES/verification/analog")
+    for root in ("/grid/OpenSERDES/verification/analog",
+                 "/opt/OpenSERDES/verification/analog"):
+        if Path(root, "pya_draw").is_dir():
+            sys.path.insert(0, root)
+            break
+    else:
+        raise SystemExit("error: pya_draw not found (grid or opt OpenSERDES)")
     from pya_draw import shim  # noqa: F401
     from pya_draw.draw_fet import draw_nfet, draw_pfet
     import pya_draw.draw_fet as df
