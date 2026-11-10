@@ -414,18 +414,23 @@ and the one-cell replica drives them at 1/gm ~ 6-7 kOhm: a 50-80 ns pole against
 a 40 ns period. Binary 127->128 lands 9.5 LSB low and never settles; a
 thermometer full-scale step lands 173 LSB low. With `vbp`/`vcp` forced the same
 carry settles in 24.4 ns and a full-scale step in 3.0 ns, so the cell and
-output path are fine and the bias network is the whole deficit - the pre-layout
-51 LSB / 0.74 ns glitch was an
-artifact of holding the bias stiff. Thermometer decode is a DNL fix, not a
-settling fix. A scaled replica was sized on the same extraction: 8x
-(64/1 + 64/0.5 + 4/0.28 at 128 uA, same current density) still misses at
--1.13 LSB on the carry and -63 LSB on full scale, and the full-scale error
-shrinks much more slowly than 1/M; a 16x *single* device is not even
-simulable, because the PDK's binned models stop at W = 100.01 um and ngspice
-silently picks no bin (the run came back at 2x current with `vcp` negative).
-The fix is a buffer on the bias pins: recovering ~2.5 pC into 8 pF to 1.6 mV
-inside 39 ns is an output impedance of ~900 Ohm, i.e. a small class-C block of
-the same kind as the wrapper and the output driver.
+output path are fine and the bias network is the whole deficit - the
+pre-layout 51 LSB / 0.74 ns glitch was an artifact of holding the bias stiff.
+Thermometer decode is a DNL fix, not a settling fix. A scaled replica was
+sized on the same extraction: 8x (64/1 + 64/0.5 + 4/0.28 at 128 uA, same
+current density) still misses at -1.13 LSB on the carry and -63 LSB on full
+scale (8x the bias buys 2.7x), so a replica large enough for full scale is not
+credible; a 16x *single* device is not even simulable, because the PDK's
+binned models stop at W = 100.01 um and ngspice silently picks no bin (the run
+came back at 2x current with `vcp` negative).
+The fix is a buffer on the bias pins. Modelled as an ideal unity-gain buffer
+with a series output resistance on a split net (the replica's diode node in,
+the array's bars out, the bars' extracted caps on the array side), 300 Ohm
+passes - carry +0.405 LSB in 35 ns, full scale +0.000 in 12 ns - and the carry
+margin is thin because the cell alone sits at +0.266. A bare follower would
+level-shift by its Vgs, so the block must be an amplifier with feedback around
+the replica: class C, ~10 devices, 0.2-0.5 mA, alongside the wrapper and the
+output driver.
 
 ## 8. Application fit
 
@@ -555,10 +560,12 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   superseded. The fix is a bias buffer, not a bigger replica: an 8x scaled
   replica (128 uA, same current density) still misses at -1.13 LSB on the
   carry and -63 LSB on full scale, a 16x single device is not even simulable
-  (the PDK bins stop at W = 100.01 um), and the array needs only ~900 Ohm on
-  `vbp`/`vcp` to recover ~2.5 pC into 8 pF inside 39 ns. That buffer is
-  class C, like the wrapper and the output driver; with the bias ideal every
-  step size closes, including full scale in 3.0 ns. Still open: the buffer,
+  (the PDK bins stop at W = 100.01 um), and the array needs a few hundred Ohm
+  on `vbp`/`vcp`: an ideal unity-gain buffer with 300 Ohm output passes both
+  the carry (+0.405 LSB, 35 ns) and full scale (+0.000, 12 ns). A bare
+  follower would level-shift by its Vgs, so it must be an amplifier with
+  feedback around the replica - class C, like the wrapper and the output
+  driver. Still open: the buffer,
   the digital macro (not hardened here), the wrapper and output driver.
   CML/HBT remains blocked: ihp130 has no installed HBT models or magic tech,
   so there is no SiGe device to build from.

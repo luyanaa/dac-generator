@@ -276,17 +276,23 @@ extraction (a prediction: the macro was not regenerated), by scaling the
 replica's PEX subckts and the reference current: at
 8x (64/1 + 64/0.5 + 4/0.28 at 128 uA, the same current density, so the array
 cells stay at 16 uA) the carry still misses at -1.13 LSB and a full-scale step
-at -63 LSB, and the full-scale disturbance shrinks much more slowly than 1/M,
-so the M that would close it is not credible. Scaling a single device past 8x
+at -63 LSB - 8x the bias buys only 2.7x - so a replica large enough for the
+full-scale case (and the PDK has no single device that wide) is not credible. Scaling a single device past 8x
 also hits the PDK's binned models, which stop at W = 100.01 um: a 16x replica
 (128 um) silently simulated at twice the current with `vcp` negative - a trap
 worth remembering, since it is a wrong answer, not an error.
 
-What the array actually needs is a stiff bias pin: ~2.5 pC has to be recovered
-into 8 pF to 1.6 mV in 39 ns, i.e. an output impedance of ~900 Ohm or less.
-That is a small class-C buffer (source follower or one-stage amp) on `vbp` and
-`vcp` - the same class as the wrapper and the output driver, not something the
-array macro can generate. Until it exists, the macro is signed off on DC,
+What the array needs is a low-impedance bias drive. Modelled on the same
+extraction as an ideal unity-gain buffer with a series output resistance (the
+replica's diode node as input, the array's bars as output, the bars' extracted
+capacitance kept on the array side), **300 Ohm passes**: carry 128.405 LSB
+(+0.405, 35 ns) and full scale 255.000 (+0.000, 12 ns). The carry has little
+margin left because the cell itself sits at +0.266 LSB with an ideal bias, so
+the block should target ~100-300 Ohm, not "a few hundred". A bare source
+follower will not do: it level-shifts by its Vgs, i.e. by ~1 V on the array's
+bias, so it has to be an amplifier whose feedback closes around the replica.
+That is a class-C block of roughly ten devices plus 0.2-0.5 mA, alongside the
+wrapper and the output driver. Until it exists, the macro is signed off on DC,
 matching, DRC/LVS/PEX and pins, and the carry is open.
 
 Gates: the settled value must be within 0.5 LSB of the loaded DC transfer at
