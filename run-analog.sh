@@ -6,7 +6,7 @@
 #   ./run-analog.sh <topology> <pdk> [stage]
 #
 #   topology   r2r | string | csteer | cdac | video
-#   pdk        gf180 | sky130
+#   pdk        gf180 | sky130 | ihp-sg13g2
 #   stage      prelayout (default) | gds | drc | lvs | pex | pins | all
 #              postlayout (r2r: poly R-C reconstruction; csteer, video:
 #              extracted DC transfer)
@@ -21,7 +21,10 @@
 # 60 steering switches, plus the analog-facing pin row via `pins`; the
 # wrapper and its pin script are class C) and cdac (sky130), and video (gf180,
 # the 255-cell dump-tail array + replica bias + the 510-pad digital pin row;
-# the digital macro, the wrapper and the output driver are class C).
+# the digital macro, the wrapper and the output driver are class C).  video
+# also has sky130 (`analog/video_sky130`) and ihp-sg13g2
+# (`analog/video_ihp`) arrays with their own signoff.py; sky130 and ihp add a
+# `dc` stage (the extracted full-scale operating point).
 # Every other leaf is class C and the stage exits 2 instead of reporting a run
 # that did not happen.
 #
@@ -49,10 +52,10 @@ video) DIR=analog/video ;;
 esac
 
 case "$PDK" in
-gf180 | sky130) ;;
+gf180 | sky130 | ihp-sg13g2) ;;
 *)
     echo "error: topology '$TOP' needs precision resistors;" >&2
-    echo "       supported PDKs for analog leaves: gf180, sky130" >&2
+    echo "       supported PDKs for analog leaves: gf180, sky130, ihp-sg13g2" >&2
     exit 2
     ;;
 esac
@@ -84,10 +87,16 @@ gds() {
 # Leaves with a device-level layout have one fail-closed entry point: their
 # signoff.py builds the macro, then gates DRC, LVS and PEX.  Routing the stages
 # here instead of a second script means `gds` cannot succeed while `drc` checks
-# a different file.
+# a different file.  video's sky130 and ihp arrays live in their own leaf
+# directories, so their SIGN is not $DIR/signoff.py.
+SIGN=""
+case "$TOP:$PDK" in
+video:sky130) SIGN=analog/video_sky130/signoff.py ;;
+video:ihp-sg13g2) SIGN=analog/video_ihp/signoff.py ;;
+esac
 case "$TOP:$PDK" in
 cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky130 | video:ihp-sg13g2)
-    SIGN="$DIR/signoff.py"
+    [ -n "$SIGN" ] || SIGN="$DIR/signoff.py"
     [ -x "$SIGN" ] || { echo "error: $SIGN missing" >&2; exit 2; }
     case "$STAGE" in
     prelayout) PDK="$PDK" "$DIR/run.sh" all ;;
