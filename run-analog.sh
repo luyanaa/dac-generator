@@ -10,14 +10,17 @@
 #   stage      prelayout (default) | gds | drc | lvs | pex | pins | all
 #              postlayout (r2r: poly R-C reconstruction; csteer: PEX core)
 #              mm (csteer: static mismatch Monte Carlo on the PEX netlist)
+#              video has no post-layout/mm bench yet and refuses those.
 #
 # gds/drc/lvs/pex are implemented for the leaves that have a device-level
 # macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
 # its TG tree is class C), csteer (gf180, the 30-cell array + replica bias +
 # 60 steering switches, plus the analog-facing pin row via `pins`; the
-# wrapper and its pin script are class C) and cdac (sky130).  Every other leaf
-# is class C and the stage exits 2 instead of reporting a run that did not
-# happen.
+# wrapper and its pin script are class C) and cdac (sky130), and video (gf180,
+# the 255-cell switched-cascode array + replica bias + the 255-pad digital pin
+# row; the digital macro, the wrapper and the output driver are class C).
+# Every other leaf is class C and the stage exits 2 instead of reporting a run
+# that did not happen.
 #
 # Unlike the digital `run.sh`, this flow is fail-closed: a missing PEX,
 # corner, or DRC result is an error rather than a skipped view.  Class A/B/C
@@ -79,7 +82,7 @@ gds() {
 # here instead of a second script means `gds` cannot succeed while `drc` checks
 # a different file.
 case "$TOP:$PDK" in
-cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180)
+cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180)
     SIGN="$DIR/signoff.py"
     [ -x "$SIGN" ] || { echo "error: $SIGN missing" >&2; exit 2; }
     case "$STAGE" in
@@ -89,11 +92,16 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180)
     lvs) "$SIGN" --stage lvs ;;
     pex) "$SIGN" --stage pex ;;
     pins) "$SIGN" --stage pins ;;
-    postlayout)
-        "$SIGN" --stage postlayout
-        ;;
-    mm)
-        "$SIGN" --stage mm
+    postlayout | mm)
+        # Only the leaves with a post-layout bench own these stages.  video's
+        # extracted DC sweep is not written yet, so it refuses instead of
+        # running csteer's bench on a netlist it was not built for.
+        if [ "$TOP" = video ]; then
+            echo "error: video has no $STAGE bench yet" >&2
+            echo "       pre-layout: ./run.sh; layout: gds|drc|lvs|pex|pins" >&2
+            exit 2
+        fi
+        "$SIGN" --stage "$STAGE"
         ;;
     all)
         PDK="$PDK" "$DIR/run.sh" all

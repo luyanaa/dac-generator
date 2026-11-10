@@ -41,3 +41,26 @@ edge_ps: 20.0
 settle_lsb: 0.5
 
 pdk: gf180
+
+# --- the device-level macro's LVS contract ---------------------------------
+# All 255 cells are the *same* device set; the binary weight lives entirely in
+# the digital decoder's fanout (see verilog/rtl/dac_video_dig.v), so these are
+# single numbers, not per-tag widths.
+cell_w: 8.0              # mirror and cascode PMOS width, um
+mir_l: 1.0               # cell mirror length (the P3 measured device), um
+cas_l: 0.5               # cascode length, um
+sw_w: 0.5                # series supply switch, um
+sw_l: 0.28
+
+# --- rail budget -----------------------------------------------------------
+# The vdd plane drop scales with the code, so it is a gain term absorbed by
+# endpoint calibration; the budget is the range it may cost at full code.
+# 2*drop/vov with vov 0.2 V is the current modulation it causes.
+vov: 0.2
+rail_gain_budget_pct: 2.0
+# iout is a single-ended bus: every cell exits at one node, so the far cell's
+# drain sits up to I*R/2 above the pad.  That is not a gain error (KCL still
+# delivers every cell's current) and the direction only adds cascode headroom;
+# the cost is that the far cells' Vds moves with the code, and through ro_unit
+# that is the LSB term gated below.  25 mV is a sanity line on the geometry.
+iout_drop_budget_mv: 25.0

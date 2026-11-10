@@ -350,10 +350,13 @@ def main() -> int:
     add(m2, -1.36, Y_VBP[0], x_b + CAS_DX + 1.24, Y_VBP[1], "vbp")
     label(x_last / 2, (Y_VBP[0] + Y_VBP[1]) / 2, "vbp", m2_lbl)
 
-    # vcp on poly: straight bar, nothing else rises through its band.
+    # vcp on poly: straight bar from the first cascode gate riser to the
+    # replica cascode's riser at the right end, so the 255 gates and the bias
+    # diode are one drawn net (a bar that stopped at the last cell left the
+    # replica on its own island - caught by the LVS stage).
     g0 = gate_span(CAS_L)
-    add(poly, CAS_DX + g0[0], Y_VCP[0], x_last + CAS_DX + g0[1], Y_VCP[1],
-        "vcp")
+    add(poly, CAS_DX + g0[0], Y_VCP[0], x_b + CAS_DX + g0[1] + 0.02,
+        Y_VCP[1], "vcp")
 
     # iout bus on M3 under the devices, straight to both ends.
     add(m3, -1.36, Y_IOUT[0], x_b + CAS_DX + 1.30, Y_IOUT[1], "iout")

@@ -1,9 +1,10 @@
 # Video-rate binary current-steering DAC leaf
 
-Fifth analog leaf (roadmap P5). Class **C**: the 255-unit cell array, its
-binary switch banks and the output stage are hand layout; only the digital
-half (`verilog/rtl/dac_video_dig.v`) is a standard-cell macro. No OpenROAD P&R
-near the analog core.
+Fifth analog leaf (roadmap P5). The 255-unit cell array is a **reusable layout
+generator** (`gen_gds.py`) with a fail-closed signoff; the digital half
+(`verilog/rtl/dac_video_dig.v`) is a standard-cell macro, and the wrapper that
+abuts the two, the output pad/ESD and the cable driver are class C hand
+layout. No OpenROAD P&R near the analog core.
 
 Named target: **8 bit, 25 MS/s (40 ns), single-ended video output**. This is
 the first leaf with a speed target rather than a resolution one; the point is
@@ -96,10 +97,51 @@ are.
 ## Digital half
 
 `verilog/rtl/dac_video_dig.v`, `dac_video_dig_tb.v` (9148 checks, lint
-clean). One register drives all eight switch banks, so the logic adds no
+clean). One register drives all 255 switch lines, so the logic adds no
 inter-bit skew; `valid` is a one-cycle launch pulse and `ready` enforces the
 settling window (`SETTLE_CYCLES`, default 4) during which `stb` is ignored.
 `dout` only ever changes on an accepted launch.
+
+`dout` is **one bit per physical cell**, not per code bit: the analog array is
+255 identical cells and each exposes exactly one switch gate, so the weight is
+the number of cells on a net. Cell j belongs to the smallest k with
+j < 2^(k+1) - 1 (bit 0 -> cell 0; bit 1 -> 1..2; ... bit 7 -> 127..254), which
+the RTL expands in a generate loop and the testbench re-expands independently.
+
+## Layout
+
+`gen_gds.py` emits `build/video.gds` (KLayout + the PDK pfet PCell; no
+transistor geometry is drawn by hand):
+
+* 767 pfet = 255 x (8/1 mirror + 8/0.5 cascode + 0.5/0.28 series supply
+  switch) + a 2-device replica bias. All 255 cells are *identical*: the
+  1/2/4/.../128 weight is the digital fanout, so there is no per-cell width
+  table to get wrong (P3's mistake).
+* the switch sits between vdd and the mirror, gate = the cell's only pin, so
+  an off cell is a real zero: no dump bus, no ground rail in the array.
+* one M2 pad per cell in cell order on an exact 7.5 um row at the bottom edge,
+  on a grid the hardened digital macro can abut.
+* vdd is an M3 plane over the devices and iout an M3 bus under them (M3 is
+  0.01 Ohm/sq against 0.09 for M1/M2; a 1.9 mm M1 bar would be hundreds of
+  ohms). vbp is an M2 bar, vcp a poly bar.
+
+`signoff.py` is the fail-closed entry point and gates, on the drawn file:
+
+| stage | result |
+|---|---|
+| drc | Magic `drc count total` = 0 items at 2, 8 and 255 cells |
+| lvs | 767 devices, 769 nets: 255 identical cells, 2 bias diodes, 4 rails; each cell re-derived from its pad tag (pad -> switch gate, drain -> mirror source, mirror drain -> cascode source -> iout) |
+| pins | 259 labelled ports; 255 m2 pads on the 7.5 um grid (`pinplan.py` reads the GDS back) |
+| pex | 767 instances, 4597 C entries, 197.8 kB: vdd 490 fF, vbp 311 fF, vcp 358 fF, iout 296 fF, 0.69 fF per pad |
+
+The same pins stage estimates the rails from the *drawn* metal: vdd 2.4 ohm ->
+1.2 mV at full code, i.e. 1.2 % of gain (2*drop/vov), which endpoint
+calibration absorbs because the drop scales with the code; iout 10.7 ohm ->
+21.8 mV between the farthest cell and the pad, which costs nothing in gain
+(KCL still delivers every cell's current) and 3e-6 LSB/cell through ro. vbp
+and vcp carry gates only, so their 311/358 fF matter for bias settling, not
+IR. `--selftest` proves the gates reject 14 mutations, including a narrowed
+vdd plane.
 
 ## Files and how to run
 
@@ -112,14 +154,22 @@ settling window (`SETTLE_CYCLES`, default 4) during which `stb` is ignored.
 ./run.sh tran            carries at 0 and 25 ps bit skew
 ./run.sh study           20-seed binary-vs-unary distribution
 
-../../run-analog.sh video gf180 [prelayout|gds|drc|all]
+./signoff.py             build + drc + lvs + pins + pex, gate on all four
+./signoff.py --stage lvs
+./signoff.py --selftest  14 mutations the gates must reject
+
+../../run-analog.sh video gf180 [prelayout|gds|drc|lvs|pex|pins|all]
 ```
 
-`run-analog.sh video gf180 gds` refuses with exit 2: this is class C, there
-is no array generator, and pretending otherwise would be worse than
-refusing. The deck is behavioural on purpose - it models the decode and the
-carry timing, while the cell current and ro come from the P3 device bench and
-are copied into `video.yaml` with provenance.
+`run-analog.sh video gf180 postlayout|mm` refuses with exit 2: there is no
+extracted DC sweep or mismatch MC for this leaf yet, and running P3's bench on
+a netlist it was not built for would be worse than refusing. The deck is
+behavioural on purpose - it models the decode and the carry timing, while the
+cell current and ro come from the P3 device bench and are copied into
+`video.yaml` with provenance.
 
-Still open, and not claimed: any layout, DRC/LVS/PEX, the cable driver, and a
-post-layout rerun of the carry transients with extracted bit-slice skew.
+Still open, and not claimed: the hardened digital macro (only the RTL exists
+here), the wrapper/pin script that abuts it, the output pad/ESD/cable driver,
+the extracted DC sweep that would turn the rail estimate into a measured
+DNL/INL, mismatch MC on the P5 netlist, and a post-layout rerun of the carry
+transients with extracted bit-slice skew.
