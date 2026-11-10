@@ -50,6 +50,16 @@ casc_w: 8.0
 casc_l: 0.5
 vdd: 3.3
 
+# Steering switch: differential NMOS pair with the tail on the cascode drain.
+# The pair (not two independent switches) keeps the sum of the two drain
+# currents equal to the cell current, so the cascode drain never floats and
+# the make-before-break gate overlap only redistributes the tail.
+sw_w: 4.0
+sw_l: 0.28
+sw_cd_ff: 10.0          # switching-node capacitance in the event bench
+sw_edge_ns: 0.2         # standard-cell inverter gate edge
+sw_skew_ns: 0.03        # complementary gate overlap (make-before-break)
+
 pdk:
   gf180:
     model_lib: sm141064.ngspice

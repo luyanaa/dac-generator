@@ -271,6 +271,8 @@ isolates the tree, is the only honest way to size it.
 | DEM | closed (model) | 15-state DWA: mean INL +/-0.48, worst sample +/-1.37, 0.39 LSB rms |
 | Digital half | closed | `dac_csteer_dig` 3007/3007 checks, lint clean, hardened config added |
 | Output I-V | **closed by design rule** | passive 1 kOhm costs DNL +6.8 / INL +8.1 LSB; active I-V required |
+| Switch | **closed pre-layout (gf180)** | differential NMOS pair W/L 4/0.28 with the tail on the cascode drain: Ron 391 Ohm, compliance 2.26 V, event charge error 8.3 fC, pair charge error 0.3 fC, settle 55 ps; corners 301-553 Ohm / 2.10-2.44 V / 45-85 ps (`run_switch.py`) |
+| Cascode bias | **closed pre-layout (gf180)** | replica of the cell with the cascode drain diode-tied: Iref 16 uA through Mref 8/1 and Mcas 8/0.5 gives vbp/vcp; 15 corner/temp points hold Icell 16.000-16.002 uA, mirror margin >= 0.57 V, cascode margin >= 1.80 V |
 | Layout | **array generator closed; switches/bias/I-V class C** | `analog/csteer/gen_gds.py` lays out 30 cascoded-PMOS unit cells in one row with shared vdd/vbp/vcp rails and `oU0..oU14`/`oB1..oB8` pads; the switch matrix, cascode bias, I-V resistor and differential wrapper stay hand layout |
 | DRC / LVS / PEX | **closed for the current-source array** | `signoff.py`: DRC 0 items, LVS 60 devices / 30 cells / 52 nets / segmentation fan-out 1-2-4-8, PEX 60 instances / 268 C entries; `--selftest` fails drop-unit, swap-gate, short-out |
 

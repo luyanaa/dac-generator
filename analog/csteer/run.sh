@@ -8,6 +8,7 @@
 #   ./run.sh dc         dc with the Pelgrom mismatch, plus the DEM study
 #   ./run.sh riv        dc into a passive 1 kOhm I-V (ro penalty)
 #   ./run.sh cell       device bench: cell current, ro, Vth sensitivity
+#   ./run.sh switch     replica cascode bias matrix + one steering event
 #   ./run.sh mismatch   per-cell mismatch over 10 seeds
 #
 # Device-level analog macro: no RTL path, so this never calls LibreLane.
@@ -39,17 +40,21 @@ riv)
 cell)
     python3 run_cell.py --pdk "$PDK"
     ;;
+switch)
+    python3 run_switch.py --pdk "$PDK"
+    ;;
 mismatch)
     python3 run_mismatch.py --pdk "$PDK" --sigma 0.018 --seeds 10
     ;;
 all)
     "$SELF" cell
+    "$SELF" switch
     "$SELF" ideal
     "$SELF" dc
     "$SELF" riv
     ;;
 *)
-    echo "usage: $0 [ideal|dc|riv|cell|mismatch|all]" >&2
+    echo "usage: $0 [ideal|dc|riv|cell|switch|mismatch|all]" >&2
     exit 2
     ;;
 esac

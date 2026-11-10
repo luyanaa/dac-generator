@@ -183,10 +183,106 @@ def bench_cell(cfg, pdk: str, dat: str, voff: float) -> str:
     ])
 
 
+def _switch_devs(cfg, pdk: str) -> str:
+    """Bias generator + one current cell + the differential NMOS pair.
+
+    The bias generator is a replica of the cell with the cascode drain tied to
+    its own gate: Mref (mirror size) is diode-connected from vdd to vbp, Mcas
+    (cascode size) from vbp to vcp, and the reference current sinks at vcp.
+    Both devices therefore carry Iref, so vbp is the mirror gate and vcp is one
+    cascode Vgs below it.  The real cell's mirror drain settles at vbp, i.e. it
+    copies both the mirror bias and the cascode Vgs -- no ideal bias source.
+    """
+    p = cfg["pdk"][pdk]
+    vdd = cfg["vdd"]
+    w, l = cfg["cell_w"], cfg["cell_l"]
+    cw, cl = cfg["casc_w"], cfg["casc_l"]
+    i_u = cfg["i_unit_ua"]
+    sw_w = cfg.get("sw_w", 4.0)
+    sw_l = cfg.get("sw_l", 0.28)
+    return "\n".join([
+        f"Vdd vdd 0 {vdd}",
+        f"Iref vcp 0 {i_u}u",
+        f"Mref vbp vbp vdd vdd {p['pfet']} w={w}u l={l}u",
+        f"Mbcas vcp vcp vbp vdd {p['pfet']} w={cw}u l={cl}u",
+        "* the cell under test plus its differential NMOS steering pair",
+        f"M1 n1 vbp vdd vdd {p['pfet']} w={w}u l={l}u",
+        f"Mcasc cd vcp n1 vdd {p['pfet']} w={cw}u l={cl}u",
+        f"Mswp ioutp swp cd 0 {p['nfet']} w={sw_w}u l={sw_l}u",
+        f"Mswn idump swn cd 0 {p['nfet']} w={sw_w}u l={sw_l}u",
+        "Voutp ioutp 0 0",
+        "Voutn idump 0 0",
+    ])
+
+
+def _pulse(t0: float, t1: float, edge: float, v0: float, v1: float,
+           delay: float = 0.0) -> str:
+    """PWL for a 0->1->0 pulse, times in ns, used by the transient bench."""
+    return (f"PWL(0 {v0} {t0 + delay}n {v0} {t0 + delay + edge}n {v1} "
+            f"{t1 + delay}n {v1} {t1 + delay + edge}n {v0} "
+            f"{t1 + delay + edge + 1}n {v0})")
+
+
+def bench_switch(cfg, pdk: str, dc_out: Path, tran_out: Path,
+                 comp_out: Path) -> tuple[str, str]:
+    """Two switch netlists: DC (crossover + compliance) and transient.
+
+    The pair is a differential NMOS pair with its tail on the cascode drain, so
+    the sum of the two drain currents is the cell current at every control
+    voltage and the cascode drain never floats.  The complement is ideal here;
+    the digital half (or a local inverter) provides it.
+    """
+    vdd = cfg["vdd"]
+    edge = float(cfg.get("sw_edge_ns", 0.2))
+    skew = float(cfg.get("sw_skew_ns", 0.03))
+    dc_body = "\n".join([
+        "* switch pair: DC crossover, then output compliance",
+        _switch_devs(cfg, pdk),
+        f"Vswp swp 0 {vdd}",
+        f"Bsw swn 0 V = {vdd} - v(swp)",
+        ".control", "set wr_singlescale", "set wr_vecnames",
+        f"dc Vswp 0 {vdd} 0.02",
+        f"wrdata {dc_out} v(swp) i(Voutp) i(Voutn) v(cd) v(n1)",
+        f"alter Vswp {vdd}",
+        "dc Voutp 0 2.5 0.02",
+        f"wrdata {comp_out} v(ioutp) i(Voutp) v(cd) v(n1)",
+        ".endc", ".end",
+    ])
+    tran_body = "\n".join([
+        "* switch pair: one steering event, make-before-break gate drive",
+        _switch_devs(cfg, pdk),
+        f"Cd cd 0 {cfg.get('sw_cd_ff', 10.0)}f",
+        f"Vswp swp 0 {_pulse(10.0, 50.0, edge, 0.0, vdd)}",
+        f"Vswn swn 0 {_pulse(10.0, 50.0, edge, vdd, 0.0, skew)}",
+        ".control", "set wr_singlescale", "set wr_vecnames",
+        f"tran 0.01n 70n",
+        f"wrdata {tran_out} v(swp) v(swn) v(cd) i(Voutp) i(Voutn)",
+        ".endc", ".end",
+    ])
+    return dc_body, tran_body
+
+
+def bench_bias(cfg, pdk: str) -> str:
+    """Operating point of the replica bias generator and the cell it drives."""
+    return "\n".join([
+        "* replica cascode bias + one cell, operating point",
+        _switch_devs(cfg, pdk),
+        f"Vswp swp 0 {cfg['vdd']}",
+        "Vswn swn 0 0",
+        ".control", "op",
+        "print v(vbp) v(vcp) v(n1) v(cd) v(ioutp) i(Voutp)",
+        "print @m1[id] @m1[vds] @m1[vgs] @m1[vth]",
+        "print @mcasc[id] @mcasc[vds] @mcasc[vgs] @mcasc[vth]",
+        "print @mswp[id] @mswp[vgs] @mswp[vth]",
+        ".endc", ".end",
+    ])
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pdk", default="gf180", choices=["gf180", "sky130"])
-    ap.add_argument("--bench", default="dc", choices=["dc", "cell"])
+    ap.add_argument("--bench", default="dc",
+                    choices=["dc", "cell", "switch", "bias"])
     ap.add_argument("--pdk-root", default=None)
     ap.add_argument("--temp", type=float, default=25.0)
     ap.add_argument("--corner", default="tt")
@@ -210,6 +306,28 @@ def main() -> None:
     root = pdk_root(cfg, a.pdk, a.pdk_root)
     (ROOT / "build").mkdir(exist_ok=True)
     dat = str(Path(a.dat) if a.dat else ROOT / "build" / f"{a.bench}.dat")
+
+    if a.bench in ("switch", "bias"):
+        head = [f"* Current-steering switch/bias, {a.pdk}, {a.corner}"
+                f" {a.temp:g} C",
+                "* Generated by analog/csteer/gen_csteer.py -- do not edit.",
+                models(cfg, a.pdk, root, a.temp, a.corner)]
+        base = Path(dat)
+        if a.bench == "bias":
+            out = Path(a.out) if a.out else base.with_name("csteer_bias.spice")
+            out.write_text("\n".join(head + [bench_bias(cfg, a.pdk), ""]))
+            print(f"wrote {out}")
+            return
+        sp = base.with_name(base.stem + "_dc.spice")
+        dcs = base.with_name(base.stem + "_dc.dat")
+        comp = base.with_name(base.stem + "_comp.dat")
+        trn = base.with_name(base.stem + "_tran.dat")
+        dc_body, tran_body = bench_switch(cfg, a.pdk, dcs, trn, comp)
+        sp.write_text("\n".join(head + [dc_body, ""]))
+        tr_sp = base.with_name(base.stem + "_tran.spice")
+        tr_sp.write_text("\n".join(head + [tran_body, ""]))
+        print(f"wrote {sp} and {tr_sp}")
+        return
 
     if a.bench == "dc":
         body, errs = bench_dc(cfg, dat, a.pointer, a.mismatch, a.seed, a.riv)
