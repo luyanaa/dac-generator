@@ -5,8 +5,9 @@ Third analog leaf (roadmap P3). Mixed: the 30-cell current-source array (the
 60 steering switches are generated and signed off (`gen_gds.py`,
 `signoff.py`) and checked again on the extracted netlist
 (`run_postlayout.py`); the digital half (`verilog/rtl/dac_csteer_dig.v`, which
-also generates the 60 steering levels) is a standard-cell macro. The I-V
-resistor, the differential wrapper and the analog-facing pin placement are
+also generates the 60 steering levels) is a standard-cell macro. The output
+termination is a 1 kOhm resistor (the cell ro is 425 MOhm, so loading costs
+0.002 LSB); the differential wrapper and the analog-facing pin placement are
 class **C** hand layout. No OpenROAD P&R near the analog core.
 
 ## Topology
@@ -32,28 +33,28 @@ class **C** hand layout. No OpenROAD P&R near the analog core.
   carrying 16 uA; a binary cell is the same stack at `0.5/1 um` carrying 1 uA,
   so the whole 8-bit field is one device flavour at two widths.
 
-## Why virtual ground
+## Output termination
 
 A current DAC is characterised into **0 V**, which is what an opamp I-V (or a
-shorted input) presents. With a passive I-V resistor the cell output
-conductance becomes a code-dependent gain error: the 425 kOhm unary-cell ro
-across the 255 mV full-scale output costs **DNL -0.07 / INL +2.4 LSB** at
-`R = 1 kOhm` even with perfectly matched cells (the binary field is 16x
-stiffer, so it no longer dominates this term). 2.4 LSB is still far outside an
-8-bit budget, so the leaf specifies an active I-V (or a much higher-impedance /
-regulated-cascode output) and the regression reports both:
+shorted input) presents. That is the reference in the regression, but it turns
+out not to be necessary here: the cascoded cell's ro is **425 MOhm**, not the
+425 kOhm the first bench printout suggested (a kOhm/MOhm slip, see the device
+table below). 15 unary cells in parallel are still ~28 MOhm, so a 1 kOhm
+passive I-V - which puts 255 mV on the output at full scale - costs
+**0.002 LSB** of INL with perfectly matched cells. A resistor is enough; an
+opamp I-V is optional, not a requirement. The extracted core agrees: the
+256-code sweep with a 1 kOhm series resistance at `iout` gives the same DNL/INL
+as the virtual-ground run (0.177 / 0.166 LSB, see below).
 
 | bench | DNL (LSB) | INL (LSB) |
 |---|---|---|
 | virtual ground, sigma = 0 (control) | 0.000 | 0.000 |
-| passive 1 kOhm I-V, sigma = 0 | -0.067 .. +0.061 | 0.000 .. +2.383 |
+| passive 1 kOhm I-V, sigma = 0 | 0.000 | 0.000 .. +0.002 |
 | virtual ground, 1.8 %/unit cell | -0.890 .. +0.275 | -0.483 .. +1.373 |
-| passive 1 kOhm I-V, 1.8 %/unit cell | -0.890 .. +0.321 | -0.215 .. +3.260 |
+| passive 1 kOhm I-V, 1.8 %/unit cell | -0.890 .. +0.275 | -0.482 .. +1.375 |
 
-The control run is exact, so the error is the injected cell mismatch, not the
-measurement path. The passive-I-V penalty is smaller than it used to be because
-the binary cells are now 1 uA devices with 16x the ro of a 16 uA cell: only the
-unary field still sees the full 425 kOhm.
+The control run is exact, so the error at 1.8 % is the injected cell mismatch,
+not the measurement path, and the two terminations are indistinguishable.
 
 ## Device cell (`run_cell.py`)
 
@@ -64,17 +65,23 @@ bias generator (next section) reproduces the same operating point from one
 
 | corner | temp | I_cell | ro |
 |---|---|---|---|
-| tt | 25 C | 15.766 uA | 425 kOhm |
-| ff | 25 C | 15.874 uA | 549 kOhm |
-| ss | 25 C | 15.632 uA | 275 kOhm |
-| fs | 25 C | 15.679 uA | 326 kOhm |
-| sf | 25 C | 15.843 uA | 508 kOhm |
-| tt | -40 C | 15.728 uA | 390 kOhm |
-| tt | +125 C | 15.821 uA | 473 kOhm |
+| tt | 25 C | 15.766 uA | 425 MOhm |
+| ff | 25 C | 15.874 uA | 549 MOhm |
+| ss | 25 C | 15.632 uA | 275 MOhm |
+| fs | 25 C | 15.679 uA | 326 MOhm |
+| sf | 25 C | 15.843 uA | 508 MOhm |
+| tt | -40 C | 15.728 uA | 390 MOhm |
+| tt | +125 C | 15.821 uA | 473 MOhm |
 
 ro is fitted over the flat window `Vout = 0.05..1.0 V`; the mirror carries
 15.77 uA rather than 16 because its Vds differs from the diode reference, a
-systematic gain error that the endpoint fit absorbs.
+systematic gain error that the endpoint fit absorbs. These are **MOhm, not
+kOhm**: `run_cell.py` used to print `ro/1e3` labelled kOhm, so the 425e6 of the
+bench appeared as "424900 kOhm" and was carried into this README and
+`csteer.yaml` as 425 kOhm - a 1000x error that made a 1 kOhm load look like a
+2.4 LSB penalty. The bench now prints MOhm, and `csteer.yaml` carries 4.249e+8.
+The extracted core confirms the same order: 51.7 MOhm for the whole 30-cell
+array at full code (1.5 GOhm per cell).
 
 Gate-referred sensitivity at tt/25 C:
 
@@ -265,6 +272,7 @@ post-layout are directly comparable:
 | transfer DNL | exact | 0.177 LSB | < 0.5 LSB |
 | transfer INL | exact | 0.166 LSB | < 1 LSB |
 | monotonic steps | - | 0 bad | 0 |
+| 1 kOhm passive I-V | 0.002 LSB (model) | 0.166 LSB | same as virtual ground |
 
 The last five rows are a **256-code sweep of the extracted core**: every gate
 is driven the way `dac_csteer_dig` drives it (thermometer on the MSBs, one
@@ -284,14 +292,21 @@ extracted capacitance instead of a guessed 10 fF, `iout`/`idump` carry their
 bus caps (7.8 / 8.8 fF), the 60 gate nets 0.7 fF each and the 30 tails 1.4 fF
 each. Peak displacement is 86.5 uA and the tail swings 15.4 mV.
 
+The code sweep is run twice, into 0 V and through 1 kOhm, and the two are
+required to agree to 0.05 LSB of INL and 0.5 % of full scale. That is the
+extracted-core proof that the leaf does not need an opamp I-V: a poly resistor
+is a sufficient termination (its own mismatch and temperature drift, not its
+loading of the cells, is what a designer then has to bound).
+
 This is a core-level result: the drawn switches behave, the charge numbers are
 real, the 256-code transfer is monotonic with the right segmentation, and the
 layout adds nothing fatal. It is **not** a mismatch linearity claim: the PEX
 netlist has one deterministic model for all 30 cells, so static INL/DNL under
-process mismatch still comes from the pre-layout Pelgrom model above, and the
-I-V, the wrapper and the analog-facing pin placement are still missing. The
-stage is fail-closed: no PEX, or a PEX older than `csteer.gds`, exits 2 instead
-of running a stale netlist.
+process mismatch still comes from the pre-layout Pelgrom model above. What is
+still missing is the differential wrapper and the analog-facing pin placement
+(class C hand work); the I-V is now only a resistor to lay out. The stage is
+fail-closed: no PEX, or a PEX older than `csteer.gds`, exits 2 instead of
+running a stale netlist.
 
 
 ## Digital half

@@ -239,7 +239,8 @@ def bench_tran(cfg, pdk: str, root: Path, pts: list[str]) -> dict:
             "settle": settle, "sweep": str(out)}
 
 
-def bench_transfer(cfg, pdk: str, root: Path, pts: list[str]) -> dict:
+def bench_transfer(cfg, pdk: str, root: Path, pts: list[str],
+                   r_series: float = 0.0) -> dict:
     """All 256 codes on the extracted core: the DAC transfer curve.
 
     This is the check the layout did not have: every switch gate is driven the
@@ -247,8 +248,13 @@ def bench_transfer(cfg, pdk: str, root: Path, pts: list[str]) -> dict:
     fanned to all cells of a binary weight), the output is a virtual ground,
     and the code is swept end to end.  The DWA pointer only permutes which
     unary cell is on, so it cannot change the sum and the bench uses pointer 0.
+
+    `r_series` puts that resistance between `iout` and the 0 V source, i.e. it
+    models a passive I-V of that input impedance.  Run it at 1 kOhm to show
+    that the leaf does not need an opamp transimpedance stage.
     """
-    out = BUILD / "post_transfer.dat"
+    tag = "gnd" if not r_series else f"{r_series:.0f}"
+    out = BUILD / f"post_transfer_{tag}.dat"
     vdd = float(cfg["vdd"])
     ub = int(cfg["unary_bits"])
     bb = int(cfg["binary_bits"])
@@ -272,22 +278,30 @@ def bench_transfer(cfg, pdk: str, root: Path, pts: list[str]) -> dict:
     for tag, cond in conds.items():
         lines.append(f"Bswa_{tag} swa_{tag} 0 V = {vdd:.3f}*{cond}")
         lines.append(f"Bswb_{tag} swb_{tag} 0 V = {vdd:.3f}*(1-{cond})")
+    if r_series:
+        lines += [f"Rz iout nz {r_series:.6g}", "Vz nz 0 0",
+                  "Vmn idump 0 0"]
+        probe = "i(Vz)"
+    else:
+        lines += ["Vmi iout 0 0", "Vmn idump 0 0"]
+        probe = "i(Vmi)"
     lines += [
-        "Vmi iout 0 0",
-        "Vmn idump 0 0",
         ".control", "set wr_singlescale", "set wr_vecnames",
         f"dc Vcode 0 {2 ** bits - 1} 1",
-        f"wrdata {out} v(code) i(Vmi) i(Vmn)",
+        f"wrdata {out} v(code) {probe} i(Vmn)",
         ".endc", ".end",
     ]
-    nl = BUILD / "post_transfer.spice"
+    nl = BUILD / f"post_transfer_{tag}.spice"
     nl.write_text("\n".join(lines) + "\n")
     ngspice(nl)
     rows = wrdata(out)
     if len(rows) < 2 ** bits:
         die(f"transfer sweep produced {len(rows)} rows, want {2 ** bits}")
 
-    i = [r[2] for r in rows]                 # iout, the I-V virtual ground
+    # iout, the I-V input node.  With a series R the current is read at the 0 V
+    # source behind it, so take the magnitude (the direction depends on the
+    # source orientation, the DAC current does not).
+    i = [abs(r[2]) if r_series else r[2] for r in rows]
     i0 = i[0]
     fs = i[-1] - i0
     if fs <= 0:
@@ -325,6 +339,7 @@ def main(argv=None) -> int:
     dc = bench_dc(cfg, a.pdk, root, pts)
     tr = bench_tran(cfg, a.pdk, root, pts)
     tf = bench_transfer(cfg, a.pdk, root, pts)
+    tf1k = bench_transfer(cfg, a.pdk, root, pts, r_series=1000.0)
     want_fs = (2 ** int(cfg["bits"]) - 1) * float(cfg["i_lsb_ua"])
 
     checks = [
@@ -346,6 +361,13 @@ def main(argv=None) -> int:
         ("transfer DNL", tf["dnl"] < 0.5, f"{tf['dnl']:.3f} LSB"),
         ("transfer INL", tf["inl"] < 1.0, f"{tf['inl']:.3f} LSB"),
         ("monotonic", tf["nonmono"] == 0, f"{tf['nonmono']} bad steps"),
+        # A 1 kOhm passive I-V is the cheapest termination the leaf can use;
+        # it must be indistinguishable from the virtual ground.  This is the
+        # check that a 1000x cell-ro error would fail.
+        ("passive 1 kOhm I-V",
+         abs(tf1k["inl"] - tf["inl"]) < 0.05
+         and abs(tf1k["fs"] - tf["fs"]) < 0.005 * tf["fs"],
+         f"INL {tf1k['inl']:.3f} / FS {tf1k['fs'] * 1e6:.1f} uA"),
     ]
     ok = True
     if not a.brief:
@@ -356,6 +378,9 @@ def main(argv=None) -> int:
         print(f"  transfer            : FS {tf['fs'] * 1e6:.1f} uA "
               f"(want {want_fs:.1f}), LSB {tf['lsb'] * 1e6:.3f} uA, "
               f"unary step {tf['unary_step']:.2f} LSB")
+        print(f"  1 kOhm passive I-V  : INL {tf1k['inl']:.3f} LSB, "
+              f"FS {tf1k['fs'] * 1e6:.1f} uA "
+              f"(virtual ground {tf['inl']:.3f} LSB)")
     for name, good, val in checks:
         ok &= good
         if a.brief:
@@ -365,7 +390,8 @@ def main(argv=None) -> int:
     print(f"post-layout {'PASS' if ok else 'FAIL'}")
     (BUILD / "postlayout.json").write_text(json.dumps(
         {"ok": ok, "pdk": a.pdk, "pex": str(PEX), "ports": len(pts),
-         "dc": dc, "tran": tr, "transfer": tf}, indent=1) + "\n")
+         "dc": dc, "tran": tr, "transfer": tf, "termination_1k": tf1k},
+        indent=1) + "\n")
     return 0 if ok else 1
 
 

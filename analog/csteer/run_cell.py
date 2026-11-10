@@ -93,10 +93,10 @@ def main() -> int:
             sys.exit(f"no data for {c}/{t}")
         rows.append((c, t, f[0], f[1]))
         if a.brief:
-            print(f"CELL {c} {t:+.0f} {f[0]*1e6:.4f} {f[1]/1e3:.1f}")
+            print(f"CELL {c} {t:+.0f} {f[0]*1e6:.4f} {f[1]/1e6:.1f}")
         else:
             print(f"{c:>2} {t:+6.0f}C  I={f[0]*1e6:8.4f} uA  "
-                  f"ro={f[1]/1e3:8.1f} kOhm")
+                  f"ro={f[1]/1e6:8.1f} MOhm")
 
     # Vth sensitivity at tt/25 C
     base = None
@@ -123,9 +123,9 @@ def main() -> int:
     out = ROOT / "build" / "cell_matrix.csv"
     with open(out, "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["corner", "temp_C", "i_cell_uA", "ro_kOhm", "sens_pct_per_mV"])
+        w.writerow(["corner", "temp_C", "i_cell_uA", "ro_MOhm", "sens_pct_per_mV"])
         for c, t, i, ro in rows:
-            w.writerow([c, t, f"{i*1e6:.4f}", f"{ro/1e3:.1f}", ""])
+            w.writerow([c, t, f"{i*1e6:.4f}", f"{ro/1e6:.1f}", ""])
         w.writerow(["tt", 25.0, "", "", f"{mean_sens*100:.4f}"])
     if not a.brief:
         print(f"wrote {out}")

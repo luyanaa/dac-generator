@@ -31,10 +31,11 @@ r_iv: 1000.0
 load_c_pf: 7.0
 
 # Cell output resistance, measured by the device bench (cascoded PMOS mirror,
-# flat window 0.05-1.0 V): 425 kOhm at 15.76 uA in saturation.  A 1 LSB device
-# carries 1/16 of that current at the same L, so its ro is 16x higher; a
-# binary bit of weight w is w such devices in parallel.
-ro_unit: 425000.0
+# flat window 0.05-1.0 V): 424.9 MOhm at 15.76 uA in saturation.  A 1 LSB
+# device carries 1/16 of that current at the same L, so its ro is 16x higher;
+# a binary bit of weight w is w such devices in parallel.  NOTE: this is the
+# *cascoded stack*; a single mirror device is ~1.5 MOhm.
+ro_unit: 4.249e+8
 
 # Per-cell current sigma (relative).  Default is the Pelgrom estimate for the
 # unit cell sized below at V_ov = 0.2 V: sigma_VT = 10 mV*um / sqrt(8*1 um^2)
