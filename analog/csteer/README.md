@@ -7,8 +7,10 @@ Third analog leaf (roadmap P3). Mixed: the 30-cell current-source array (the
 (`run_postlayout.py`); the digital half (`verilog/rtl/dac_csteer_dig.v`, which
 also generates the 60 steering levels) is a standard-cell macro. The output
 termination is a 1 kOhm resistor (the cell ro is 425 MOhm, so loading costs
-0.002 LSB); the differential wrapper and the analog-facing pin placement are
-class **C** hand layout. No OpenROAD P&R near the analog core.
+0.002 LSB). The 60 gate pins come out on a uniform 2.75 um M2 row that a
+hardened digital macro can abut (`pins` stage); the differential wrapper and
+the wrapper's own pin script are class **C** hand layout. No OpenROAD P&R near
+the analog core.
 
 ## Topology
 
@@ -194,6 +196,7 @@ DNL is required.
 | `measure.py` | endpoint-fit DNL/INL plus the analytic DEM mean/worst/noise |
 | `run_cell.py` | device cell across corners/temperature and the Vth sensitivity |
 | `run_switch.py` | replica bias matrix + one steering event (Ron, compliance, charge, settling) |
+| `pinplan.py` | the port geometry, re-read from the written GDS (KLayout) |
 | `run_postlayout.py` | the switch gates and the 256-code transfer re-run on the extracted core (PEX netlist) |
 | `run_mismatch.py` | per-cell mismatch seed sweep |
 | `run.sh` | one-command pre-layout regression |
@@ -227,14 +230,20 @@ steering switch pair per cell:
   carries its own switch, the binary weight is a count of cells sharing a gate
   net, and the complementary drive comes from the digital macro. Row A exits its
   gate on the same y band; row B's gate poly climbs over the `idump` bus
-  because the next cell's gate poly blocks that band. Each of the 60 gates ends
-  on its own M2 pad at the top edge.
+  because the next cell's gate poly blocks that band.
+* **Analog-facing pin row.** Both gates of a cell climb to one M2 row at
+  y = 19.40..19.84, two pads per cell on an exact 2.75 um grid (half the cell
+  pitch): `swa_<tag>` at 0.90 + 5.5k, `swb_<tag>` at 3.65 + 5.5k. Row B's riser
+  jogs right in the clear band above the `idump` bus to reach its pin. That is
+  the edge a hardened digital macro abuts, so its 60 outputs can land on the
+  pins in cell order without a per-pin fan-out; the analog ports stay on their
+  buses (below the row) and are tapped where they are labelled.
 * **Buses.** `iout`, `idump` and the two `vss` bulk rails run the full width on
   M1; the two `vss` rails are strapped on M2 at the right end.
 
 Gates: Magic DRC 0 items, LVS 122 devices (30 cells + 2 bias + 60 switches) /
-126 nets (6 rails + 30 tails + 30 internal + 60 gates), PEX 122 instances /
-993 C entries. The LVS contract is written from `csteer.yaml` only and checks
+126 nets (6 rails + 30 tails + 30 internal + 60 gates), pins 96 labelled ports
+with 60 on the 2.75 um row, PEX 122 instances / 1022 C entries. The LVS contract is written from `csteer.yaml` only and checks
 the tail fan-out (one cascode drain and exactly two switch sources per
 `cd_<tag>`), the drain split (one `iout`, one `idump` per cell), 60 distinct
 gate nets, the 1-2-4-8 tag weights, and every device's W/L/bulk. Width is
@@ -243,19 +252,21 @@ for a `b*` tag, and the mirror on the same internal node must match it - so a
 binary cell silently drawn at 16 LSB fails LVS instead of merely shifting the
 transfer curve. `--selftest` rejects drop-unit, swap-gate, short-tail,
 drop-switch, short-drain, wrong-source, two bias mutations, a widened binary
-cascode and a widened binary mirror.
+cascode, a widened binary mirror, and five pin-plan mutations (a pin off the
+grid, two pins swapped, a widened pad, a dropped port, a pin on the wrong
+layer). `pinplan.py` re-reads the written GDS, so the pin check is on drawn
+metal, not on the generator's own coordinates.
 
 Not in this macro: the gate drive itself (the digital macro generates both
-phases; the wrapper only routes them to these pads), the I-V resistor and the
-differential wrapper. The 256-code sweep below is a *deterministic* transfer
-check; mismatch INL/DNL, the I-V and the analog-facing pin placement remain
-open.
+phases; the wrapper only routes them to these pins) and the differential
+wrapper. The 256-code sweep below is a *deterministic* transfer check;
+mismatch INL/DNL is not claimed.
 
 ## Post-layout (`run_postlayout.py`)
 
 `run-analog.sh csteer gf180 postlayout` (equivalently `./signoff.py --stage
 postlayout`) instantiates the hierarchical PEX of the whole core — 122 devices
-plus 993 coupling capacitors over 96 ports — and re-runs the two
+plus 1022 coupling capacitors over 96 ports — and re-runs the two
 `run_switch.py` measurements against the same thresholds, so pre- and
 post-layout are directly comparable:
 
@@ -303,9 +314,9 @@ real, the 256-code transfer is monotonic with the right segmentation, and the
 layout adds nothing fatal. It is **not** a mismatch linearity claim: the PEX
 netlist has one deterministic model for all 30 cells, so static INL/DNL under
 process mismatch still comes from the pre-layout Pelgrom model above. What is
-still missing is the differential wrapper and the analog-facing pin placement
-(class C hand work); the I-V is now only a resistor to lay out. The stage is
-fail-closed: no PEX, or a PEX older than `csteer.gds`, exits 2 instead of
+still missing is the differential wrapper and the wrapper's pin script (class C
+hand work; the analog side of the contract is `build/pinplan.json`). The stage
+is fail-closed: no PEX, or a PEX older than `csteer.gds`, exits 2 instead of
 running a stale netlist.
 
 
@@ -322,9 +333,9 @@ vector index is the physical cell and the port names match the analog pads
 register bit, so the weight is the cell count (1/2/4/8) and no second decode
 exists. Both phases come from the same register, so the pair is complementary
 by construction; the wrapper adds no inversion, only the physical connection.
-What is still hand work is the pin placement on the analog-facing edge: the 60
-switch pins have to land on the 5.5 um cell pitch that `gen_gds.py` uses for the
-control pads.
+The analog-facing pin row is generated and checked (`pins` stage): two pins per
+5.5 um cell on a 2.75 um M2 grid, `swa` then `swb` in cell order, exported as
+`build/pinplan.json` for the digital side's pin script to match.
 
 DWA has **15 pointer states**, not 16: there are 15 unary cells. Over 15
 consecutive samples of a constant code with `k` unary cells, every physical
@@ -364,17 +375,19 @@ penalty, the digital half, and the switch metrics again on the extracted core
 
 Not verified / not done:
 
-* **Core macro generated.** `run-analog.sh csteer gf180 gds|drc|lvs|pex|all`
+* **Core macro generated.** `run-analog.sh csteer gf180 gds|drc|lvs|pex|pins|all`
   builds the 30-cell array, the replica bias and the 60 steering switches
   through `signoff.py`: Magic DRC 0 items, LVS 122 devices / 30 cells / 60
-  switches / 126 nets, PEX 122 instances / 993 C entries; `--selftest` fails
-  drop-unit, swap-gate, short-tail, drop-switch, short-drain, wrong-source,
-  bias-gate and bias-source.
+  switches / 126 nets, pins 96 ports / 60 on the 2.75 um row, PEX 122
+  instances / 1022 C entries; `--selftest` fails drop-unit, swap-gate,
+  short-tail, drop-switch, short-drain, wrong-source, bias-gate, bias-source,
+  cell-width, mirror-width and five pin-plan mutations.
 * **Switch drive is generated, not placed.** `run_switch.py` closes the device
   sizing (Ron, charge, settling), the layout places both NFETs of every pair,
   and `dac_csteer_dig` now generates all 60 `swa`/`swb` levels (3733 checks).
-  Still hand work: the analog-facing pin placement at the 5.5 um cell pitch,
-  the I-V resistor and the differential wrapper.
+  The analog pin row is generated and gated; still hand work: the pin script
+  that puts the digital macro's outputs on that grid, the differential
+  wrapper, and the 1 kOhm output resistor.
 * **No full-DAC post-layout.** The core macro is extracted and re-checked on
   the PEX netlist (`run_postlayout.py`: Ron 391 Ohm, compliance 2.26 V, event
   charge 8.9 fC, pair charge 1.1 fC, settle 47 ps, all gates PASS), but

@@ -64,6 +64,17 @@ EXPECTED_W_UM = 8.0
 MIR_L_UM = 1.0
 CAS_L_UM = 0.5
 
+# Analog-facing pin contract (um).  The 60 switch gates come out on one M2 row
+# with two pins per 5.5 um cell (2.75 um pitch, swa then swb) so a hardened
+# digital macro can abut with its outputs on that grid; the six analog ports
+# stay on the array (M1/M2 buses) and are tapped where they are labelled.
+PIN_PITCH_UM = 2.75
+PIN_X0_UM = 0.90
+PIN_Y_UM = (19.40, 19.84)
+PIN_W_UM = 0.60
+PIN_H_UM = 0.44
+ANALOG_PORTS = ("vdd", "vbp", "vcp", "iout", "idump", "vss")
+
 
 def expected_w(tag: str, cfg) -> float:
     """Drawn PMOS width for one cell, from its segmentation tag."""
@@ -589,8 +600,131 @@ def selftest() -> int:
     print(f"selftest mirror-w   : {'FAIL' if p10 else 'PASS (bad!)'} ({len(p10)})")
     ok &= bool(p10)
 
+    # Pin contract, on the plan re-read from the written GDS.  These mutate
+    # the drawn geometry, so they also prove check_pins is not reading the
+    # generator's own numbers back.
+    plan_path = BUILD / "pinplan.json"
+    if not plan_path.is_file():
+        die("no build/pinplan.json; run --stage pins first")
+    plan = json.loads(plan_path.read_text())
+    pp = check_pins(plan, cfg)
+    print(f"selftest pins-real : {'FAIL' if pp else 'PASS'} ({len(pp)})")
+    ok &= not pp
+
+    def plan_mut(fn):
+        m = json.loads(json.dumps(plan))
+        fn(m["pins"])
+        return check_pins(m, cfg)
+
+    def shift(pins):
+        b = pins["swa_b8_7"]["bbox"]
+        pins["swa_b8_7"]["bbox"] = [v + 1.0 for v in b]
+
+    def swap(pins):
+        pins["swa_u13"], pins["swb_u13"] = pins["swb_u13"], pins["swa_u13"]
+
+    def widen(pins):
+        b = pins["swb_u0"]["bbox"]
+        pins["swb_u0"]["bbox"] = [b[0] - 0.4, b[1], b[2] + 0.4, b[3]]
+
+    def drop(pins):
+        del pins["swb_b8_7"]
+
+    def wrong_layer(pins):
+        pins["swa_u0"]["layer"] = "m1"
+
+    for name, fn in (("pin-shift", shift), ("pin-swap", swap),
+                     ("pin-widen", widen), ("pin-drop", drop),
+                     ("pin-layer", wrong_layer)):
+        pr = plan_mut(fn)
+        print(f"selftest {name:10}: {'FAIL' if pr else 'PASS (bad!)'} "
+              f"({len(pr)})")
+        ok &= bool(pr)
+
     print("selftest " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
+
+
+def check_pins(plan: dict, cfg) -> list[str]:
+    """Verify the drawn port geometry against the pin contract.
+
+    `plan` is pinplan.py's JSON: for every label, the pad it sits on.  The
+    check is on the GDS, not on the generator's variables, so a pin that is
+    drawn off the grid is caught even if the generator thinks it is right.
+    """
+    problems = list(plan.get("problems", []))
+    pins = plan.get("pins", {})
+    tags = [t for t, _ in cell_tags(cfg)]
+    want = {f"{p}_{t}" for t in tags for p in ("swa", "swb")}
+    want |= {f"cd_{t}" for t in tags} | set(ANALOG_PORTS)
+    got = set(pins)
+    if got != want:
+        problems.append(
+            f"{len(got)} labelled ports, want {len(want)}: missing "
+            f"{sorted(want - got)[:6]}, extra {sorted(got - want)[:6]}")
+
+    row = {n: v for n, v in pins.items()
+           if abs(v["bbox"][3] - PIN_Y_UM[1]) < 1e-6}
+    if len(row) != 2 * len(tags):
+        problems.append(f"{len(row)} pads on the pin row, want {2 * len(tags)}")
+    # The digital macro's outputs are numbered by cell: swa then swb, tag
+    # order, on an exact arithmetic grid.  Anything else cannot abut.
+    for i, tag in enumerate(tags):
+        for j, pre in ((2 * i, "swa"), (2 * i + 1, "swb")):
+            name = f"{pre}_{tag}"
+            v = pins.get(name)
+            if v is None:
+                continue
+            if name not in row:
+                problems.append(f"{name}: not on the analog-facing pin row")
+                continue
+            b = v["bbox"]
+            w, h = b[2] - b[0], b[3] - b[1]
+            if v["layer"] != "m2":
+                problems.append(f"{name}: pin on {v['layer']}, want m2")
+            if abs(w - PIN_W_UM) > 1e-6 or abs(h - PIN_H_UM) > 1e-6:
+                problems.append(f"{name}: pad {w:.3f}x{h:.3f} um, want "
+                                f"{PIN_W_UM:.3f}x{PIN_H_UM:.3f}")
+            cx = (b[0] + b[2]) / 2
+            want_x = PIN_X0_UM + PIN_PITCH_UM * j
+            if abs(cx - want_x) > 1e-6:
+                problems.append(f"{name}: pin centre {cx:.3f} um, want "
+                                f"{want_x:.3f}")
+            if abs(b[1] - PIN_Y_UM[0]) > 1e-6:
+                problems.append(f"{name}: pad bottom {b[1]:.3f}, want "
+                                f"{PIN_Y_UM[0]:.3f}")
+    for n in ANALOG_PORTS:
+        v = pins.get(n)
+        if v is None:
+            continue
+        b = v["bbox"]
+        if b[3] > PIN_Y_UM[0] + 1e-6:
+            problems.append(f"{n}: analog port reaches y={b[3]:.3f}, into the "
+                            f"digital pin row")
+        # These are buses, not pads: they only have to be real metal wide
+        # enough to tap, and to stay clear of the digital edge.
+        if min(b[2] - b[0], b[3] - b[1]) < 0.20:
+            problems.append(f"{n}: label sits on a {b[2] - b[0]:.2f}x"
+                            f"{b[3] - b[1]:.2f} um sliver")
+    return problems
+
+
+def pins(pdk: Path) -> dict:
+    if not Path(KLAYOUT_BUILD).is_file():
+        die(f"{KLAYOUT_BUILD} missing (needs the pya build)")
+    out = BUILD / "pinplan.json"
+    proc = run([KLAYOUT_BUILD, "-b", "-r", ROOT / "pinplan.py",
+                "-rd", f"gds={GDS}", "-rd", f"out={out}"])
+    if proc.returncode != 0 or not out.is_file():
+        print(proc.stdout + proc.stderr, file=sys.stderr)
+        die("pinplan extraction failed")
+    plan = json.loads(out.read_text())
+    cfg = load_cfg()
+    problems = check_pins(plan, cfg)
+    row = [n for n, v in plan.get("pins", {}).items()
+           if abs(v["bbox"][3] - PIN_Y_UM[1]) < 1e-6]
+    return {"ok": not problems, "problems": problems, "ports": len(
+        plan.get("pins", {})), "row": len(row), "plan": str(out)}
 
 
 def pex(pdk: Path) -> dict:
@@ -643,7 +777,8 @@ def pex(pdk: Path) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--stage", default="all",
-                    choices=["all", "build", "drc", "lvs", "pex", "postlayout"])
+                    choices=["all", "build", "drc", "lvs", "pex", "pins",
+                             "postlayout"])
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--brief", action="store_true")
     a = ap.parse_args(argv)
@@ -660,7 +795,7 @@ def main(argv=None) -> int:
     pdk = find_pdk()
     rep: dict = {"pdk": str(pdk), "top": TOP, "steps": {}}
     failed = []
-    if a.stage in ("all", "build", "drc", "lvs", "pex"):
+    if a.stage in ("all", "build", "drc", "lvs", "pex", "pins"):
         build()
     if a.stage in ("all", "drc"):
         r = drc(pdk)
@@ -676,6 +811,15 @@ def main(argv=None) -> int:
         print(f"lvs  {'PASS' if r['ok'] else 'FAIL'}  {r['devices']} devices "
               f"({r['cells']} cells + {r['switches']} switches + bias), "
               f"{r['nets']} nets, scale {r['scale_nm']:g} nm")
+        for p in r["problems"]:
+            print(f"     {p}")
+    if a.stage in ("all", "pins"):
+        r = pins(pdk)
+        rep["steps"]["pins"] = r
+        if not r["ok"]:
+            failed.append("pins")
+        print(f"pins {'PASS' if r['ok'] else 'FAIL'}  {r['ports']} ports, "
+              f"{r['row']} on the 2.75 um digital row")
         for p in r["problems"]:
             print(f"     {p}")
     if a.stage in ("all", "pex"):

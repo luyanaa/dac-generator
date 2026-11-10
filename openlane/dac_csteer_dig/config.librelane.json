@@ -15,9 +15,10 @@
     "//note3": "current cells are a device-level analog macro abutting this one;",
     "//note4": "no analog device is placed by this flow.",
     "//note5": "The 60 swa/swb outputs must sit on the analog-facing edge on the",
-    "//note6": "5.5 um cell pitch that analog/csteer/gen_gds.py uses for the gate",
-    "//note7": "pads; the default pin placement does not know that, so the",
-    "//note8": "wrapper's pin script owns it.",
+    "//note6": "contract analog/csteer publishes in build/pinplan.json: one M2 row,",
+    "//note7": "two pins per 5.5 um cell on a 2.75 um grid, swa then swb in cell",
+    "//note8": "order. The default pin placement does not know that, so the",
+    "//note9": "wrapper's pin script owns it and must read that file.",
     "pdk::gf180mcu*": {
         "DIE_AREA": "0 0 220 140"
     }

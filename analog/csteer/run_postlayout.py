@@ -7,7 +7,7 @@
 This closes the loop the layout opens: `signoff.py` builds the 30-cell array
 with its replica cascode bias and 60 steering switches and extracts it, but
 until here the PEX netlist was evidence only.  The script instantiates the
-hierarchical extraction of the whole core (122 devices plus the 993 coupling
+hierarchical extraction of the whole core (122 devices plus the 1022 coupling
 capacitors) and re-runs the two switch measurements of `run_switch.py` against
 the same gates, so pre- and post-layout numbers are comparable:
 

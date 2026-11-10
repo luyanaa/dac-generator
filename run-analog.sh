@@ -7,15 +7,16 @@
 #
 #   topology   r2r | string | csteer | cdac | video
 #   pdk        gf180 | sky130
-#   stage      prelayout (default) | gds | drc | lvs | pex | all
+#   stage      prelayout (default) | gds | drc | lvs | pex | pins | all
 #              postlayout (r2r: poly R-C reconstruction; csteer: PEX core)
 #
 # gds/drc/lvs/pex are implemented for the leaves that have a device-level
 # macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
 # its TG tree is class C), csteer (gf180, the 30-cell array + replica bias +
-# 60 steering switches; the I-V, wrapper and pin placement are class C)
-# and cdac (sky130).  Every other leaf is class C and the stage exits 2
-# instead of reporting a run that did not happen.
+# 60 steering switches, plus the analog-facing pin row via `pins`; the
+# wrapper and its pin script are class C) and cdac (sky130).  Every other leaf
+# is class C and the stage exits 2 instead of reporting a run that did not
+# happen.
 #
 # Unlike the digital `run.sh`, this flow is fail-closed: a missing PEX,
 # corner, or DRC result is an error rather than a skipped view.  Class A/B/C
@@ -86,6 +87,7 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180)
     drc) "$SIGN" --stage drc ;;
     lvs) "$SIGN" --stage lvs ;;
     pex) "$SIGN" --stage pex ;;
+    pins) "$SIGN" --stage pins ;;
     postlayout)
         "$SIGN" --stage postlayout
         ;;
@@ -106,7 +108,7 @@ case "$STAGE" in
 prelayout)
     PDK="$PDK" "$DIR/run.sh" all
     ;;
-gds | drc | lvs | pex | all)
+gds | drc | lvs | pex | pins | all)
     # Class C leaves have no generator, so every layout stage refuses rather
     # than reporting a run that did not happen.
     gds

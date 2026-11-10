@@ -11,11 +11,16 @@ The 1/2/4/8 binary weight is the *cell count* on each gate net, not the device
 width: all 15 binary cells are identical 0.5/1 um devices, which is what the
 digital macro drives (`swa_b8[7:0]` fans one register bit to eight cells).
 
+What it does contain, besides the 30 cells: the replica cascode bias
+generator, one 4/0.28 NMOS steering pair per cell, and the analog-facing pin
+row - both switch gates of a cell reach one M2 row, two pads per 5.5 um cell on
+a 2.75 um grid, in cell order, so a hardened digital macro can abut.
+
 What it does not contain (class C, hand layout, see README):
 
-  * the switch matrix (30 cells -> 255 codes, DEM rotation wires),
-  * the cascode bias generator (vbp/vcp are brought out as rails),
-  * the I-V output resistor and the differential wrapper.
+  * the differential wrapper,
+  * the wrapper's pin script (it must read `build/pinplan.json`),
+  * the 1 kOhm output termination.
 
 Cell (all dimensions um).  Two devices side by side, mirror on the left and
 cascode on the right, sharing one M1 node in the middle:
@@ -364,7 +369,19 @@ def main() -> int:
     y_a, y_b = 12.0, 16.0
     y_iout = y_a + 1.17
     y_idump = y_b + 1.17
-    y_ctrl_a, y_ctrl_b = 18.00, 18.75
+
+    # Analog-facing pin row.  Two pins per cell on a uniform 2.75 um grid (half
+    # the 5.5 um cell pitch), all on M2, all at the same y: that is the edge a
+    # hardened digital macro abuts, so its 60 outputs can land on every pin
+    # without a per-pin fan-out.  `swa_<tag>` sits at 0.90 + 5.5k, `swb_<tag>`
+    # at 3.65 + 5.5k, i.e. the sequence 0.90 + 2.75*j with j even/odd.
+    # `pinplan.py` re-derives this from the written GDS and `signoff.py`
+    # refuses anything that is not exactly this grid.
+    pin_y = (19.40, 19.84)
+    pin_w = 0.60
+    pin_a = 0.90                     # swa pad centre within the cell
+    pin_b = 3.65                     # swb pad centre; b - a = PITCH/2
+    assert abs((pin_b - pin_a) - PITCH / 2) < 1e-9
 
     def nfet(X, Y, tag, row, gate):
         top.insert(pya.CellInstArray(
@@ -428,8 +445,10 @@ def main() -> int:
         add(m1, x + 0.80, y_a + 0.40, x + 1.20, y_a + 0.80, "swa_" + tag)
         top.shapes(via1).insert(box(x + 0.87, y_a + 0.48,
                                     x + 1.13, y_a + 0.74))
-        add(m2, x + 0.80, y_a + 0.42, x + 1.20, y_ctrl_a + 0.35, "swa_" + tag)
-        label(x + 1.00, y_ctrl_a + 0.17, "swa_" + tag, m2_lbl)
+        add(m2, x + 0.80, y_a + 0.42, x + 1.20, pin_y[0] + 0.10, "swa_" + tag)
+        add(m2, x + pin_a - pin_w / 2, pin_y[0],
+            x + pin_a + pin_w / 2, pin_y[1], "swa_" + tag)
+        label(x + pin_a, (pin_y[0] + pin_y[1]) / 2, "swa_" + tag, m2_lbl)
 
         # Row B gate: the same y band is blocked by the next cell's gate poly
         # (it starts at x+1.78), so the poly climbs over the idump bus and
@@ -440,8 +459,16 @@ def main() -> int:
         top.shapes(cont).insert(box(x + 1.60, 17.82, x + 1.82, 18.04))
         add(m1, x + 1.53, 17.75, x + 1.93, 18.15, "swb_" + tag)
         top.shapes(via1).insert(box(x + 1.60, 17.81, x + 1.86, 18.07))
-        add(m2, x + 1.53, 17.75, x + 1.93, y_ctrl_b + 0.35, "swb_" + tag)
-        label(x + 1.73, y_ctrl_b + 0.17, "swb_" + tag, m2_lbl)
+        # ... then a jog right in the clear band above the idump bus, and up to
+        # its pin.  The jog crosses nothing: the next cell starts 3.6 um away
+        # and the swa riser is to the left of it.
+        add(m2, x + 1.53, 17.75, x + 1.93, 18.70, "swb_" + tag)
+        add(m2, x + 1.53, 18.26, x + pin_b + 0.20, 18.70, "swb_" + tag)
+        add(m2, x + pin_b - 0.20, 18.26, x + pin_b + 0.20,
+            pin_y[1], "swb_" + tag)
+        add(m2, x + pin_b - pin_w / 2, pin_y[0],
+            x + pin_b + pin_w / 2, pin_y[1], "swb_" + tag)
+        label(x + pin_b, (pin_y[0] + pin_y[1]) / 2, "swb_" + tag, m2_lbl)
 
     # ---------- self-check ------------------------------------------------
     problems = []
@@ -470,8 +497,8 @@ def main() -> int:
               f"{want_sw} nfet switches")
         print(f"cell widths: unary {W:.3f} um, binary {w_bin:.3f} um "
               f"({len(cells) - n_unary} binary cells at 1 LSB each)")
-        print(f"terminals  : iout/idump buses, vss, "
-              f"{want_sw} switch gates, 3 bias rails, iref on vcp")
+        print(f"terminals  : iout/idump buses, vss, {want_sw} switch gates "
+              f"on a 2.75 um M2 pin row, 3 bias rails, iref on vcp")
         for p in problems:
             print("  " + p)
     if problems:
