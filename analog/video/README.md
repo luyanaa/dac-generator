@@ -275,14 +275,13 @@ on - but the sizes do, because 16 uA needs a very different Vov per process:
 | PDK | supply | devices | mirror | cascode | pair | vbp / vcp | carry | full scale |
 |---|---|---|---|---|---|---|---|---|
 | sky130 | 3.3 V | g5v0d10v5 | 8/0.5 | 8/0.5 | 8/0.5 | 2.192 / 0.843 V | dc only | dc only |
-| ihp-sg13g2 | 1.8 V | lv (PSP103) | 8/1 | 8/0.5 | 4/0.28 | 1.232 / 0.627 V | +0.023 LSB | -0.860 LSB |
+| ihp-sg13g2 | 1.8 V | lv (PSP103) | 8/1 | 8/0.5 | 4/0.28 | 1.232 / 0.627 V | +0.024 LSB | -0.412 LSB |
 | icsprout55 | 1.2 V | nm1p2/pm1p2 | - | - | - | - | - | **blocked** |
 
 * **ihp-sg13g2** (130 nm, PSP103 OSDI): the gf180 sizes fit unchanged - an 8/1
-  PMOS needs only Vsg 0.57 V at 16 uA.  The carry settles at **+0.023 LSB**
-  with the bias flat; the full-scale step is **-0.86 LSB** with 100 pF on
-  `vcp`, i.e. this PDK would want a larger decoupling cap than gf180's 100 pF
-  (the deck now uses 220 pF).
+  PMOS needs only Vsg 0.57 V at 16 uA.  Carry **+0.024 LSB** at 2.57 ns with
+  the bias flat; full-scale **-0.412 LSB** at 3.35 ns with 220 pF on `vcp`
+  (100 pF gives -0.86, so this PDK wants more decoupling than gf180's 100 pF).
 * **sky130**: the 1.8 V logic PMOS cannot stack two diodes at 16 uA inside
   1.8 V - measured, the replica's `vcp` is driven *negative* because the sink
   pulls harder than the stack can supply - so the cell moves to the 5 V
