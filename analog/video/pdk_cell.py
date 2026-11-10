@@ -48,7 +48,7 @@ PDKS: dict[str, dict] = {
         "pfet": "sky130_fd_pr__pfet_g5v0d10v5",
         "nfet": "sky130_fd_pr__nfet_g5v0d10v5",
         "fmt": "{n} {d} {g} {s} {b} {m} w={w:g} l={l:g}",
-        "mir": (8.0, 0.5), "cas": (8.0, 0.5), "pair": (8.0, 0.5),
+        "mir": (8.0, 0.5), "cas": (8.0, 0.5), "pair": (16.0, 0.5),
         "vcp_cap_pf": 100.0,
         "env": {},
     },
