@@ -12,37 +12,45 @@ bias away: the dc sweep re-solves the operating point at every code.  This runs
 the extracted netlist *with its capacitance* through a carry, the way the DAC
 actually uses it:
 
-  * `build/magic/pex.spice` is hierarchical.  The top subckt has 260 ports
-    (`vcp vgnd vbp`, the 255 pads, `vdd iout`) and the three device subckts have
-    a `VSUBS` port that the top subckt leaves as a *local* net - i.e. the
-    MOSFET bodies are not connected to anything unless this bench adds the
-    port.  So `patch_pex()` inserts `VSUBS` in the top subckt's port list and
-    the deck ties it to vdd; the patched netlist is a build product.
-  * the gate drives are ideal PWL sources on the 255 pads, one common edge with
-    the yaml's `skew_ps` per code bit - the same drive model the pre-layout
-    carry study used, so the two are comparable.  A real standard-cell driver
-    is class C (not hardened here); this bench therefore measures the *cell*,
-    not the decoder's drive strength.
+  * `build/magic/pex.spice` is hierarchical.  The top subckt has 516 ports
+    (`vss vcp vbp`, the 510 pads, `vdd iout idump`) and the PMOS device
+    subckts have a `VSUBS` port that the top subckt leaves as a *local* net -
+    i.e. the PMOS bodies are not connected to anything unless this bench adds
+    the port.  So `patch_pex()` inserts `VSUBS` in the top subckt's port list
+    and the deck ties it to vdd; the patched netlist is a build product.
+  * the gate drives are ideal PWL sources on the 510 pads (`d_`/`db_`
+    complementary), one common edge with the yaml's `skew_ps` per code bit.  A
+    real standard-cell driver is class C (not hardened here); this bench
+    therefore measures the *cell*, not the decoder's drive strength.
   * the load is `r_load` in parallel with `c_load_pf`, and the settled value is
     checked against the loaded DC transfer in `postlayout.json`, so the two
     benches cannot drift apart.
 
 Why this stage exists
 ---------------------
-The pre-layout carry study modelled each cell as an ideal current source with a
-gain error and a finite ro.  That model turns a cell off instantly and holds
-the bias at an ideal voltage.  The extracted cell does neither: the series
-switch is in the mirror's *source*, so switching a cell swings that source by
-~0.6 V and - when the switch is open - lets the cascode source float up by
-~1.4 V.  Both nodes are coupled to bias lines that carry the gate capacitance
-of all 255 cells and are driven by a replica the size of *one* cell.  This
-bench is the one that can see the resulting settling.
+The pre-layout carry study modelled each cell as an ideal current source with
+a gain error and a finite ro.  That model turns a cell off instantly and holds
+the bias at an ideal voltage; a real cell does neither, and the *first* P5
+macro - a series switch between vdd and the mirror's source - failed here
+badly: switching a cell moved its mirror source 0.59 V and its cascode source
+1.4 V, the 255 gates loaded the bias lines with ~8 pF, and the one-cell
+replica drove them at 1/gm ~ 6-7 kOhm.  A 50-80 ns pole against a 40 ns
+period, -9.5 LSB on the 127->128 carry.
+
+This macro is the dump-tail cell: the mirror and cascode keep 16 uA flowing at
+all times and an NMOS pair steers the tail to `iout` or `idump`, so neither
+the mirror's Vgs nor its Vds moves with the code.  The residual dynamics are
+(a) the cascode-gate line being kicked by the pair's drain swing at the
+cascode's Cgd - 255 x Cgd x 0.15 V, which is why the wrapper puts 100 pF on
+`vcp` (without it the full-scale step lands -4.3 LSB; with it, -0.3) - and
+(b) the pair's own switching charge into the 2 pF output, a ~350-450 LSB
+spike that decays in ~3 ns, well clear of the 40 ns sample point.
 
 Gates
 -----
  1. No netlist, no PEX, a PEX older than the GDS, or no `postlayout.json` -> 2.
- 2. The patched netlist must expose 261 ports and 768 devices, all five rails
-    and all 255 pads; `vss`/`idump` must not exist (this is the P5 array).
+ 2. The patched netlist must expose 517 ports and 1022 devices, all six rails
+    and all 510 pads; `vgnd`/`n_ref` must not exist (the old cell's ports).
  3. Per carry: the output must be within 0.5 LSB of the loaded DC value at the
     25 MS/s period (40 ns), and `vbp`/`vcp` must be within 2 mV of their DC
     values at that time - the second explains the first.
@@ -72,11 +80,12 @@ PATCHED = BUILD / "tran_pex.spice"
 PERIOD_NS = 40.0
 # Settle within half an LSB of the loaded dc value.
 SETTLE_LSB = 0.5
-# A bias that has not recovered moves every cell: 0.253 %/mV on vbp, i.e.
-# ~0.32 LSB per mV at code 128.  2 mV is the same 0.5 LSB window as above,
-# seen from the cause; it separates the binary run by more than an order of
-# magnitude, so it is a diagnostic gate, not a second copy of the first.
-BIAS_MV = 2.0
+# A bias that has not recovered moves every cell.  The dump-tail cell's mirror
+# is undegenerated, so its measured 0.558 %/mV is 0.71 LSB/mV at code 128:
+# 0.7 mV is the same 0.5 LSB window as above, seen from the cause.  The
+# measured worst is 0.48 mV, so this gate has real margin left - it is a
+# diagnostic bound, not a second copy of the first.
+BIAS_MV = 0.7
 T0_NS = 1.0
 
 
@@ -128,9 +137,9 @@ def patch_pex(txt: str) -> tuple[str, list[str]]:
         ports.insert(ports.index("vbp") + 1, "VSUBS")
         head = ".subckt " + TOP + " " + " ".join(ports)
         txt = txt[:m.start()] + head + txt[m.end():]
-    if len(ports) != 261:
-        die(f"{PEX.name}: top subckt has {len(ports)} ports, want 260 + "
-            f"VSUBS (the LVS contract)")
+    if len(ports) != 517:
+        die(f"{PEX.name}: top subckt has {len(ports)} ports, want 516 + "
+            f"VSUBS (6 rails + 510 pads)")
     return txt, ports
 
 
@@ -140,10 +149,10 @@ def patched_netlist() -> list[str]:
     if GDS.is_file() and GDS.stat().st_mtime > PEX.stat().st_mtime:
         die(f"stale {PEX.name}: {GDS.name} is newer; re-extract")
     txt, ports = patch_pex(PEX.read_text())
-    pads = [p for p in ports if p.startswith("d_")]
-    if len(pads) != 255:
-        die(f"{PEX.name}: {len(pads)} pads, want 255")
-    for rail in ("vdd", "iout", "vbp", "vcp", "vgnd", "VSUBS"):
+    pads = [p for p in ports if p.startswith("d_") or p.startswith("db_")]
+    if len(pads) != 510:
+        die(f"{PEX.name}: {len(pads)} pads, want 510")
+    for rail in ("vdd", "vss", "iout", "idump", "vbp", "vcp", "VSUBS"):
         if rail not in ports:
             die(f"{PEX.name}: no {rail} port")
     # The body net must not also be a top-level pin under another spelling.
@@ -156,7 +165,7 @@ def patched_netlist() -> list[str]:
 def gate_case(cfg, root: Path, ports: list[str], frm: int, to: int,
               edge_ps: float, skew_ps: float, tstop_ns: float,
               stiff: bool, decode: str = "binary", tstep_ps: float = 5.0,
-              t0_ns: float = T0_NS) -> str:
+              t0_ns: float = T0_NS, vcp_cap_pf: float = 100.0) -> str:
     vdd = float(cfg["vdd"])
     edge = edge_ps * 1e-12
     skew = skew_ps * 1e-12
@@ -166,11 +175,15 @@ def gate_case(cfg, root: Path, ports: list[str], frm: int, to: int,
              *pl.models(root),
              f'.include "{PATCHED}"',
              f"Vdd vdd 0 {vdd:.6g}",
-             "Vgnd vgnd 0 0",
+             "Vss vss 0 0",
              "Vbulk VSUBS 0 %.6g" % vdd,
+             "Vdump idump 0 0",
              "Iref vcp 0 %.6gu" % float(cfg["i_unit_ua"]),
              "Rl iout 0 %.6g" % float(cfg["r_load"]),
-             "Cl iout 0 %.6gp" % float(cfg["c_load_pf"])]
+             "Cl iout 0 %.6gp" % float(cfg["c_load_pf"]),
+             # The wrapper's decoupling: the full-scale step kicks the
+             # cascode-gate line and 100 pF takes it from 5 mV to 0.5 mV.
+             f"Cvcp vcp 0 {vcp_cap_pf:.6g}p"]
     if stiff:
         # Diagnostic only: force the two bias lines to their dc values, so the
         # cell's own settling can be separated from the bias network's.
@@ -179,14 +192,19 @@ def gate_case(cfg, root: Path, ports: list[str], frm: int, to: int,
         lines += [f"Vbp vbp 0 {d['vbp']:.8g}", f"Vcp vcp 0 {d['vcp']:.8g}"]
     tagj = {tag_of(j): j for j in range(2 ** int(cfg["bits"]) - 1)}
     for p in ports:
-        if not p.startswith("d_"):
+        neg = p.startswith("db_")
+        if not (p.startswith("d_") or neg):
             continue
-        j = tagj[p[2:]]
+        j = tagj[p[3:] if neg else p[2:]]
         # With a thermometer decode only one cell changes per step, so there
         # is no bit-slice skew to model; the binary bank keeps the yaml's.
         k = pl.cell_bit(j) if decode == "binary" else 0
-        g0 = 0.0 if cell_on(j, frm, decode) else vdd
-        g1 = 0.0 if cell_on(j, to, decode) else vdd
+        # NMOS gates: high conducts.  `d_` high puts the cell's tail on iout,
+        # `db_` high dumps it, so the two are complementary.
+        on0 = cell_on(j, frm, decode)
+        on1 = cell_on(j, to, decode)
+        g0 = (0.0 if on0 else vdd) if neg else (vdd if on0 else 0.0)
+        g1 = (0.0 if on1 else vdd) if neg else (vdd if on1 else 0.0)
         t = t0_ns * 1e-9 + k * skew
         if g0 == g1:
             lines.append(f"V{p} {p} 0 {g0:.6g}")
@@ -262,9 +280,10 @@ def measure(tag: str, frm: int, to: int, post: dict, cfg,
 
 
 def one(cfg, root, ports, frm, to, edge_ps, skew_ps, tstop_ns, stiff,
-        post, decode="binary", tstep_ps: float = 5.0) -> dict:
+        post, decode="binary", tstep_ps: float = 5.0,
+        vcp_cap_pf: float = 100.0) -> dict:
     tag = gate_case(cfg, root, ports, frm, to, edge_ps, skew_ps, tstop_ns,
-                    stiff, decode, tstep_ps)
+                    stiff, decode, tstep_ps, vcp_cap_pf=vcp_cap_pf)
     return measure(tag, frm, to, post, cfg, tstop_ns)
 
 
@@ -316,6 +335,9 @@ def main(argv=None) -> int:
     ap.add_argument("--skew-ps", type=float, default=None)
     ap.add_argument("--tstop-ns", type=float, default=PERIOD_NS + 10.0)
     ap.add_argument("--tstep-ps", type=float, default=5.0)
+    ap.add_argument("--vcp-cap-pf", type=float, default=100.0,
+                    help="decoupling on vcp (the wrapper requirement; 100 pF "
+                         "takes the full-scale kick from 5 mV to 0.5 mV)")
     ap.add_argument("--decode", choices=["binary", "thermo"], default="binary",
                     help="binary = the leaf's 1/2/4/... expansion; thermo = "
                          "first N cells, one cell per step (the control)")
@@ -358,7 +380,7 @@ def main(argv=None) -> int:
     rows = []
     for frm, to in carries:
         r = one(cfg, root, ports, frm, to, edge, skew, a.tstop_ns,
-                a.stiff_bias, post, a.decode, a.tstep_ps)
+                a.stiff_bias, post, a.decode, a.tstep_ps, a.vcp_cap_pf)
         rows.append(r)
         if not a.brief:
             show(r)

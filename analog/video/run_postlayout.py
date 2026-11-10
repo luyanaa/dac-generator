@@ -5,18 +5,16 @@
     ./run_postlayout.py --brief
 
 `signoff.py` builds and extracts the array but leaves the netlist as evidence.
-This runs the extracted *devices* - the drawn W/L, ad/as and the series switch
-in place - through the full 256-code transfer, driven the way
-`dac_video_dig.v` drives it (one bit per physical cell, bit k fanned to all
-2^k cells), so the pre-layout model's assumptions get checked:
+This runs the extracted *devices* - the drawn W/L and ad/as in place - through
+the full 256-code transfer, driven the way `dac_video_dig.v` drives the pair
+(one bit per physical cell, bit k fanned to all 2^k cells, `d_`/`db_`
+complementary), so the pre-layout model's assumptions get checked:
 
-  * the drawn unit current, and therefore the gain, includes the series
-    switch's own drop.  That is exactly why the replica bias repeats the
-    switch: the drop then sits in the bias branch too and cancels to first
-    order.  This bench is what found the missing switch - with a two-device
-    replica the array measured 8.07 uA/cell against the modelled 16 uA - and
-    `--selftest` puts that netlist back to make sure the mechanism stays
-    checked;
+  * the drawn unit current, and therefore the gain, comes from the replica
+    diode alone: the pair steers a constant tail, so unlike the first
+    series-switch cell there is no I*Ron degeneration to reproduce in the
+    bias branch.  `--selftest` moves the bias mirror's source off vdd and
+    requires the bench to reject the resulting operating point;
   * with 255 identical devices and an ideal decoder the transfer must be
     monotonic and linear except for the two second-order terms: the ro
     modulation by the output swing, and the code-dependent vdd drop that the
@@ -138,7 +136,12 @@ def ngspice(netlist: Path, timeout: int = 3600) -> None:
 
 
 def drive(cfg) -> list[str]:
-    """The 255 gate drives, from the same cell->bit rule as the RTL."""
+    """The 510 gate drives, from the same cell->bit rule as the RTL.
+
+    The pair steers the tail: `d_<tag>` high puts the cell's 16 uA on `iout`,
+    `db_<tag>` is its complement.  A cell that is on therefore has its NMOS
+    gate at vdd and its dump switch at 0.
+    """
     vdd = float(cfg["vdd"])
     n = 2 ** int(cfg["bits"]) - 1
     lines = []
@@ -147,8 +150,8 @@ def drive(cfg) -> list[str]:
         w = 2 ** k
         bit = (f"(floor(v(code)/{w})-2*floor(v(code)/{2 * w}))")
         tag = f"b{k}_{j - (2 ** k - 1)}"
-        # PMOS switch: on when the gate is low.
-        lines.append(f"Bd_{tag} d_{tag} 0 V = {vdd:.3f}*(1-{bit})")
+        lines.append(f"Bd_{tag} d_{tag} 0 V = {vdd:.3f}*{bit}")
+        lines.append(f"Bdb_{tag} db_{tag} 0 V = {vdd:.3f}*(1-{bit})")
     return lines
 
 
@@ -161,8 +164,9 @@ def transfer(cfg, root: Path, devs: list[str], r_series: float,
              *models(root),
              *devs,
              f"Vdd vdd 0 {vdd:.3f}",
-             # The replica switch's static 0 V gate: the one non-rail port.
-             "Vgnd vgnd 0 0",
+             "Vss vss 0 0",
+             # The dump bus returns to ground (a tail that is not on iout).
+             "Vdump idump 0 0",
              "Iref vcp 0 %gu" % float(cfg["i_unit_ua"]),
              "Vcode code 0 0",
              *drive(cfg)]
@@ -212,8 +216,8 @@ def main(argv=None) -> int:
     ap.add_argument("--riv", type=float, default=37.5,
                     help="load resistance at iout (0 = virtual ground)")
     ap.add_argument("--selftest", action="store_true",
-                    help="re-run with the bias branch's series switch removed "
-                         "(the bug this bench found)")
+                    help="re-run with the bias mirror's source off vdd "
+                         "(an operating point the gate must reject)")
     a = ap.parse_args(argv)
 
     if not LVS.is_file():
@@ -231,19 +235,19 @@ def main(argv=None) -> int:
     devs = devices(txt)
     nets = net_names(devs)
     n_cells = 2 ** int(cfg["bits"]) - 1
-    if len(devs) != 3 * n_cells + 3:
-        die(f"netlist has {len(devs)} devices, want {3 * n_cells + 3}")
-    want = {"d_" + t for t in
-            [f"b{cell_bit(j)}_{j - (2 ** cell_bit(j) - 1)}"
-             for j in range(n_cells)]}
-    got = {p for p in nets if p.startswith("d_")}
+    if len(devs) != 4 * n_cells + 2:
+        die(f"netlist has {len(devs)} devices, want {4 * n_cells + 2}")
+    tags = [f"b{cell_bit(j)}_{j - (2 ** cell_bit(j) - 1)}"
+            for j in range(n_cells)]
+    want = ({"d_" + t for t in tags} | {"db_" + t for t in tags})
+    got = {p for p in nets if p.startswith("d_") or p.startswith("db_")}
     if got != want:
         die(f"netlist exposes {len(got)} pads, want {len(want)}")
-    for rail in ("vdd", "vbp", "vcp", "iout", "vgnd"):
+    for rail in ("vdd", "vss", "vbp", "vcp", "iout", "idump"):
         if rail not in nets:
             die(f"netlist has no {rail}")
-    if "vss" in nets or "idump" in nets:
-        die("netlist has vss/idump; this is not the P5 array")
+    if "vgnd" in nets:
+        die("netlist has vgnd; this is the old series-switch cell")
     pts = sorted(nets)
 
     i_unit = float(cfg["i_unit_ua"])
@@ -264,10 +268,10 @@ def main(argv=None) -> int:
     checks = [
         ("full scale", abs(gnd["fs"] * 1e6 - want_fs) < 0.6 * want_fs,
          f"{gnd['fs'] * 1e6:.1f} uA vs {want_fs:.1f}"),
-        # The replica switch makes the cell's series drop common mode, so the
-        # drawn unit current must land on the reference current; 5 % covers
-        # the yaml's 16.0 uA rounding of the measured 15.77 uA.  A two-device
-        # replica lands at -49.5 % and `--selftest` requires that to fail.
+        # The replica diode sets the unit current, so the drawn current must
+        # land on the reference; 5 % covers the yaml's 16.0 uA rounding.  A
+        # bias mirror whose source is not vdd lands far away and `--selftest`
+        # requires that to fail.
         ("drawn unit current", abs(gain_shift) < 0.05,
          f"{drawn * 1e6:.3f} uA ({gain_shift * 100:+.1f} % vs model)"),
         ("transfer DNL", gnd["dnl"] < 0.5, f"{gnd['dnl']:.3f} LSB"),
@@ -308,13 +312,13 @@ def main(argv=None) -> int:
 
 
 def selftest(cfg, root: Path, devs: list[str], good_ok: bool) -> int:
-    """Re-run with the replica's series switch shorted out.
+    """Re-run with the bias mirror's source moved off vdd.
 
-    That is the exact netlist the first extraction produced, and the bench is
-    the only stage that can see it: the cells' switch drops I*Ron in their
-    mirror's source, so a bias branch without that drop sits ~50 % away.  The
-    gate must notice - if this passes, the bench is not measuring what it
-    claims.
+    The cell's current is set by the replica's diode (mirror + cascode), so a
+    bias mirror whose source is not vdd is a different operating point and the
+    unit current must move far outside the 16 uA the leaf is built on.  The
+    gate must notice - if this passes, the bench is not measuring the bias it
+    claims to.
     """
     n_cells = 2 ** int(cfg["bits"]) - 1
     mut = []
@@ -322,20 +326,19 @@ def selftest(cfg, root: Path, devs: list[str], good_ok: bool) -> int:
     for ln in devs:
         f = ln.split()
         if f[2] == "vbp" and f[1] == "vbp":
-            # Bias mirror: feed it straight from vdd (undo the degeneration).
             hit += 1
-            ln = " ".join([f[0], f[1], f[2], "vdd", f[4]] + f[5:])
+            ln = " ".join([f[0], f[1], f[2], "vcp", f[4]] + f[5:])
         mut.append(ln)
     print()
     print(f"selftest nominal      : {'PASS' if good_ok else 'FAIL (bad!)'}")
     if hit != 1:
-        print(f"selftest undegenerated: cannot run ({hit} bias mirrors found)")
+        print(f"selftest bad-bias      : cannot run ({hit} bias mirrors found)")
         return 1
     r = transfer(cfg, root, mut, 0.0, "selftest")
     drawn = r["fs"] / n_cells * 1e6
     shift = drawn / float(cfg["i_unit_ua"]) - 1.0
-    bad = shift < -0.30
-    print(f"selftest undegenerated: drawn {drawn:.3f} uA "
+    bad = abs(shift) > 0.10
+    print(f"selftest bad-bias      : drawn {drawn:.3f} uA "
           f"({shift * 100:+.1f} % vs model) "
           f"{'rejected' if bad else 'PASS (bad!)'}")
     ok = good_ok and bad

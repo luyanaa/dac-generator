@@ -15,7 +15,9 @@ the PDK's own mismatch law instead.
 
 Where the draws come from
 -------------------------
-The PDK's statistical subckt (`pfet_03v3_dss`) is not used directly: it also
+Both device kinds are drawn from the PDK's own law: `pfet_03v3_dss` for the
+mirror and cascode, `nfet_03v3_dss` for the pair.  The statistical subckt is
+not used directly: it also
 inserts source/drain diffusion resistors that the extraction already has, and
 Magic's hierarchical pex puts several cells in one generated subckt, so its
 `agauss` would draw *once per subckt*.  The law is taken from it instead, and
@@ -45,8 +47,10 @@ Fail-closed gates
     `postlayout.json` (DNL and INL within 0.02 LSB).
  3. The within-sample cell-to-cell spread must land on the PDK area law
     propagated through the extracted cell, with the cell's own measured
-    sensitivity to each of its three devices' Vth *and* beta (all six probed
-    on that cell, not borrowed from the device bench).
+    sensitivity to each of its four devices' Vth *and* beta (all probed on
+    that cell, not borrowed from the device bench).  In the dump-tail cell
+    the pair's sensitivity is 0.000 %/mV: it sits in the drain path, so it
+    sets the tail node's voltage, not the current.
  4. Every sample must be monotonic, and the fixed-pointer DNL/INL must meet
     the 0.5 / 1.0 LSB target the leaf already uses.
 """
@@ -92,8 +96,9 @@ def flat_devs() -> list[str]:
     devs = []
     for ln in pl.devices(LVS.read_text()):
         f = ln.split()
-        if not f[5].startswith("pfet"):
-            die(f"{f[0]}: device model {f[5]}; P5 is a PMOS array")
+        if not (f[5].startswith("pfet") or f[5].startswith("nfet")):
+            die(f"{f[0]}: device model {f[5]}; P5 has PMOS pairs and "
+                f"NMOS steering switches")
         devs.append(" ".join(f[1:]))
     return devs
 
@@ -134,26 +139,38 @@ def tags(cfg) -> list[str]:
 
 
 def cell_devs(devs: list[str], tag: str) -> dict[str, int]:
-    """Indices of a cell's switch, mirror and cascode, walked from its pad.
+    """Indices of a cell's devices, walked from its two pads.
 
-    The pad is the only net Magic leaves unmangled, so the walk goes pad ->
-    switch gate -> switch drain -> mirror source -> mirror drain -> cascode
-    source.  That is the same chain the LVS contract uses.
+    The pads are the only nets Magic leaves unmangled, so the walk goes
+    pad `d_<tag>` -> NMOS (its drain is iout) -> shared source (the tail) ->
+    the partner NMOS (`db_<tag>`) -> the cascode (gate vcp, drain = tail) ->
+    the mirror (drain = cascode source, gate vbp, source vdd).  That is the
+    same chain the LVS contract uses.
     """
-    pad = "d_" + tag
+    pad, padb = "d_" + tag, "db_" + tag
     sw = [i for i, ln in enumerate(devs) if ln.split()[1] == pad]
     if len(sw) != 1:
-        die(f"{tag}: {len(sw)} switches on {pad}; the netlist changed")
-    src = devs[sw[0]].split()[0]
-    mir = [i for i, ln in enumerate(devs)
-           if ln.split()[2] == src and ln.split()[1] == "vbp"]
-    if len(mir) != 1:
-        die(f"{tag}: {len(mir)} mirrors on {src}")
-    mdr = devs[mir[0]].split()[0]
-    cas = [i for i, ln in enumerate(devs) if ln.split()[2] == mdr]
+        die(f"{tag}: {len(sw)} devices on {pad}; the netlist changed")
+    if devs[sw[0]].split()[0] != "iout":
+        die(f"{tag}: {pad}'s drain is {devs[sw[0]].split()[0]}, want iout")
+    tail = devs[sw[0]].split()[2]
+    swb = [i for i, ln in enumerate(devs)
+           if ln.split()[1] == padb and ln.split()[2] == tail]
+    if len(swb) != 1:
+        die(f"{tag}: {len(swb)} partners on {padb} sharing {tail}")
+    cas = [i for i, ln in enumerate(devs)
+           if ln.split()[1] == "vcp" and ln.split()[0] == tail]
     if len(cas) != 1:
-        die(f"{tag}: {len(cas)} cascodes on {mdr}")
-    return {"switch": sw[0], "mirror": mir[0], "cascode": cas[0]}
+        die(f"{tag}: {len(cas)} cascodes on the tail {tail}")
+    md = devs[cas[0]].split()[2]
+    mir = [i for i, ln in enumerate(devs)
+           if ln.split()[1] == "vbp" and ln.split()[0] == md]
+    if len(mir) != 1:
+        die(f"{tag}: {len(mir)} mirrors on {md}")
+    if devs[mir[0]].split()[2] != "vdd":
+        die(f"{tag}: mirror source {devs[mir[0]].split()[2]}, want vdd")
+    return {"switch": sw[0], "switch_b": swb[0], "mirror": mir[0],
+            "cascode": cas[0]}
 
 
 # --------------------------------------------------------------------------
@@ -165,14 +182,17 @@ def deck(cfg, root: Path, devs: list[str], draws, out: Path, tag: str,
     body = ["* %s: seed-drawn delvto/mulu0 on the extracted devices" % tag,
             *pl.models(root),
             "Vdd vdd 0 %.6g" % vdd,
-            "Vgnd vgnd 0 0",
+            "Vss vss 0 0",
+            "Vdump idump 0 0",
             # The reference sinked at vcp is 16 uA, as in the bench.
             "Iref vcp 0 %gu" % float(cfg["i_unit_ua"])]
     for j, (ln, (dv, dk)) in enumerate(zip(devs, draws)):
         body.append(f"M{j} {ln} delvto={dv:.6g} mulu0={1.0 - dk:.6g}")
     body.append(f"Vsel sel 0 {sel}")
     for j, t in enumerate(tags(cfg)):
-        body.append(f"Bd_{t} d_{t} 0 V = {vdd:.6g}*(1-(abs(v(sel)-{j})<0.5))")
+        on = f"(abs(v(sel)-{j})<0.5)"
+        body.append(f"Bd_{t} d_{t} 0 V = {vdd:.6g}*{on}")
+        body.append(f"Bdb_{t} db_{t} 0 V = {vdd:.6g}*(1-{on})")
     body += ["Vmi iout 0 0",
              ".control", "set wr_singlescale", "set wr_vecnames"]
     if sweep:
@@ -242,10 +262,11 @@ def sensitivity(cfg, root: Path, devs, base: float, i: int,
                 dv: float = 0.0, dk: float = 0.0) -> float:
     """Cell 0's current ratio when one of its devices' draws is perturbed.
 
-    Probed on the extracted cell itself: the series switch degenerates the
-    mirror, so the cell's sensitivity to mirror Vth is 0.44x what an
-    undegenerated 8/1 would show, and to mirror beta likewise.  A number
-    borrowed from a device bench would not describe this cell.
+    Probed on the extracted cell itself: the dump-tail cell has no series
+    degeneration, so the mirror shows its full gm (0.558 %/mV at 16 uA), the
+    cascode is shielded by the mirror and the pair sits in the drain path and
+    does not move the current at all.  A number borrowed from a device bench
+    would not describe this cell.
     """
     draws = [(0.0, 0.0)] * len(devs)
     draws[i] = (dv, dk)
@@ -260,9 +281,12 @@ def expected_sigma(devs, sig, sens: dict, tag: str) -> float:
     idx = cell_devs(devs, tag)
     total = 0.0
     for role, i in idx.items():
+        # The two pair members are the same device in the same place; probe
+        # one of them and use its numbers for both.
+        key = "switch" if role.startswith("switch") else role
         sv, sk = sig[i]
-        dv = (sens[role]["vth"] - 1.0) * 100.0 / 2.0       # %/mV (2 mV)
-        dk = (sens[role]["beta"] - 1.0) * 100.0 / 1.0      # %/%  (1 %)
+        dv = (sens[key]["vth"] - 1.0) * 100.0 / 2.0       # %/mV (2 mV)
+        dk = (sens[key]["beta"] - 1.0) * 100.0 / 1.0      # %/%  (1 %)
         total += (sv * 1e3 * dv) ** 2 + (sk * 100.0 * dk) ** 2
     return math.sqrt(total)
 
@@ -307,16 +331,17 @@ def selftest(cfg, root, devs, sig, want_u) -> int:
           f"(spread {sp:.3f} % vs law {want_u:.3f} %)")
     ok &= p
 
-    # Draws on the mirrors only: the switch's Vth and beta are half of the
-    # cell's sigma here, so this cannot land on the law either.
-    mir = {i for t in tags(cfg) for r, i in cell_devs(devs, t).items()
-           if r == "mirror"}
+    # Draws on the pair only: in the dump-tail cell the switches sit in the
+    # drain path, not the mirror's source, so their Vth/beta barely move the
+    # current.  The spread must stay far below the law.
+    pair = {i for t in tags(cfg) for r, i in cell_devs(devs, t).items()
+            if r.startswith("switch")}
     rng = random.Random(9)
-    dr = [(rng.gauss(0.0, sv), rng.gauss(0.0, sk)) if i in mir else (0.0, 0.0)
+    dr = [(rng.gauss(0.0, sv), rng.gauss(0.0, sk)) if i in pair else (0.0, 0.0)
           for i, (sv, sk) in enumerate(sig)]
-    sp = spread(one(dr, "mm_st_mirror"))
-    p = not (abs(sp - want_u) < 0.20 * want_u)
-    print(f"selftest mm-mirror : {'FAIL' if p else 'PASS (bad!)'} "
+    sp = spread(one(dr, "mm_st_pair"))
+    p = sp < 0.5 * want_u
+    print(f"selftest mm-pair   : {'PASS' if p else 'FAIL (bad!)'} "
           f"(spread {sp:.3f} % vs law {want_u:.3f} %)")
     ok &= p
 
@@ -346,8 +371,8 @@ def main(argv=None) -> int:
     n = len(tags(cfg))
 
     devs = flat_devs()
-    if len(devs) != 3 * n + 3:
-        die(f"{len(devs)} devices, want {3 * n + 3}")
+    if len(devs) != 4 * n + 2:
+        die(f"{len(devs)} devices, want {4 * n + 2}")
     sig = [sigmas(model_of(ln), *geom(ln)) for ln in devs]
 
     # The distinct (model, w, l) groups, which is all the PEX order allows us

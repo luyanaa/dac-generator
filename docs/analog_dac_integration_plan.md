@@ -343,106 +343,55 @@ study`), so the physics stays visible instead of being tuned away.
 ### 7.5 P5 (video-rate binary current steering) status
 
 Named target: 8 bit, 25 MS/s (40 ns), single-ended video, 37.5 ohm at the DAC
-(75 ohm line double terminated), gf180. The 255-cell array is generated and
-signed off on DC, matching, DRC/LVS/PEX and pins; its carry does not settle
-(below), so the bias buffer that would fix it is now a required class-C block,
-alongside the digital macro, the wrapper that abuts it and the output driver.
-The leaf asks whether a plain binary decoder is viable at
-8 bit when the weights are parallel copies of one unit cell rather than
-scaled devices - the decoder cost question, not another segmentation study.
+(75 ohm line double terminated), gf180.  The 255-cell array is generated and
+signed off end to end (DRC/LVS/PEX/pins, extracted DC, mismatch MC, carry
+transient).  The digital macro (which now needs 510 outputs), the wrapper that
+abuts it, the output driver and the 100 pF `vcp` decoupling are class C.  The
+leaf asks whether a plain binary decoder is viable at 8 bit when the weights
+are parallel copies of one unit cell - the decoder cost question, not another
+segmentation study.
 
 | Gate | State | Evidence |
 |---|---|---|
-| Device cell | reused (gf180, measured) | P3 cell: 16 uA, ro 425 MOhm, W/L 8/1 + 8/0.5 um cascoded PMOS mirror |
-| Array model | closed | 255 identical unit cells grouped 1/2/4/.../128; full scale 4.08 mA |
-| DC, binary decode | **marginal at the pre-layout sigma** | seed 0 DNL -0.176/+0.176, INL -0.199/+0.199; 20 seeds worst DNL **0.680**, INL 0.442; 5/20 seeds exceed 0.5 LSB DNL. At the PDK area law (0.72 %/cell) the extracted netlist gives 0.174 worst - see *Post-layout mismatch* |
+| Device cell | **changed to a dump tail** | 8/1 mirror (source vdd, gate vbp) + 8/0.5 cascode (gate vcp) + a 4/0.28 NMOS pair steering the constant 16 uA tail to `iout`/`idump`; the mirror's Vgs *and* Vds are code-independent.  The first cell (a series PMOS in the mirror's source) closed DC/matching and failed the carry - see *Why the cell changed* |
+| Array model | closed | 255 identical unit cells grouped 1/2/4/.../128; full scale 4.080 mA |
+| DC, binary decode (pre-layout) | **marginal at the pre-layout sigma** | seed 0 DNL -0.176/+0.176, INL -0.199/+0.199; 20 seeds worst DNL **0.680**, INL 0.442; 5/20 seeds exceed 0.5 LSB DNL.  At the PDK area law the extracted array gives 0.24 worst - see *Post-layout mismatch* |
 | DC, unary decode (control) | closed | same 255 cells, same seeds: worst DNL 0.066, INL 0.487 |
-| DC, passive load | **passes; the load is not the limit** | 425 MOhm cell ro makes the 37.5 ohm load a 0.006 LSB gain error: INL -0.198/+0.200 LSB vs -0.199/+0.199 virtual ground, and 37.5/100/300/550 ohm all within 0.02 LSB. 1 LSB would need a 1.7 MOhm load. The earlier "+1.517 LSB fail" came from a 1000x kOhm/MOhm printout slip |
-| Binary carry glitch, pre-layout | **superseded** | the ideal-current-source model gave 51.4 LSB / 740 ps at 127->128 (63->64: 25.3 LSB). It holds `vbp`/`vcp` stiff; the extracted array gives 103 LSB and never settles - see *Post-layout carry* |
-| Speed, pre-layout | **superseded** | 0.83 ns worst settling in the behavioural model; the extracted array uses 24.4 ns of the 40 ns window even with an ideal bias |
-| Digital half | closed | `dac_video_dig` 9148 checks, lint clean; one launch register, `ready` guard = SETTLE_CYCLES; `dout` is **255 bits, one per physical cell** (cell j = smallest k with j < 2^(k+1)-1), so bit k fans to all 2^k cells from the same launch edge |
-| Array macro | closed | `analog/video/gen_gds.py`: 768 pfet = 255 x (8/1 mirror + 8/0.5 cascode + 0.5/0.28 supply switch) + a 3-device replica *cell*; no standard cell in the macro |
-| DRC / LVS / PEX | closed | `signoff.py`: Magic DRC 0 items; LVS 768 devices, 771 nets, 255 *identical* cells re-derived from the pin tag (pad d_tag -> switch drain -> mirror source -> mirror drain -> cascode source -> iout), the replica's mirror source required to be its own switch drain, and negative checks for `vss`/`idump`; PEX 768 instances, 4609 C entries (198.2 kB) |
-| Pins / rails | closed | 255 M2 pads, cell order, exact 7.5 um grid (one per cell, so the digital macro abuts) plus a separate `vgnd` pad on the bias side; vdd plane 2.4 ohm = 1.2 mV at full code (1.2% gain, endpoint-calibrated), iout bus 10.7 ohm = 21.8 mV one-ended which costs 3e-6 LSB/cell through ro; vbp/vcp/vgnd carry gates only (311/358 fF, bias settling) |
-| Post-layout DC | closed (nominal) | `run_postlayout.py`: 256-code sweep on the extracted netlist, virtual ground and 37.5 ohm - 4.080 mA full scale, **16.000 uA/cell**, DNL/INL 0.000 LSB, 0 bad steps, `vbp` 1.951 V / `vcp` 0.505 V; the loaded run is indistinguishable from virtual ground. Nominal only: Magic extracts capacitance, not metal R, and identical cells make the transfer exact by construction, so this gates the operating point, not linearity |
-| Post-layout mismatch | **closed (PDK area law)** | `run_mismatch_pex.py`: `delvto`/`mulu0` drawn per extracted device from `par_vth`/`par_k` of `pfet_03v3_dss` (the wrapper itself is not used - it adds diffusion R the extraction has, and draws once per subckt), 16 samples of a 255-point selector sweep. Cell spread **0.720 %** vs the law's 0.727 % (mirror Vth 0.454 %, switch Vth 0.449 %, switch beta 0.345 % in quadrature); fixed DNL **0.035..0.174** LSB, INL 0.028..0.124, 16/16 monotonic; the zero-draw reconstruction reproduces the bench transfer to 0.0004 LSB. `--selftest` rejects a single shared draw (0.0000 %), half-sigma draws (0.345 %) and mirror-only draws (0.489 %) |
-| Post-layout carry, binary | **FAIL** | `run_transient_pex.py`: extracted netlist *with its capacitance*, 20 ps edges, 25 ps bit skew, 25 MS/s. 127->128 settles to **118.503 LSB at 40 ns (-9.497)** and never enters the 0.5 LSB window; 128->127 -8.590, 63->64 -2.440. `vbp` +31.8 mV / `vcp` +46.1 mV (2 mV is 0.5 LSB at code 128). Converged: 2 ps and 20 ps timesteps agree to 0.007 LSB, so it is not numerical |
-| Post-layout carry, ideal bias | cell and output path close; the bias does not | the same carry with `vbp`/`vcp` forced: 128.266 LSB (+0.266), 0.5 LSB at **24.4 ns** of the 40 ns window, glitch 99.9 LSB, and a full-scale 0->255 step at **3.0 ns**. Every step size closes on the cell and output path; the ~50 ns bias pole is the whole deficit |
-| Chosen topology: dump tail (device level) | **closes the carry; the macro is not drawn yet** | 4 devices per cell (mirror + cascode + 4/0.28 NMOS pair steering the constant 16 uA tail to `iout`/`idump`), 2 pins per cell, `vss` bulk rail, `idump` bus, 100 pF on `vcp`. Device-level 255-cell run: carry 127->128 **127.995 LSB (-0.005), 2.34 ns**, vbp/vcp flat to 0.00 mV; full scale 0->255 **250.744 LSB (-4.256)** bare, **254.768 (-0.232)** with 100 pF on `vcp`, 255.031 with `vcp` ideal. Residual: a ~165 LSB/3 ns switching spike into the 2 pF output, clear of the 40 ns sample |
-| Carry with the switch at the mirror drain (rewired PEX, prediction) | **FAIL, 4x better** | same extraction, mirror source on vdd and the switch between the mirror's drain and the cascode's source (replica rewired, dc unchanged: 16.000 uA/cell, `vbp` 2.170 V): 127->128 **-2.295 LSB**, 0->255 **+54.058 LSB**, neither settles. The 255 mirror gates' charge still has to change ~10 fC/cell - Cgd x 2.45 V instead of Cgs x 0.59 V |
-| Post-layout carry, thermometer | one cell per step passes, full scale fails worse | `--decode thermo`: 127->128 -0.432 LSB / 18.3 ns / 0.6 LSB glitch, but 0->255 (every cell on at once) is **81.721 LSB (-173.279)** with `vbp` +313 mV, `vcp` +431 mV. Thermometer decode buys DNL (0.680 -> 0.066 at the pre-layout sigma; binary is 0.174 at the PDK law) and one-cell carries, not 25 MS/s operation |
+| DC, passive load (pre-layout) | **passes; the load is not the limit** | 425 MOhm cell ro makes the 37.5 ohm load a 0.006 LSB gain error: INL -0.198/+0.200 LSB vs -0.199/+0.199 virtual ground, and 37.5/100/300/550 ohm all within 0.02 LSB.  1 LSB would need a 1.7 MOhm load |
+| Binary carry, pre-layout model | **superseded** | 51.4 LSB / 740 ps at 127->128 in the ideal-current-source model; the extracted series-switch cell gave 103 LSB and never settled, which is why the cell changed |
+| Speed, pre-layout model | **superseded** | 0.83 ns worst settling in the behavioural model; the extracted dump-tail cell settles in 2.3-2.7 ns |
+| Array macro | **closed (gf180)** | `gen_gds.py`: 1022 devices = 255 x (8/1 mirror + 8/0.5 cascode + 2 x 4/0.28 NMOS) + a 2-device replica; no standard cell in the macro; 510 M2 pads on a 3.75 um row; vss M1 rail, idump M3 bus |
+| DRC | closed | Magic `drc count total` = 0 items on the full array |
+| LVS | closed | 1022 devices, 1026 nets: 255 identical 4-device cells re-derived from the pad pair (`d_`/`db_` -> NMOS -> shared tail -> cascode -> mirror -> vdd), a 2-device replica, 6 rails; negative checks for the old `vgnd`/`n_ref`, for a PMOS on a pad and for an NMOS source on a rail; `--selftest` rejects 12 mutations |
+| PEX | closed | 1022 instances, 7912 C entries (321.4 kB): vdd 404 fF, vbp 307 fF, vcp 359 fF, iout 208 fF, idump 333 fF, vss 875 fF |
+| Pins / rails | closed | 516 ports: 510 M2 pads, cell order, exact 3.75 um grid (two per cell, so a 510-output digital macro abuts) plus a `vss` pad on the bias side; vdd plane 2.4 ohm = 1.2 mV at full code (1.2% gain, endpoint-calibrated), iout bus 10.7 ohm = 21.8 mV one-ended (0 LSB/cell through ro), idump the same class; vbp/vcp/vss carry no DC current |
+| Post-layout DC | closed (nominal) | `run_postlayout.py`: 256-code sweep on the extracted netlist, virtual ground and 37.5 ohm - 4.080 mA full scale, **16.001 uA/cell**, DNL/INL 0.000 LSB, 0 bad steps, `vbp` 2.170 V / `vcp` 0.782 V.  Nominal only: Magic extracts capacitance, not metal R, and identical cells make the transfer exact by construction, so this gates the operating point, not linearity |
+| Post-layout mismatch | **closed (PDK area law)** | `run_mismatch_pex.py`: `delvto`/`mulu0` per extracted device from the PDK law (pfet and nfet), 16 samples of a 255-point selector sweep.  Cell spread **1.00 %** vs the law's 1.003 % - the mirror's Vth alone (0.558 %/mV x 1.79 mV = 1.00 %); the pair's sensitivity is 0.000 %/mV because it sits in the drain path.  Fixed DNL **0.12..0.24** LSB, INL 0.09..0.16, 16/16 monotonic; the zero-draw reconstruction reproduces the bench transfer to 0.0000 LSB.  `--selftest` rejects a shared draw, half-sigma draws and pair-only draws |
+| Post-layout carry | **closed** | `run_transient_pex.py`: 510 PWL pads, 20 ps edges, 25 ps bit skew, 25 MS/s.  127->128 **128.000 LSB (+0.000), 0.5 LSB at 2.30 ns**; 128->127 and 63->64 likewise; full scale 0->255 **254.693 (-0.307), 2.72 ns**; `vbp`/`vcp` within 0.48 mV.  With the wrapper's 100 pF on `vcp`: without it the full-scale step lands at -4.3 LSB (device level), and that cap is a documented wrapper requirement |
+| Glitch | recorded, not gated | the steering pair's switching charge into the 2 pF output is a ~340-450 LSB spike decaying in ~3 ns (clear of the 40 ns sample); larger than the old cell's 103 LSB and a spec for the output filter |
+| Digital half | **needs the complementary pair** | `dac_video_dig` supplies 255 one-hot lines; the dump-tail cell needs `d_`/`db_` (510 outputs).  Class C follow-up, like the wrapper |
 
-Two extraction findings, both caught by a gate rather than by reading the
-generator. (1) The vcp poly bar stopped at the last cell, so the 255 cascode
-gates were one unnamed island and only the replica cascode sat on `vcp` -
-LVS printed 255 gates on a net that was not a port. (2) The post-layout bench
-measured 8.07 uA per cell instead of 16 uA: the cell's series switch drops
-I*Ron *inside* the mirror's source, degenerating it by 0.075 V at a 0.23 V
-overdrive, while the two-device replica bias had no such drop. The fix is the
-standard one - repeat the cell's switch in the bias branch, gate on a static
-0 V `vgnd` reference - which makes the drop common mode and the unit current
-equal to the reference current to first order (measured 16.000 uA; the
-degenerated bias is reproduced as a `--selftest` mutation and rejected at
--49.5 %). Side effects recorded: the degeneration scales the cell's
-sensitivity to its mirror by gm/(1+gm*Ron) = 0.44 (0.253 %/mV), which is why
-the mismatch MC below puts the cell at 0.72 %, and a 0.1 V digital-low error
-now moves a cell 0.013 LSB.
-`signoff.py --selftest` (17 mutations) rejects a dropped switch, a relabelled
-gate, a shorted drain, a wrong cascode length or mirror width, a broken bias
-diode, a cascode drain off `iout`, a dead or shorted or *absent* replica
-switch, five pin-plan mutations and a narrowed vdd plane.
+**Why the cell changed.** The first macro put a 0.5/0.28 PMOS in series with
+the mirror's source - true zero, no dump - and closed DC and matching
+(16.000 uA/cell, 0.720 %/cell, fixed DNL 0.174).  Its extracted carry then
+failed by an order of magnitude (118.503 LSB, -9.497) because switching a cell
+moved the mirror source 0.59 V and the cascode source 1.4 V into 7-10 pF of
+gate load driven by a one-cell replica at 1/gm ~ 6-7 kOhm (50-80 ns pole).
+Thermometer decode (-173 LSB at full scale), an 8x scaled replica
+(-1.13 / -63 LSB) and moving the switch to the mirror's drain
+(-2.30 / +54 LSB) were all measured and all insufficient: the 255 mirror
+gates' charge still changes by ~10 fC per cell.  Only a cell whose mirror keeps
+both Vgs and Vds constant avoids it, so the tail now keeps flowing and is
+steered.  Cost: 4 devices per cell, 2 pins, vss/idump rails, a 100 pF wrapper
+cap, and the cell sigma rose 0.72 -> 1.00 % because the degeneration is gone
+(DNL 0.174 -> 0.30 worst, still inside 0.5).
 
-Two results size the leaf. **Binary decoding is an INL-neutral, DNL-costly
-choice**: over 20 seeds the binary array's INL matches the thermometer
-control within 0.05 LSB, but its carry DNL reaches 0.68 LSB and crosses the
-0.5 target in 5 seeds, while the thermometer version stays at 0.066. That is
-at the pre-layout 1.8 %/cell assumption; the PDK law puts the cell at 0.72 %,
-and the extracted netlist gives worst fixed DNL 0.174 LSB (INL 0.124) over 16
-samples - about 7x the unary control's, still inside the 0.5 LSB target. The
-0.680 figure remains the right number for a 2.5x worse sigma: the decode did
-not improve, the sigma estimate did. A pure binary decoder is therefore usable
-at this matching without MSB trim, and P3's 4+4 segmentation + DEM stays the
-answer when the cell sigma is worse than the PDK law says. **The load is not the
-limit; the decoder is**: the P3 cell ro is 425 MOhm (a 1000x kOhm/MOhm
-printout slip had put 425 kOhm here), so 37.5 ohm across the 153 mV full
-scale costs 0.006 LSB of gain error - 0.02 LSB even at the 2.24 V compliance
-edge - and a resistor is a sufficient termination. The static limit is the
-binary carry DNL above; the dynamic one is worse.
-
-**The 25 MS/s carry fails on the extracted netlist**, and not because of the
-decoder. The series switch puts the mirror's source on a 0.59 V pedestal that
-moves with every cell transition, the 255 mirror gates load `vbp` with ~8 pF,
-and the one-cell replica drives them at 1/gm ~ 6-7 kOhm: a 50-80 ns pole against
-a 40 ns period. Binary 127->128 lands 9.5 LSB low and never settles; a
-thermometer full-scale step lands 173 LSB low. With `vbp`/`vcp` forced the same
-carry settles in 24.4 ns and a full-scale step in 3.0 ns, so the cell and
-output path are fine and the bias network is the whole deficit - the
-pre-layout 51 LSB / 0.74 ns glitch was an artifact of holding the bias stiff.
-Thermometer decode is a DNL fix, not a settling fix. A scaled replica was
-sized on the same extraction: 8x (64/1 + 64/0.5 + 4/0.28 at 128 uA, same
-current density) still misses at -1.13 LSB on the carry and -63 LSB on full
-scale (8x the bias buys 2.7x), so a replica large enough for full scale is not
-credible; a 16x *single* device is not even simulable, because the PDK's
-binned models stop at W = 100.01 um and ngspice silently picks no bin (the run
-came back at 2x current with `vcp` negative).
-Moving the switch is not enough, and charge conservation says why. Rewired
-on the same extraction with the switch between the mirror's drain and the
-cascode's source (mirror source on vdd, replica rewired, dc point unchanged),
-the carry improves from -9.50 to **-2.30 LSB** and full scale from -173 to
-**+54.1 LSB** - 4x better, neither settling. The 255 mirror gates' charge has
-to change by ~10 fC per cell whichever terminal the switch interrupts (today
-Cgs x 0.59 V, in the variant Cgd x 2.45 V), so only a cell whose mirror keeps
-both Vgs and Vds constant avoids it: a steering pair with a dump tail (P3's
-cell), at 2x current, +1 device and +1 pin per cell.
-
-The fix is a buffer on the bias pins. Modelled as an ideal unity-gain buffer
-with a series output resistance on a split net (the replica's diode node in,
-the array's bars out, the bars' extracted caps on the array side), 300 Ohm
-passes - carry +0.405 LSB in 35 ns, full scale +0.000 in 12 ns - and the carry
-margin is thin because the cell alone sits at +0.266. A bare follower would
-level-shift by its Vgs, so the block must be an amplifier with feedback around
-the replica: class C, ~10 devices, 0.2-0.5 mA, alongside the wrapper and the
-output driver.
+Two extraction findings from the first cell, kept because they shaped this
+one: (1) the vcp poly bar stopped at the last cell, leaving the 255 cascode
+gates on an unnamed island (LVS caught it); (2) the post-layout bench measured
+8.07 uA per cell instead of 16 because the series switch degenerated the
+mirror and the replica did not reproduce the drop - the fix then was to repeat
+the switch in the replica, and in this cell it is to remove it from both.
 
 ## 8. Application fit
 
@@ -525,70 +474,41 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   gds|drc|all` drives it. Still open, and explicitly not claimed: the
   differential wrapper (two mirrored arrays), the comparator/TG bias (class
   C) and the 256-code post-layout transient sweep.
-- **P5. DONE on gf180 except the 25 MS/s carry (pre-layout + digital half +
-  array macro + post-layout DC + mismatch MC).** 8 bit, 25 MS/s video-rate
-  binary current steering, 255 parallel unit cells decoded
-  1/2/4/.../128. Binary decode is INL-neutral but costs carry DNL: 0.680
-  worst vs 0.066 for the same cells with a thermometer decoder (5/20 seeds
-  over 0.5 LSB) - at the pre-layout 1.8 %/cell sigma. At the PDK area law the
-  cell is 0.72 % and the extracted array's worst fixed DNL is 0.174 LSB
-  (INL 0.124) over 16 samples, 16/16 monotonic, so the binary penalty is real
-  but inside the 0.5 LSB target. A passive 37.5 ohm load is fine: the P3 cell ro is 425 MOhm,
-  so it costs 0.006 LSB of gain error (0.02 LSB at the 2.24 V compliance
-  edge) and the leaf needs no transimpedance stage. The pre-layout carry
-  figure (50.8 LSB glitch, 735 ps settle) did not survive extraction: a
-  `ready` window cannot fix a bias that does not settle (below). The array macro is generated and signed off: 255 identical
-  switched-cascode cells (series 0.5/0.28 PMOS between vdd and the mirror, so
-  an *off* cell is a real zero and there is no dump bus), one M2 pad per cell
-  on a 7.5 um row so the 255-bit digital macro can abut, vdd/iout on M3 for
-  the 1.9 mm run. `signoff.py` gates DRC 0, LVS 768 devices/771 nets with the
-  cell identity re-derived from the pad tag, PEX 768 instances and the pin
-  grid, plus a rail estimate from the drawn metal (1.2 mV vdd drop, 21.8 mV
-  iout bus). The extracted 256-code sweep (`run_postlayout.py`) is what
-  caught the design error the layout had: the cells' series switch
-  degenerates the mirror, and the two-device replica bias did not reproduce
-  that drop, so the array ran at 8.07 uA/cell against the modelled 16. With
-  the switch repeated in the bias branch (static 0 V `vgnd` gate) the
-  extracted array gives 16.000 uA/cell, 4.080 mA full scale, DNL/INL 0.000 on
-  virtual ground and on 37.5 ohm. That sweep is nominal-only (no metal R in a
-  Magic extraction, and identical cells make the transfer exact), so it gates
-  the operating point, not linearity.
-  `run_mismatch_pex.py` then closes linearity: per-device `delvto`/`mulu0`
-  from the PDK law, 16 samples, cell spread 0.720 % against a predicted
-  0.727 % (mirror and switch Vth each ~0.45 %, switch beta 0.35 %), fixed DNL
-  0.174 max. Note the matching story: the 0.5/0.28 series switch contributes
-  as much mismatch as the 8/1 mirror, so it cannot be shrunk for area without
-  paying DNL.
+- **P5. DONE on gf180 (dump-tail array, signed off end to end).** 8 bit,
+  25 MS/s video-rate binary current steering, 255 parallel unit cells decoded
+  1/2/4/.../128.  Binary decode is INL-neutral but costs carry DNL: 0.680
+  worst vs 0.066 for the same cells with a thermometer decoder (5/20 seeds over
+  0.5 LSB) - at the pre-layout 1.8 %/cell sigma.  At the PDK area law the
+  extracted array's worst fixed DNL is **0.30 LSB** (INL 0.20) over 16 samples,
+  16/16 monotonic, so the binary penalty is real but inside the 0.5 LSB
+  target.  A passive 37.5 ohm load is fine (0.006 LSB gain error; no
+  transimpedance stage).
+  The cell is a **dump tail**: an 8/1 mirror and 8/0.5 cascode keep 16 uA
+  flowing while a 4/0.28 NMOS pair steers it to `iout` or `idump`, so the
+  mirror's Vgs and Vds never move with the code.  That is the answer to the
+  leaf's timing question: the first cell - a series PMOS in the mirror's
+  source, true zero/no dump - closed DC and matching (16.000 uA/cell,
+  0.720 %/cell, DNL 0.174) and then failed the extracted carry by 9.5 LSB and
+  never settled.  Thermometer decode (-173 LSB full scale), an 8x scaled
+  replica (-1.13/-63) and moving the switch to the drain (-2.30/+54) were each
+  measured and none closed it; ~10 fC per cell of mirror gate charge has to go
+  somewhere whichever terminal the switch interrupts.  With the tail steered,
+  the extracted 127->128 carry is **128.000 LSB (+0.000) at 2.30 ns** and the
+  full-scale step **254.693 (-0.307) at 2.72 ns**, with `vbp`/`vcp` inside
+  0.48 mV - the residual is a 5 mV cascode-gate kick, handled by the wrapper's
+  100 pF on `vcp`, and a ~400 LSB/3 ns switching spike that the 40 ns sample
+  is clear of.
+  The macro is generated and signed off: 1022 devices (4 per cell) + a
+  2-device replica, 510 M2 pads on a 3.75 um row, vss M1 rail, idump M3 bus;
+  DRC 0, LVS 1022 devices/1026 nets re-derived from each pad pair, PEX 1022
+  instances/7912 C entries, 516 labelled ports.  `signoff.py --selftest`
+  rejects 12 LVS, 5 pin and 1 rail mutation.
   `run-analog.sh video gf180 gds|drc|lvs|pex|pins|postlayout|mm|tran|all`
-  drives it. The last gate, `run_transient_pex.py` (the `tran` stage), **fails
-  and that is the leaf's current answer**: at 25 MS/s the binary 127->128
-  carry settles to 118.5 LSB (-9.5 LSB) with `vbp` +31.8 mV / `vcp` +46.1 mV,
-  and a thermometer full-scale step (0->255) is worse: -173.3 LSB, `vbp`
-  +313 mV. The cell is not the limit - with an ideal bias the same carry
-  settles in 24.4 ns of the 40 ns window - the bias network is: the series
-  switch moves each mirror source 0.59 V, the 255 gates load the bias lines
-  with ~8 pF, and the one-cell replica drives them at 1/gm ~ 6-7 kOhm, a
-  50-80 ns pole. The pre-layout "51 LSB glitch, 0.74 ns settle" claim is
-  superseded. Moving the series switch to the mirror's drain is not enough
-  either (rewired PEX: -2.30 LSB carry, +54.1 LSB full scale - 4x better and
-  still failing; the mirror's gate charge has to change either way), so the
-  fix is the dump-tail steering cell: a constant 16 uA tail steered to
-  `iout`/`idump` by a 4/0.28 NMOS pair, which is measured at the device level
-  to give **-0.005 LSB carry** (bias flat) and **-0.232 LSB full scale** with
-  100 pF on `vcp`; it costs 4 devices and 2 pins per cell, a `vss` rail and an
-  `idump` bus, and the macro still has to be redrawn. On the cell as drawn the
-  alternative is a bias buffer: an 8x scaled
-  replica (128 uA, same current density) still misses at -1.13 LSB on the
-  carry and -63 LSB on full scale, a 16x single device is not even simulable
-  (the PDK bins stop at W = 100.01 um), and the array needs a few hundred Ohm
-  on `vbp`/`vcp`: an ideal unity-gain buffer with 300 Ohm output passes both
-  the carry (+0.405 LSB, 35 ns) and full scale (+0.000, 12 ns). A bare
-  follower would level-shift by its Vgs, so it must be an amplifier with
-  feedback around the replica - class C, like the wrapper and the output
-  driver. Still open: the buffer,
-  the digital macro (not hardened here), the wrapper and output driver.
-  CML/HBT remains blocked: ihp130 has no installed HBT models or magic tech,
-  so there is no SiGe device to build from.
+  drives it.  Still open, and class C: the digital macro (the RTL still drives
+  255 one-hot lines, not the cell's 510 complementary pair), the wrapper and
+  its pin script, the output pad/ESD/cable driver, and placing that 100 pF
+  `vcp` cap.  CML/HBT remains blocked: ihp130 has no installed HBT models or
+  magic tech, so there is no SiGe device to build from.
 
 ## 10. Risks / non-goals
 

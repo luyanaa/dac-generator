@@ -20,8 +20,8 @@
 # its TG tree is class C), csteer (gf180, the 30-cell array + replica bias +
 # 60 steering switches, plus the analog-facing pin row via `pins`; the
 # wrapper and its pin script are class C) and cdac (sky130), and video (gf180,
-# the 255-cell switched-cascode array + replica bias + the 255-pad digital pin
-# row; the digital macro, the wrapper and the output driver are class C).
+# the 255-cell dump-tail array + replica bias + the 510-pad digital pin row;
+# the digital macro, the wrapper and the output driver are class C).
 # Every other leaf is class C and the stage exits 2 instead of reporting a run
 # that did not happen.
 #
