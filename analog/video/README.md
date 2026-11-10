@@ -326,14 +326,14 @@ only passes if the wells are merged.  DRC is **0 items** on the full
 nfet, all pfet bulks vdd and all nfet bulks vss**; the pad-pair walk passes
 on all 255 cells; the drawn pads measure 510 on the 3.75 um grid.  The
 signoff is `analog/video_sky130/signoff.py` (build/drc/lvs/pins/pex).
-* **ihp-sg13g2**.  The tooling is complete - KLayout `sg13g2_pycell_lib`,
-  `tech/drc/run_drc.py`, `tech/lvs/run_lvs.py`, and a magic tech - but the
-  *device layouts* are not: `libs.ref/sg13g2_pr/gds/sg13g2_pr.gds` holds only
-  fixed PCM cells (`pmos`/`nmos` are 0.87 x 0.41 um - a characterisation
-  device, not a 16 uA cell), and the pycell library is the `cni`/`PCellWrapper`
-  framework, which needs KLayout's PCell host rather than the plain
-  `create_cell(...)` API gf180's macro uses.  A generator therefore starts
-  with a device drawer (act/poly/li1/contacts/nwell/implants) and a DRC loop.
+* **ihp-sg13g2**.  The device source is solved: the PDK's `SG13_dev`
+  PCells work headlessly in KLayout once the library is imported, the
+  `sg13g2` technology is set (`KLAYOUT_PATH`), parameters are **unit strings**
+  (`"8u"`, not metres) and the top is flattened before writing.  A 4-device
+  dump-tail cell core (pmos 8/1 + 8/0.5, nmos 4/0.28, gate lands, ntap/ptap
+  taps, merged nwell bar) is **DRC 0 items** on the PDK deck at one and two
+  cells (`analog/video_ihp/`).  The array routing (md/cd, vbp/vcp split,
+  iout/idump, pads, replica) and the LVS/PEX hand-off remain.
 * **icsprout55**.  The KLayout cell
   `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
   its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC
