@@ -10,8 +10,8 @@
 #   stage      prelayout (default) | gds | drc | lvs | pex | pins | all
 #              postlayout (r2r: poly R-C reconstruction; csteer, video:
 #              extracted DC transfer)
-#              mm (csteer: static mismatch Monte Carlo on the PEX netlist;
-#              video refuses it - no P5 mismatch deck yet).
+#              mm (csteer, video: static mismatch Monte Carlo on the PEX
+#              netlist; video is a flat dc sweep, ~1 min per sample).
 #
 # gds/drc/lvs/pex are implemented for the leaves that have a device-level
 # macro: r2r (gf180, full ladder), string (gf180, the 255-unit string only;
@@ -94,15 +94,8 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180)
     pex) "$SIGN" --stage pex ;;
     pins) "$SIGN" --stage pins ;;
     postlayout | mm)
-        # Only the leaves with a post-layout bench own these stages.  video has
-        # the extracted DC sweep but no mismatch Monte Carlo yet, so it refuses
-        # `mm` instead of running csteer's bench on a netlist it was not built
-        # for.
-        if [ "$TOP" = video ] && [ "$STAGE" = mm ]; then
-            echo "error: video has no mismatch MC yet" >&2
-            echo "       post-layout: postlayout (see analog/video/README.md)" >&2
-            exit 2
-        fi
+        # Only the leaves that own a bench get these stages: the stage is
+        # routed, never silently run against another leaf's netlist.
         "$SIGN" --stage "$STAGE"
         ;;
     all)

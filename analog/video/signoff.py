@@ -4,6 +4,7 @@
     ./signoff.py                 # build + drc + lvs + pins + pex, gate on all
     ./signoff.py --stage lvs
     ./signoff.py --stage postlayout   # delegate to the extracted DC bench
+    ./signoff.py --stage mm           # delegate to the mismatch Monte Carlo
     ./signoff.py --selftest      # prove the gates reject mutations
 
 This is the P5 counterpart of `../csteer/signoff.py`.  `gen_gds.py` generates
@@ -50,8 +51,15 @@ class C (hand layout), so the gates below sign off the array, not the DAC.
        per-net capacitance, kept as evidence for the digital driver load and
        for the vbp/vcp bias settling.
 
+  postlayout / mm  delegated to `run_postlayout.py` (extracted 256-code dc
+       transfer) and `run_mismatch_pex.py` (static mismatch Monte Carlo with
+       per-device `delvto`/`mulu0` drawn from the PDK area law).  They own
+       their netlist, gates and report, so the stage name cannot drift from
+       what ran.
+
 Not claimed: the digital macro, the wrapper, the output pad/ESD/cable driver,
-the per-sample settling, or any post-layout linearity of the DAC.
+or the per-sample settling.  The array's own post-layout linearity is `mm`'s
+job (static mismatch only: no dynamic error, no envelope, no cable driver).
 """
 from __future__ import annotations
 
@@ -848,16 +856,18 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--stage", default="all",
                     choices=["all", "build", "drc", "lvs", "pex", "pins",
-                             "postlayout"])
+                             "postlayout", "mm"])
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--brief", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
-    if a.stage == "postlayout":
-        # The bench owns the netlist, the gates and the report, so the stage
+    if a.stage in ("postlayout", "mm"):
+        # Each bench owns the netlist, the gates and the report, so a stage
         # cannot drift from what it means.
-        cmd = [sys.executable, str(ROOT / "run_postlayout.py")]
+        script = ("run_postlayout.py" if a.stage == "postlayout"
+                  else "run_mismatch_pex.py")
+        cmd = [sys.executable, str(ROOT / script)]
         if a.brief:
             cmd.append("--brief")
         return subprocess.run(cmd).returncode

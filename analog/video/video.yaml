@@ -29,8 +29,12 @@ ro_unit: 4.249e+8        # measured, per unit cell (cascoded stack, 424.9 MOhm)
 r_load: 37.5
 c_load_pf: 2.0
 
-# Per-cell current sigma.  Same Pelgrom estimate as P3: sigma_VT 3.5 mV at
-# V_ov 0.2 V -> 1.75 %, rounded to 1.8 %.
+# Per-cell current sigma for the *pre-layout* study.  Same Pelgrom estimate as
+# P3: sigma_VT 3.5 mV at V_ov 0.2 V -> 1.75 %, rounded to 1.8 %.  It is kept
+# deliberately pessimistic: the PDK's own area law (1.79 mV for an 8/1 mirror)
+# and the extracted-cell mismatch MC (`run_mismatch_pex.py`, `mm`) put the cell
+# at 0.72 %.  Do not "fix" this number to match - the pre-layout study is the
+# conservative corner, and the post-layout stage is the measured one.
 cell_sigma: 0.018
 vdd: 3.3
 

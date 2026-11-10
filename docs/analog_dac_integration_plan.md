@@ -353,7 +353,7 @@ scaled devices - the decoder cost question, not another segmentation study.
 |---|---|---|
 | Device cell | reused (gf180, measured) | P3 cell: 16 uA, ro 425 MOhm, W/L 8/1 + 8/0.5 um cascoded PMOS mirror |
 | Array model | closed | 255 identical unit cells grouped 1/2/4/.../128; full scale 4.08 mA |
-| DC, binary decode | **marginal** | seed 0 DNL -0.176/+0.176, INL -0.199/+0.199; 20 seeds worst DNL **0.680**, INL 0.442; 5/20 seeds exceed 0.5 LSB DNL |
+| DC, binary decode | **marginal at the pre-layout sigma** | seed 0 DNL -0.176/+0.176, INL -0.199/+0.199; 20 seeds worst DNL **0.680**, INL 0.442; 5/20 seeds exceed 0.5 LSB DNL. At the PDK area law (0.72 %/cell) the extracted netlist gives 0.174 worst - see *Post-layout mismatch* |
 | DC, unary decode (control) | closed | same 255 cells, same seeds: worst DNL 0.066, INL 0.487 |
 | DC, passive load | **passes; the load is not the limit** | 425 MOhm cell ro makes the 37.5 ohm load a 0.006 LSB gain error: INL -0.198/+0.200 LSB vs -0.199/+0.199 virtual ground, and 37.5/100/300/550 ohm all within 0.02 LSB. 1 LSB would need a 1.7 MOhm load. The earlier "+1.517 LSB fail" came from a 1000x kOhm/MOhm printout slip |
 | Binary carry glitch | characterised | 127->128: 51.4 LSB transient with 25 ps bit skew, settles 740 ps (0 LSB / 262 ps at 0 ps skew); 63->64: 25.3 LSB |
@@ -363,6 +363,7 @@ scaled devices - the decoder cost question, not another segmentation study.
 | DRC / LVS / PEX | closed | `signoff.py`: Magic DRC 0 items; LVS 768 devices, 771 nets, 255 *identical* cells re-derived from the pin tag (pad d_tag -> switch drain -> mirror source -> mirror drain -> cascode source -> iout), the replica's mirror source required to be its own switch drain, and negative checks for `vss`/`idump`; PEX 768 instances, 4609 C entries (198.2 kB) |
 | Pins / rails | closed | 255 M2 pads, cell order, exact 7.5 um grid (one per cell, so the digital macro abuts) plus a separate `vgnd` pad on the bias side; vdd plane 2.4 ohm = 1.2 mV at full code (1.2% gain, endpoint-calibrated), iout bus 10.7 ohm = 21.8 mV one-ended which costs 3e-6 LSB/cell through ro; vbp/vcp/vgnd carry gates only (311/358 fF, bias settling) |
 | Post-layout DC | closed (nominal) | `run_postlayout.py`: 256-code sweep on the extracted netlist, virtual ground and 37.5 ohm - 4.080 mA full scale, **16.000 uA/cell**, DNL/INL 0.000 LSB, 0 bad steps, `vbp` 1.951 V / `vcp` 0.505 V; the loaded run is indistinguishable from virtual ground. Nominal only: Magic extracts capacitance, not metal R, and identical cells make the transfer exact by construction, so this gates the operating point, not linearity |
+| Post-layout mismatch | **closed (PDK area law)** | `run_mismatch_pex.py`: `delvto`/`mulu0` drawn per extracted device from `par_vth`/`par_k` of `pfet_03v3_dss` (the wrapper itself is not used - it adds diffusion R the extraction has, and draws once per subckt), 16 samples of a 255-point selector sweep. Cell spread **0.720 %** vs the law's 0.727 % (mirror Vth 0.454 %, switch Vth 0.449 %, switch beta 0.345 % in quadrature); fixed DNL **0.035..0.174** LSB, INL 0.028..0.124, 16/16 monotonic; the zero-draw reconstruction reproduces the bench transfer to 0.0004 LSB. `--selftest` rejects a single shared draw (0.0000 %), half-sigma draws (0.345 %) and mirror-only draws (0.489 %) |
 
 Two extraction findings, both caught by a gate rather than by reading the
 generator. (1) The vcp poly bar stopped at the last cell, so the 255 cascode
@@ -375,9 +376,10 @@ standard one - repeat the cell's switch in the bias branch, gate on a static
 0 V `vgnd` reference - which makes the drop common mode and the unit current
 equal to the reference current to first order (measured 16.000 uA; the
 degenerated bias is reproduced as a `--selftest` mutation and rejected at
--49.5 %). Side effects recorded: degeneration cuts the cell's current sigma
-from 1.8 % to ~0.8 % (the pre-layout study stays conservative), and a 0.1 V
-digital-low error now moves a cell 0.013 LSB.
+-49.5 %). Side effects recorded: the degeneration scales the cell's
+sensitivity to its mirror by gm/(1+gm*Ron) = 0.44 (0.253 %/mV), which is why
+the mismatch MC below puts the cell at 0.72 %, and a 0.1 V digital-low error
+now moves a cell 0.013 LSB.
 `signoff.py --selftest` (17 mutations) rejects a dropped switch, a relabelled
 gate, a shorted drain, a wrong cascode length or mirror width, a broken bias
 diode, a cascode drain off `iout`, a dead or shorted or *absent* replica
@@ -386,9 +388,14 @@ switch, five pin-plan mutations and a narrowed vdd plane.
 Two results size the leaf. **Binary decoding is an INL-neutral, DNL-costly
 choice**: over 20 seeds the binary array's INL matches the thermometer
 control within 0.05 LSB, but its carry DNL reaches 0.68 LSB and crosses the
-0.5 target in 5 seeds, while the thermometer version stays at 0.066. A pure
-binary decoder is therefore only usable with MSB-group trim/calibration;
-otherwise the answer is P3's 4+4 segmentation + DEM. **The load is not the
+0.5 target in 5 seeds, while the thermometer version stays at 0.066. That is
+at the pre-layout 1.8 %/cell assumption; the PDK law puts the cell at 0.72 %,
+and the extracted netlist gives worst fixed DNL 0.174 LSB (INL 0.124) over 16
+samples - about 7x the unary control's, still inside the 0.5 LSB target. The
+0.680 figure remains the right number for a 2.5x worse sigma: the decode did
+not improve, the sigma estimate did. A pure binary decoder is therefore usable
+at this matching without MSB trim, and P3's 4+4 segmentation + DEM stays the
+answer when the cell sigma is worse than the PDK law says. **The load is not the
 limit; the decoder is**: the P3 cell ro is 425 MOhm (a 1000x kOhm/MOhm
 printout slip had put 425 kOhm here), so 37.5 ohm across the 153 mV full
 scale costs 0.006 LSB of gain error - 0.02 LSB even at the 2.24 V compliance
@@ -479,11 +486,14 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   differential wrapper (two mirrored arrays), the comparator/TG bias (class
   C) and the 256-code post-layout transient sweep.
 - **P5. DONE on gf180 (pre-layout + digital half + array macro + post-layout
-  DC).** 8 bit, 25 MS/s video-rate binary current steering, 255 parallel unit
-  cells decoded
+  DC + mismatch MC).** 8 bit, 25 MS/s video-rate binary current steering, 255
+  parallel unit cells decoded
   1/2/4/.../128. Binary decode is INL-neutral but costs carry DNL: 0.680
   worst vs 0.066 for the same cells with a thermometer decoder (5/20 seeds
-  over 0.5 LSB). A passive 37.5 ohm load is fine: the P3 cell ro is 425 MOhm,
+  over 0.5 LSB) - at the pre-layout 1.8 %/cell sigma. At the PDK area law the
+  cell is 0.72 % and the extracted array's worst fixed DNL is 0.174 LSB
+  (INL 0.124) over 16 samples, 16/16 monotonic, so the binary penalty is real
+  but inside the 0.5 LSB target. A passive 37.5 ohm load is fine: the P3 cell ro is 425 MOhm,
   so it costs 0.006 LSB of gain error (0.02 LSB at the 2.24 V compliance
   edge) and the leaf needs no transimpedance stage; the 25 ps bit-skew carry
   glitch is 50.8 LSB
@@ -504,10 +514,16 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   virtual ground and on 37.5 ohm. That sweep is nominal-only (no metal R in a
   Magic extraction, and identical cells make the transfer exact), so it gates
   the operating point, not linearity.
-  `run-analog.sh video gf180 gds|drc|lvs|pex|pins|postlayout|all` drives it.
+  `run_mismatch_pex.py` then closes linearity: per-device `delvto`/`mulu0`
+  from the PDK law, 16 samples, cell spread 0.720 % against a predicted
+  0.727 % (mirror and switch Vth each ~0.45 %, switch beta 0.35 %), fixed DNL
+  0.174 max. Note the matching story: the 0.5/0.28 series switch contributes
+  as much mismatch as the 8/1 mirror, so it cannot be shrunk for area without
+  paying DNL.
+  `run-analog.sh video gf180 gds|drc|lvs|pex|pins|postlayout|mm|all` drives it.
   Still open: the digital macro is not hardened here, the wrapper and output
-  driver stay class C, and there is no mismatch MC on the P5 netlist yet.
-  CML/HBT remains blocked: ihp130 has no
+  driver stay class C, and the carried transients have not been rerun on the
+  extracted netlist. CML/HBT remains blocked: ihp130 has no
   installed HBT models or magic tech, so there is no SiGe device to build
   from.
 

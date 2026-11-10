@@ -141,6 +141,7 @@ transistor geometry is drawn by hand):
 | pins | 260 labelled ports; 255 m2 pads on the 7.5 um grid (`pinplan.py` reads the GDS back) |
 | pex | 768 instances, 4609 C entries, 198.2 kB: vdd 490 fF, vbp 311 fF, vcp 358 fF, iout 296 fF, 0.69 fF per pad |
 | postlayout | 256-code DC transfer on the extracted netlist, virtual ground and 37.5 ohm: 4.080 mA full scale, 16.000 uA/cell, DNL/INL 0.000 LSB, 0 bad steps |
+| mismatch | `run_mismatch_pex.py`: PDK area law drawn per extracted device, 16 samples; cell spread 0.720 % (law 0.727 %), fixed DNL 0.035..0.174 LSB, INL 0.028..0.124 LSB, 0 non-monotonic |
 
 The same pins stage estimates the rails from the *drawn* metal: vdd 2.4 ohm ->
 1.2 mV at full code, i.e. 1.2 % of gain (2*drop/vov), which endpoint
@@ -164,9 +165,10 @@ and the measured 16.000 uA at `vbp` 1.951 V / `vcp` 0.505 V confirms it.
 
 Two side effects are worth recording rather than hiding:
 
-* the degeneration *improves* matching - the effective gm is gm/(1+gm*Ron) =
-  0.44*gm, so a cell's current sigma is 0.8 % rather than the 1.8 % the
-  pre-layout study assumed (that study therefore stays conservative);
+* the degeneration *improves* matching - it scales the cell's sensitivity to
+  its mirror by gm/(1+gm*Ron) = 0.44, measured below as 0.253 %/mV instead of
+  0.575 %/mV, and the cell lands at 0.72 % rather than the 1.8 % the
+  pre-layout study assumed (that study stays conservative);
 * the gain is now sensitive to the digital macro's *low* level: 0.1 V of
   low-level error moves a cell 1.3 %, i.e. 0.013 LSB. Per-cell spread at that
   level is negligible; a common shift is a gain term calibration already
@@ -175,6 +177,46 @@ Two side effects are worth recording rather than hiding:
 `run_postlayout.py --selftest` re-runs the deck with the replica switch
 shorted out and requires the bench to reject it (8.074 uA, -49.5 %), so the
 measurement cannot silently lose the mechanism it was built to check.
+
+### Matching: the PDK's own law, on the extracted cell
+
+The extracted transfer is exact by construction (255 identical cells), so the
+leaf's linearity was still the pre-layout Pelgrom assumption: A_VT = 10 mV*um,
+3.5 mV for the 8/1 mirror, 1.8 %/cell. `run_mismatch_pex.py` replaces that with
+the PDK's law, drawn per *extracted device* (`delvto`/`mulu0` from
+`par_vth`/`par_k` in `pfet_03v3_dss`; the wrapper itself is not used, since it
+adds diffusion resistors the extraction already has and would draw once per
+shared subckt).
+
+| device | W/L (um) | sigma_Vth | sigma_beta | cell dI/I, Vth | cell dI/I, beta |
+|---|---|---|---|---|---|
+| mirror | 8/1 | 1.79 mV | 0.076 % | 0.253 %/mV | 0.449 %/% |
+| cascode | 8/0.5 | 2.80 mV | 0.119 % | 0.0007 %/mV | 0.001 %/% |
+| switch | 0.5/0.28 | 16.9 mV | 0.717 % | 0.0266 %/mV | 0.478 %/% |
+
+The three sensitivities are *probed on the extracted cell* (2 mV of `delvto`
+and 1 % of `mulu0` on each device in turn), not borrowed from the device
+bench, because the cell's series switch degenerates its mirror. In quadrature
+that predicts **0.727 %/cell**, dominated by mirror V_th (0.454 %), switch V_th
+(0.449 %) and switch beta (0.345 %) - the 0.5/0.28 switch's 16.9 mV of V_th is
+as large a matching term as the 8/1 mirror's 1.79 mV, which is the price of
+putting the switch in series with the mirror's source.
+
+Sixteen samples measure **0.720 %** (0.677..0.804), i.e. 1 % from the law.
+The 256-code transfer reconstructed from those cell currents (exact
+superposition, endpoint fit as in the bench) gives fixed DNL 0.035..0.174 LSB
+and INL 0.028..0.124 LSB, 16/16 monotonic. Binary decode
+therefore inherits 0.174 LSB of DNL at the PDK law, not the 0.680 LSB the
+20-seed pre-layout study predicted at 1.8 %/cell: that study's sigma was 2.5x
+pessimistic, and its 5/20 seeds over 0.5 LSB DNL do not happen here.
+
+Gates: the zero-draw reconstruction must reproduce the measured bench transfer
+(0.0004 LSB), the measured spread must land within 20 % of the law, and every
+sample must meet 0.5 LSB DNL / 1.0 LSB INL and stay monotonic.
+`--selftest` rejects a single draw shared by all devices (spread 0.0000 %),
+per-device draws at half the law (0.345 %) and draws applied only to the
+mirrors (0.489 %). 16 samples take ~16 min (one 255-point selector sweep per
+sample, ~1 min); `--samples` changes the count.
 
 ## Files and how to run
 
@@ -195,20 +237,20 @@ measurement cannot silently lose the mechanism it was built to check.
 ./run_postlayout.py      virtual ground + 37.5 ohm load (add --riv 0)
 ./run_postlayout.py --selftest    the un-degenerated bias must be rejected
 
-../../run-analog.sh video gf180 [prelayout|gds|drc|lvs|pex|pins|postlayout|all]
+./run_mismatch_pex.py    mismatch MC on the extracted array (16 x 255-point decks)
+./run_mismatch_pex.py --samples 32
+./run_mismatch_pex.py --selftest  shared / half-sigma / mirror-only draws rejected
+
+../../run-analog.sh video gf180 [prelayout|gds|drc|lvs|pex|pins|postlayout|mm|all]
 ```
 
-`run-analog.sh video gf180 mm` refuses with exit 2: there is no mismatch Monte
-Carlo on the P5 netlist yet, and running P3's bench on a netlist it was not
-built for would be worse than refusing. The pre-layout deck is behavioural on
-purpose - it models the decode and the carry timing, while the cell current and
-ro come from the P3 device bench and are copied into `video.yaml` with
-provenance.
+The pre-layout deck is behavioural on purpose - it models the decode and the
+carry timing, while the cell current and ro come from the P3 device bench and
+are copied into `video.yaml` with provenance.
 
 Still open, and not claimed: the hardened digital macro (only the RTL exists
 here), the wrapper/pin script that abuts it, the output pad/ESD/cable driver,
-mismatch MC on the P5 netlist, and a post-layout rerun of the carry transients
-with extracted bit-slice skew. The extracted DC sweep is nominal-only: the
+and a post-layout rerun of the carry transients with extracted bit-slice skew. The extracted DC sweep is nominal-only: the
 netlist carries no metal resistance (Magic extracts capacitance only), so the
 vdd-drop term stays the analytic estimate in `signoff.py`, and the DNL/INL it
 reports are exact by construction - all 255 cells are drawn identically. What
