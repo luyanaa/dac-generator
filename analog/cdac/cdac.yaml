@@ -22,35 +22,36 @@ differential: true
 # area 0.63 um^2.  Flat-band minimum is the sizing value; the model evaluates
 # the full curve at each code's actual capacitor bias.
 #
-# The moscap C(V) is measured from -0.9 to +0.9 V here (this repo extends the
-# reference's +-0.6 V sweep): that is exactly the range a 1.8 V bottom-plate
-# array applies, and the curve is NOT symmetric - 5.022 fF at -0.9 V against
-# 3.964 fF at +0.9 V, with the flat-band minimum at 0 V.
+# The moscap C(V) is measured with the top plate (gate) held at Vcm and the
+# bottom plate swept, i.e. V(top)-V(bottom) = -0.9..+0.9 V: the actual
+# bottom-plate CDAC bias (the old table moved both plates and its x axis was
+# 2x the real gate-bottom voltage).  The curve is not symmetric - 4.411 fF
+# at -0.9 V against 3.541 fF at +0.9 V, with the flat-band minimum near 0 V.
 cu_ff: 2.67309
 cu_area_um2: 0.63
 cu_wn_um: 1.4
 cu_wp_um: 2.8
 cu_l_um: 0.15
-c_ff_vs_vdiff:   # vdiff = V(top) - V(bottom); measured on the flattened deck
-  "-0.9": 5.0224
-  "-0.8": 4.9801
-  "-0.7": 4.9258
-  "-0.6": 4.8212
-  "-0.5": 4.5299
-  "-0.4": 3.8288
-  "-0.3": 3.0653
-  "-0.2": 2.7496
-  "-0.1": 2.6805
+c_ff_vs_vdiff:   # vdiff = V(top) - V(bottom)
+  "-0.9": 4.4112
+  "-0.8": 4.0666
+  "-0.7": 3.6268
+  "-0.6": 3.2195
+  "-0.5": 2.9438
+  "-0.4": 2.7955
+  "-0.3": 2.7258
+  "-0.2": 2.6948
+  "-0.1": 2.6806
   "0.0": 2.6729
-  "0.1": 2.6813
-  "0.2": 2.7297
-  "0.3": 2.9586
-  "0.4": 3.4273
-  "0.5": 3.6997
-  "0.6": 3.8022
-  "0.7": 3.8620
-  "0.8": 3.9133
-  "0.9": 3.9641
+  "0.1": 2.6683
+  "0.2": 2.668
+  "0.3": 2.6774
+  "0.4": 2.7111
+  "0.5": 2.801
+  "0.6": 2.9825
+  "0.7": 3.2236
+  "0.8": 3.4235
+  "0.9": 3.5414
 
 # Pelgrom, measured on sky130 (40 MC runs each at 0.63 and 2.52 um^2).
 a_c_pct_um: 0.234

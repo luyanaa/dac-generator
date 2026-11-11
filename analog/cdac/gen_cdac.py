@@ -101,6 +101,25 @@ class CapModel:
                 return ca + t * (cb - ca)
         return xs[-1][1]
 
+    def q(self, v: float) -> float:
+        """Charge per unit: Q(v) = integral_0^v C(u) du (fF*V).
+
+        The C(V) curve is a *differential* capacitance from an ac run, so the
+        charge is its integral, not C(V)*V.  The piecewise-linear curve is
+        integrated exactly (trapezoids), with the endpoint value held outside
+        the measured range.
+        """
+        if self.points is None:
+            return self.flat * v
+        if v == 0.0:
+            return 0.0
+        a, b = (0.0, v) if v > 0 else (v, 0.0)
+        xs = [a] + [x for x, _ in self.points if a < x < b] + [b]
+        q = 0.0
+        for x0, x1 in zip(xs, xs[1:]):
+            q += 0.5 * (self.c(x0) + self.c(x1)) * (x1 - x0)
+        return q if v > 0 else -q
+
     def sigma_rel(self, cfg: dict) -> float:
         """Pelgrom sigma_C/C for one unit of this backend."""
         if self.kind == "mim":
@@ -155,24 +174,31 @@ def side_top(cfg: dict, cap: CapModel, code: int, invert: bool,
     gains.append(factors[idx])
     assert idx + 1 == (1 << nbits), (idx, nbits)
 
-    # sampling: top plate held at Vcm; charge on the floating node
+    # sampling: top plate held at Vcm; charge on the floating node.  The
+    # charge is the integral of the differential C(V), not C(V)*V.
     q = 0.0
     for s, g in zip(sample, gains):
-        q += g * cap.c(vcm - s) * (vcm - s)
+        q += g * cap.q(vcm - s)
 
+    # conversion: solve sum_k Q_k(Vtop - Vbot_k) = Q_sample.  Q is monotonic
+    # in Vtop, so Newton on F(V) = sum Q - q converges in a few steps.
     vtop = vcm
-    for _ in range(200):
-        num = q
-        den = 0.0
+    for _ in range(60):
+        f = -q
+        df = 0.0
         for vb, g in zip(bots, gains):
-            c = g * cap.c(vtop - vb)
-            num += c * vb
-            den += c
-        nv = num / den
+            f += g * cap.q(vtop - vb)
+            df += g * cap.c(vtop - vb)
+        if abs(df) < 1e-15:
+            break
+        nv = vtop - f / df
         if abs(nv - vtop) < vdiff_pad:
             vtop = nv
             break
         vtop = nv
+    den = 0.0
+    for vb, g in zip(bots, gains):
+        den += g * cap.c(vtop - vb)
     return vtop, den
 
 
@@ -280,7 +306,7 @@ def unit_netlist(cfg: dict, deck: Path, vdiff: float) -> str:
                            l=cfg["cu_l_um"])
     return f"""* CDAC unit cap C(V), sky130, flattened deck
 {leaf}.include {deck}
-Vg vsh 0 dc {vcm + vdiff:.6f} ac 1
+Vg vsh 0 dc {vcm:.6f} ac 1
 Vb fl 0 dc {vcm - vdiff:.6f}
 Vnw vnw 0 dc {vcm * 2:.6f}
 Vpw vpw 0 dc 0

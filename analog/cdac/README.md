@@ -33,8 +33,9 @@ differential, 1.8 V, 1 MS/s, bottom-plate sampling, moscap backend.
 
 ## The model is charge based, not `C_u x code`
 
-A MOSCAP is not a constant. Measured on the flattened sky130 tt deck, the
-unit moves 2.673 fF at 0 V bias to 5.022 fF at -0.9 V and 3.964 fF at +0.9 V -
+A MOSCAP is not a constant. Measured on the flattened sky130 tt deck with the top plate (gate) held
+at Vcm and the bottom plate swept, the
+unit moves 2.673 fF at 0 V bias to 4.411 fF at -0.9 V and 3.541 fF at +0.9 V -
 exactly the range a 1.8 V bottom-plate array applies. The top plate floats, so
 capacitance and top-plate voltage solve each other:
 
@@ -53,11 +54,11 @@ mismatch the transfer must be exactly linear, and it is (0.000 LSB).
 | backend | C_unit | DNL (LSB) | INL (LSB) | fs_max |
 |---|---|---|---|---|
 | const (control, no mismatch) | 2.673 fF | 0.000 | 0.000 | 48 MS/s |
-| MIM, A_C 0.3 %*um | 8.0 fF | -0.043 .. +0.057 | 0.037 | 17 MS/s |
-| moscap, A_C 0.234 %*um | 2.673 fF | -0.227 .. +0.684 | **+/-11.9** | 48 MS/s |
+| MIM, A_C 0.3 %*um | 8.0 fF | -0.028 .. +0.040 | 0.034 | 17 MS/s |
+| moscap, A_C 0.234 %*um | 2.673 fF | -0.243 .. +0.310 | **+/-9.69** | 48 MS/s |
 
 **The 8-bit limit is the moscap's bias dependence, not mismatch.** Mismatch
-alone is 0.04-0.06 LSB; the C(V) curve is worth 11.9 LSB of even-symmetric bow
+alone is 0.04-0.06 LSB; the C(V) curve is worth 9.69 LSB of even-symmetric bow
 (+11.8 at 1/8 scale, 0 at mid-code), and it is a deterministic function of
 the code, so averaging does not remove it. DNL stays monotonic but exceeds the
 0.5 LSB target at the major carries.

@@ -61,9 +61,12 @@ module audiodac_fifo
 	reg		[FIFO_SIZE-1:0]	read_ptr, write_ptr;
 	wire	[FIFO_SIZE-1:0]	next_write;
 	reg		[WIDTH-1:0]		fifo_store[0:(1<<FIFO_SIZE)-1];
-	// needed for asynch. I/F synchronization (2 stages)
+	// The async interface is a 4-phase handshake: the source holds
+	// fifo_indata_i stable while fifo_indata_rdy_i is high and until
+	// fifo_indata_ack_o.  Only the single-bit rdy is synchronized; the data
+	// bus is sampled directly (a 2-FF sync on the bus would capture mixed
+	// words).  fifo_indata_ack_o is the write-side handshake.
 	reg						fifo_rdy_del1, fifo_rdy_del2;
-	reg		[WIDTH-1:0]		fifo_data_del1, fifo_data_del2;
 	wire					fifo_rdy;
 	wire	[WIDTH-1:0]		fifo_data;
 
@@ -74,7 +77,7 @@ module audiodac_fifo
 	assign next_write = write_ptr + 1'b1;
 
 	assign fifo_rdy = FIFO_ASYNC ? fifo_rdy_del2 : fifo_indata_rdy_i;
-	assign fifo_data = FIFO_ASYNC ? fifo_data_del2 : fifo_indata_i;
+	assign fifo_data = fifo_indata_i;
 
 	always @(posedge clk_i) begin
 		if (!rst_n_i) begin
@@ -88,15 +91,10 @@ module audiodac_fifo
 
 			fifo_rdy_del1 <= 1'b0;
 			fifo_rdy_del2 <= 1'b0;
-			fifo_data_del1 <= {WIDTH{1'b0}};
-			fifo_data_del2 <= {WIDTH{1'b0}};
 		end else begin
-			// use two stages to sync-in fifo_indata_rdy_i
+			// use two stages to sync-in fifo_indata_rdy_i only
 			fifo_rdy_del2 <= fifo_rdy_del1;
 			fifo_rdy_del1 <= fifo_indata_rdy_i;
-			// use two stages to sync-in fifo_indata_i
-			fifo_data_del2 <= fifo_data_del1;
-			fifo_data_del1 <= fifo_indata_i;
 
 			// manage the FIFO read process, if fifo_outdata_rd_i is asserted
 			// the read pointer location is increased, as long as

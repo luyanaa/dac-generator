@@ -107,10 +107,10 @@ module dac_r2r_dig_tb;
 		@(posedge clk); #0.1;
 		check(code_o, 8'h5A, "reserved behaves as register");
 
-		// valid_o stays low while disabled.
+		// valid_o is a one-cycle update strobe; it clears while disabled.
 		mode = 2'b00; en = 0; code_i = 8'h00;
 		@(posedge clk); #0.1;
-		check(valid_o, 1, "valid holds while disabled");
+		check(valid_o, 0, "valid clears while disabled");
 
 		$display("");
 		if (fails == 0)

@@ -37,13 +37,18 @@ module pwmdac_pwm
 	output wire				ds_n_o,
 
 	input					rst_n_i,
-	input					clk_i
+	input					clk_i,
+	input					center_i	// runtime centre-aligned enable
 );
 
 	reg			[BW-1:0]	cnt;			// free-running PWM counter
 	reg						dir;			// 0 = up, 1 = down (center-aligned)
 
 	assign ds_n_o = ~ds_o;
+
+	// The parameter is the build-time capability; center_i selects it at
+	// runtime (it must be static within a PWM frame).
+	wire cen = CENTER_ALIGNED && center_i;
 
 	// The compare uses the *current* duty word. data_i is only re-sampled by
 	// the wrapper once per PWM period, so the pulse shape is never torn.
@@ -53,7 +58,7 @@ module pwmdac_pwm
 			dir		<= 1'b0;
 			ds_o	<= 1'b0;
 		end else begin
-			if (CENTER_ALIGNED) begin
+			if (cen) begin
 				// up/down counter: period = 2^BW+1, spectrum centred at
 				// f_clk/(2^(BW+1)) with symmetric edges -> lower EMI
 				if (dir == 1'b0) begin

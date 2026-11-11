@@ -51,24 +51,28 @@ module dac_r2r_dig #(
 		if (!rst_n_i) begin
 			code_o  <= {N{1'b0}};
 			valid_o <= 1'b0;
-		end else if (en_i) begin
-			case (mode_i)
-				MODE_RAMP: begin
-					code_o  <= code_o + {{(N-1){1'b0}}, 1'b1};
-					valid_o <= 1'b1;
-				end
-				MODE_REG: begin
-					code_o  <= code_i;
-					valid_o <= 1'b1;
-				end
-				MODE_HOLD: begin
-					// Freeze the code; valid_o keeps its previous meaning.
-				end
-				default: begin
-					code_o  <= code_i;
-					valid_o <= 1'b1;
-				end
-			endcase
+		end else begin
+			// valid_o is a one-cycle "code_o was updated this cycle" strobe.
+			valid_o <= 1'b0;
+			if (en_i) begin
+				case (mode_i)
+					MODE_RAMP: begin
+						code_o  <= code_o + {{(N-1){1'b0}}, 1'b1};
+						valid_o <= 1'b1;
+					end
+					MODE_REG: begin
+						code_o  <= code_i;
+						valid_o <= 1'b1;
+					end
+					MODE_HOLD: begin
+						// Freeze the code; no update, no valid.
+					end
+					default: begin
+						code_o  <= code_i;
+						valid_o <= 1'b1;
+					end
+				endcase
+			end
 		end
 	end
 

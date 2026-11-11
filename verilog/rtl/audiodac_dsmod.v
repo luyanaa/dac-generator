@@ -58,15 +58,19 @@ module audiodac_dsmod
 );
 
 	localparam	[BW-1:0]	DATA_MID	= {1'b1,{(BW-1){1'b0}}};
-	localparam	signed [20:0]	MID_EXT		= 21'sd32768;	// FS/2, state width
-	localparam	signed [20:0]	ISTATE_MAX	= 21'sd393216; // 6 * 2^BW
+	// The CIFF state is held in BW+5 bits: enough for 6*2^BW plus the
+	// feed-forward sum for any BW the interface accepts.  The 21-bit values
+	// that used to be hard-coded were only correct for BW=16.
+	localparam	integer		SW			= BW + 5;
+	localparam	signed [SW-1:0]	MID_EXT		= (1 << (BW-1));   // FS/2
+	localparam	signed [SW-1:0]	ISTATE_MAX	= (6 * (1 << BW)); // 6 * 2^BW
 
 	// 1st-order accumulator (unsigned; carry == output)
 	reg 		[BW-1:0]	accu1;
 
 	// 2nd-order CIFF integrators (signed, fixed point in input LSBs)
-	reg	signed	[20:0]	i1;
-	reg	signed	[20:0]	i2;
+	reg	signed	[SW-1:0]	i1;
+	reg	signed	[SW-1:0]	i2;
 
 	reg			[7:0]		fetch_ctr;		// clock divider by osr
 
@@ -88,14 +92,14 @@ module audiodac_dsmod
 	wire signed	[BW:0]		data_calc;		// signed attenuation around midscale
 	/* verilator lint_on UNUSEDSIGNAL */
 	wire signed	[BW:0]		x_s;			// centred 2nd-order input
-	wire signed	[20:0]		x_se;			// x_s sign-extended to state width
-	wire signed	[20:0]		s1;				// i1 + x
-	wire signed	[20:0]		u2;				// 2nd-order quantizer input
+	wire signed	[SW-1:0]	x_se;			// x_s sign-extended to state width
+	wire signed	[SW-1:0]	s1;				// i1 + x
+	wire signed	[SW-1:0]	u2;				// 2nd-order quantizer input
 	wire						y2;				// 2nd-order quantizer output
-	wire signed	[20:0]		i1_pos, i1_neg;	// next i1 for +FS/2 / -FS/2 feedback
-	wire signed	[20:0]		i2_acc;			// i2 + i1
-	wire signed	[20:0]		i2_pos, i2_neg;	// next i2 for +FS/2 / -FS/2 feedback
-	wire signed	[20:0]		i1_nxt, i2_nxt;
+	wire signed	[SW-1:0]	i1_pos, i1_neg;	// next i1 for +FS/2 / -FS/2 feedback
+	wire signed	[SW-1:0]	i2_acc;			// i2 + i1
+	wire signed	[SW-1:0]	i2_pos, i2_neg;	// next i2 for +FS/2 / -FS/2 feedback
+	wire signed	[SW-1:0]	i1_nxt, i2_nxt;
 
 	// provide out and out_n to make levelshifter easier
 	assign ds_n_o = ~ds_o;
@@ -103,8 +107,11 @@ module audiodac_dsmod
 	// Volume in 6 dB steps: 0 = mute, 15 = 0 dB, 14 = -6 dB, ..., 1 = -84 dB.
 	// Attenuate the signed distance from midscale so an unsigned sample does
 	// not move its DC operating point when the volume changes.
+	localparam integer ATT_MAX = (BW < 16) ? BW : 15;
+	wire [3:0] att = (4'd15 - scale_i);
+	wire [3:0] att_clamped = (att > ATT_MAX) ? ATT_MAX : att;
 	assign data_calc = (($signed({1'b0,data_i}) - $signed({1'b0,DATA_MID}))
-						>>> (4'd15 - scale_i)) + $signed({1'b0,DATA_MID});
+						>>> att_clamped) + $signed({1'b0,DATA_MID});
 	assign data_scaled = (scale_i == 4'd0)  ? DATA_MID :
 						 (scale_i == 4'd15) ? data_i   :
 						 $unsigned(data_calc[BW-1:0]);
@@ -119,7 +126,7 @@ module audiodac_dsmod
 	// final mux depends on y2.  This keeps the combinational loop short
 	// (two adders + compare + mux) so the design still closes timing.
 	assign x_s  = $signed({1'b0,data_scaled}) - $signed({1'b0,DATA_MID});
-	assign x_se = {{(21-BW-1){x_s[BW]}}, x_s};
+	assign x_se = {{(SW-BW-1){x_s[BW]}}, x_s};
 	assign s1   = i1 + x_se;
 	assign u2   = s1 + i2;
 	assign y2   = (u2 >= 0);
@@ -136,8 +143,8 @@ module audiodac_dsmod
 	// cycles (reloads at 0)
 	assign data_rd_o = (fetch_ctr == 8'd0);
 
-	function signed [20:0] sat_state;
-		input signed [20:0] v;
+	function signed [SW-1:0] sat_state;
+		input signed [SW-1:0] v;
 		begin
 			if (v > ISTATE_MAX)
 				sat_state = ISTATE_MAX;
@@ -152,8 +159,8 @@ module audiodac_dsmod
 		if (!rst_n_i) begin
 			// reset all registers
 			accu1 <= {BW{1'b0}};
-			i1 <= 21'sd0;
-			i2 <= 21'sd0;
+			i1 <= {SW{1'b0}};
+			i2 <= {SW{1'b0}};
 			ds_o <= 1'b0;
 			fetch_ctr <= 8'b0;
 		end else begin

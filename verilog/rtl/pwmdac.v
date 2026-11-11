@@ -77,7 +77,8 @@ module pwmdac #(
 	wire		[15:0]		fifo_data_w;
 	wire		[BW-1:0]	duty_fifo;
 	wire					fifo_rd, period_end;
-	reg			[BW-1:0]	shadow_cnt;		// tracks the PWM frame boundary
+	reg			[BW:0]		shadow_cnt;		// tracks the PWM frame boundary
+	wire		[BW:0]		frame_max;
 	reg			[BW-1:0]	duty_reg;		// period-aligned duty latch
 	wire		[BW-1:0]	duty_sel;
 
@@ -108,36 +109,53 @@ module pwmdac #(
 		end
 	endgenerate
 
-	// map the 16b signed-INT FIFO word onto the BW-bit unsigned duty
-	assign duty_fifo = fifo_data_w[BW-1:0] + DATA_MID;
+	// Map the 16b signed-INT FIFO word onto the BW-bit unsigned duty.  The
+	// high BW bits are the signed word divided by 2^(16-BW); adding the mid
+	// offset makes the two's-complement slice an unsigned duty (the minimum
+	// -2^15 lands at 0, -1 just below mid, +max just below full scale).
+	// BW > 16 is not a meaningful setting for this interface.
+	assign duty_fifo = fifo_data_w[15 -: BW] + DATA_MID;
 
 	// select input source (register feed wins when data_ld_i is held high)
 	assign duty_sel = data_ld_i ? data_i : duty_fifo;
 
-	// commit the selected duty once per PWM frame so a changing input cannot
+	// Commit the selected duty once per PWM frame so a changing input cannot
 	// slice a pulse in two; the core's counter is internal, so shadow it here.
+	// The centre-aligned core is a triangle: its full frame is 2^(BW+1)
+	// cycles (up + down, one hold at each rail), so the shadow counter needs
+	// one extra bit and the same frame length.
+	assign frame_max = (CENTER_ALIGNED && center_i)
+		? {1'b1,{BW{1'b1}}} : {1'b0,{BW{1'b1}}};
 	always @(posedge clk_i or negedge rst_n_i) begin
 		if (!rst_n_i) begin
-			shadow_cnt <= {BW{1'b0}};
+			shadow_cnt <= {(BW+1){1'b0}};
 			duty_reg   <= DATA_MID;
 		end else begin
-			shadow_cnt <= shadow_cnt + 1'b1;
+			if (shadow_cnt == frame_max)
+				shadow_cnt <= {(BW+1){1'b0}};
+			else
+				shadow_cnt <= shadow_cnt + 1'b1;
 			if (period_end)
 				duty_reg <= duty_sel;
 		end
 	end
-	assign period_end = (shadow_cnt == {BW{1'b1}});
+	assign period_end = (shadow_cnt == frame_max);
 	assign data_ack_o = period_end;
+
+	// 1-LSB dither, saturating at full scale (the old +1 wrapped to 0).
+	wire [BW-1:0] duty_dith = (dith_i && (duty_reg != {BW{1'b1}}))
+		? duty_reg + 1'b1 : duty_reg;
 
 	// the PWM core does the counter+compare
 	pwmdac_pwm
 		#(.BW(BW), .CENTER_ALIGNED(CENTER_ALIGNED))
 		pwm0 (
-			.data_i(dith_i ? duty_reg + 1'b1 : duty_reg),
+			.data_i(duty_dith),
 			.ds_o(ds_o),
 			.ds_n_o(ds_n_o),
 			.rst_n_i(rst_n_i),
-			.clk_i(clk_i)
+			.clk_i(clk_i),
+			.center_i(center_i)
 		);
 
 	// fetch the next FIFO word once per frame (when one is waiting)

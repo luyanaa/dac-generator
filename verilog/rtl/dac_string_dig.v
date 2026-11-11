@@ -34,25 +34,30 @@ module dac_string_dig #(
     output reg          bsy
 );
 
-    reg [N-1:0] code_q;   // code currently applied to the tree
-    reg         pend;     // new code waiting for the break window
+    reg [N-1:0] code_q;    // code currently applied to the tree
+    reg [N-1:0] code_pend; // code latched at the break, applied at make
+    reg         pend;      // new code waiting for the break window
 
     wire change = (code != code_q);
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            code_q <= {N{1'b0}};
-            pend   <= 1'b0;
-            en     <= 1'b0;
-            bsy    <= 1'b0;
+            code_q    <= {N{1'b0}};
+            code_pend <= {N{1'b0}};
+            pend      <= 1'b0;
+            en        <= 1'b0;
+            bsy       <= 1'b0;
         end else if (change && !pend) begin
-            // Break: disconnect the tree and latch the request.
-            pend <= 1'b1;
-            en   <= 1'b0;
-            bsy  <= 1'b1;
+            // Break: disconnect the tree and latch the request.  The code
+            // bus may move during the break window; the request that caused
+            // the break is the one that must be applied.
+            code_pend <= code;
+            pend      <= 1'b1;
+            en        <= 1'b0;
+            bsy       <= 1'b1;
         end else if (pend) begin
-            // Make: apply the new code and reconnect in the same cycle.
-            code_q <= code;
+            // Make: apply the latched request and reconnect.
+            code_q <= code_pend;
             pend   <= 1'b0;
             en     <= 1'b1;
             bsy    <= 1'b0;

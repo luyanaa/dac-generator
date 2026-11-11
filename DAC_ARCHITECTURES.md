@@ -41,11 +41,16 @@ backends) + `pwmdac_level.v` (static-level register feed).
 
 - **Modulator**: free-running `BW`-bit counter vs. `data_i` compare →
   `bitstream = (cnt < duty)`. Duty = `data_i/2^BW` exactly; zero dead logic.
-- **Params**: `BW` (default 12 → up to ~0.024% LSB step), optional
-  `DITHER`/`CENTER_ALIGNED` mode for lower EMI.
-- **Refresh**: a new `data_i` is sampled once per PWM period (no tearing).
+- **Params**: `BW` (default 12 → up to ~0.024% LSB step), `CENTER_ALIGNED`
+  as the build-time capability with `center_i` as the runtime select.
+- **Refresh**: a new `data_i` is sampled once per PWM frame (no tearing);
+  the centre-aligned triangle frame is 2^(BW+1) cycles and the wrapper's
+  shadow counter uses the same length (the old 2^BW shadow updated mid-frame).
+- **Mapping**: the 16-bit signed FIFO word is mapped from its high BW bits
+  plus the mid offset; the old low-bit slice lost the sign and the high bits.
 - **Output**: `bitstream_o` to one GPIO; `RC` off-die (or on-die parasitic
-  R + pad-cap as the pole). `f_pwm = f_clk / 2^BW`.
+  R + pad-cap as the pole). `f_pwm = f_clk / 2^BW` (saw) or
+  `f_clk / 2^(BW+1)` (centre).
 
 ## Architecture #2 — `audiodac` (ΔΣ → RC)
 
@@ -88,7 +93,7 @@ digital half (`_dig`) abutted in the wrapper:
 | 8-bit resistor string | `analog/string/` | `dac_string_dig` | pre-layout; layout class C |
 | 8-bit unit current steering (4+4 + DWA) | `analog/csteer/` | `dac_csteer_dig` | pre-layout + DEM model; layout class C, active I-V required |
 | 8-bit differential binary CDAC (SAR target) | `analog/cdac/` | `dac_cdac_dig` | model + digital half + 256-unit array macro; DRC 0, LVS/PEX clean; wrapper/comparator open |
-| 8-bit 25 MS/s video binary current-steering | `analog/video/` | `dac_video_dig` | model + digital half; binary carry DNL 0.68 worst, passive-load INL 1.5 LSB; class C layout open |
+| 25 MS/s video current-steering (8-bit binary / 7-bit thermometer) | `analog/video/`, `analog/video_sky130/`, `analog/video_ihp/` | `dac_video_dig` (RESOLUTION/ENCODING params, 510 complementary outputs) | sky130 and IHP arrays DRC 0/LVS/PEX/DC/tran; sky130 7-bit thermometer DNL 0.174/INL 0.831, IHP 8-bit DNL 0.196/INL 0.122; GF180 model+macro; 510-pin digital hardening open |
 
 `./run-analog.sh <topology> <pdk> [prelayout\|gds\|drc\|all]` is the analog
 entry point and fails closed: it refuses a stage it cannot actually run

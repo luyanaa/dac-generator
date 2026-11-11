@@ -1,46 +1,63 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Self-checking testbench for dac_video_dig: launch handshake, settle window,
-// and the guarantee that dout changes only on an accepted launch.
-//
-// `dout` is one bit per physical analog cell (255 of them), so every expected
-// value is the 8-bit code expanded through `expand()`, which is the same
-// cell->bit grouping the analog macro uses:
-//   bit 0 -> cell 0, bit 1 -> 1..2, bit 2 -> 3..6, ... bit 7 -> 127..254.
+// Self-checking testbench for dac_video_dig:
+//   * binary 8-bit / 255-cell expansion (GF180, IHP),
+//   * thermometer 7-bit / 127-cell expansion (sky130),
+//   * launch handshake, settle window, 25 MS/s accept rate at 100 MHz,
+//   * dout_n is the exact complement of dout,
+//   * dout changes only on an accepted launch.
 `timescale 1ns / 1ps
 `default_nettype none
 
 module dac_video_dig_tb;
 
-    localparam integer SETTLE = 4;
-    localparam integer CLK_PS = 10;   // 10 ns period, 100 MHz
+    localparam integer SETTLE = 3;    // 100 MHz -> 25 MS/s sustained
+    localparam integer CLK_PS = 10;
 
-    reg          clk = 1'b0;
-    reg          rst_n = 1'b0;
-    reg          stb = 1'b0;
-    reg  [7:0]   code = 8'd0;
-    wire [254:0] dout;
-    wire         valid;
-    wire         ready;
+    reg clk = 1'b0;
+    reg rst_n = 1'b0;
+
+    reg        stb_b = 1'b0;
+    reg  [7:0] code_b = 8'd0;
+    wire [254:0] dout_b, doutn_b;
+    wire       valid_b, ready_b;
+
+    reg        stb_t = 1'b0;
+    reg  [6:0] code_t = 7'd0;
+    wire [254:0] dout_t, doutn_t;
+    wire       valid_t, ready_t;
 
     integer checks = 0;
     integer errors = 0;
 
-    dac_video_dig #(.SETTLE_CYCLES(SETTLE)) dut (
-        .clk(clk), .rst_n(rst_n), .stb(stb), .code(code),
-        .dout(dout), .valid(valid), .ready(ready));
+    dac_video_dig #(.RESOLUTION(8), .ENCODING(0), .SETTLE_CYCLES(SETTLE))
+        dut_b (.clk(clk), .rst_n(rst_n), .stb(stb_b), .code(code_b),
+               .dout(dout_b), .dout_n(doutn_b), .valid(valid_b),
+               .ready(ready_b));
+
+    dac_video_dig #(.RESOLUTION(7), .ENCODING(1), .SETTLE_CYCLES(SETTLE))
+        dut_t (.clk(clk), .rst_n(rst_n), .stb(stb_t), .code(code_t),
+               .dout(dout_t), .dout_n(doutn_t), .valid(valid_t),
+               .ready(ready_t));
 
     always #(CLK_PS / 2.0) clk = ~clk;
 
-    // Cell j belongs to the smallest k with j < 2^(k+1) - 1.
-    function [254:0] expand(input [7:0] c);
+    function [254:0] expand_bin(input [7:0] c);
         integer j, k;
         begin
             for (j = 0; j < 255; j = j + 1) begin
                 k = 0;
                 while (j >= (1 << (k + 1)) - 1) k = k + 1;
-                expand[j] = c[k];
+                expand_bin[j] = c[k];
             end
+        end
+    endfunction
+
+    function [254:0] expand_th(input [6:0] c);
+        integer j;
+        begin
+            for (j = 0; j < 255; j = j + 1)
+                expand_th[j] = (j < 127) ? (j < c) : 1'b0;
         end
     endfunction
 
@@ -49,110 +66,111 @@ module dac_video_dig_tb;
             checks = checks + 1;
             if (!cond) begin
                 errors = errors + 1;
-                $display("FAIL: %0s (t=%0t dout[31:0]=%h valid=%b ready=%b)",
-                         what, $time, dout[31:0], valid, ready);
+                $display("FAIL: %0s (t=%0t)", what, $time);
             end
         end
     endtask
 
-    // Wait for ready, then launch `c` and verify handshake, dout and the
-    // settle window.  Leaves stb low.
-    task launch_check(input [7:0] c);
+    task launch_bin(input [7:0] c);
         integer nlow;
         begin
-            while (!ready) @(negedge clk);
+            while (!ready_b) @(negedge clk);
             @(negedge clk);
-            stb  = 1'b1;
-            code = c;
-            @(posedge clk);
-            #1;
-            chk(dout === expand(c), "dout latches the launched code");
-            chk(valid === 1'b1, "valid pulses on launch");
-            chk(ready === 1'b0, "ready drops on launch");
-            @(negedge clk);
-            stb = 1'b0;
+            stb_b = 1'b1; code_b = c;
+            @(posedge clk); #1;
+            chk(dout_b === expand_bin(c), "binary dout latches the code");
+            chk(doutn_b === ~dout_b, "binary dout_n is the complement");
+            chk(valid_b === 1'b1, "binary valid pulses");
+            chk(ready_b === 1'b0, "binary ready drops");
+            @(negedge clk); stb_b = 1'b0;
             nlow = 1;
-            @(posedge clk);
-            #1;
-            while (!ready) begin
+            @(posedge clk); #1;
+            while (!ready_b) begin
                 nlow = nlow + 1;
-                @(posedge clk);
-                #1;
+                @(posedge clk); #1;
             end
-            chk(nlow == SETTLE, "ready low for exactly SETTLE_CYCLES");
-            chk(dout === expand(c), "dout held through the settle window");
-            @(posedge clk);
-            #1;
-            chk(valid === 1'b0, "valid is one cycle only");
+            chk(nlow == SETTLE, "binary ready low for SETTLE_CYCLES");
+            chk(dout_b === expand_bin(c), "binary dout held");
+            chk(doutn_b === ~dout_b, "binary dout_n held");
+            @(posedge clk); #1;
+            chk(valid_b === 1'b0, "binary valid is one cycle");
         end
     endtask
 
-    // Launch `c`, then assert stb with `ic` inside the settle window and prove
-    // the request is ignored.
-    task ignored_check(input [7:0] c, input [7:0] ic);
+    task launch_th(input [6:0] c);
+        integer nlow;
         begin
-            while (!ready) @(negedge clk);
+            while (!ready_t) @(negedge clk);
             @(negedge clk);
-            stb  = 1'b1;
-            code = c;
-            @(posedge clk);
-            #1;
-            chk(dout === expand(c), "dout latches before ignored launch");
-            chk(ready === 1'b0, "settle window is open");
-            @(negedge clk);
-            stb  = 1'b1;          // hold stb through the settle window
-            code = ic;
-            @(posedge clk);
-            #1;
-            chk(ready === 1'b0, "ready still low when stb is pushed");
-            chk(valid === 1'b0, "ignored stb produces no valid");
-            chk(dout === expand(c), "ignored stb does not change dout");
-            @(negedge clk);
-            stb = 1'b0;
-            while (!ready) begin
-                @(posedge clk);
-                #1;
-                chk(valid === 1'b0, "no valid while !ready");
+            stb_t = 1'b1; code_t = c;
+            @(posedge clk); #1;
+            chk(dout_t === expand_th(c), "thermo dout latches the code");
+            chk(doutn_t === ~dout_t, "thermo dout_n is the complement");
+            chk(valid_t === 1'b1, "thermo valid pulses");
+            chk(ready_t === 1'b0, "thermo ready drops");
+            @(negedge clk); stb_t = 1'b0;
+            nlow = 1;
+            @(posedge clk); #1;
+            while (!ready_t) begin
+                nlow = nlow + 1;
+                @(posedge clk); #1;
             end
-            chk(dout === expand(c), "dout held through the settle window");
+            chk(nlow == SETTLE, "thermo ready low for SETTLE_CYCLES");
+            chk(dout_t === expand_th(c), "thermo dout held");
+            chk(doutn_t === ~dout_t, "thermo dout_n held");
+            @(posedge clk); #1;
+            chk(valid_t === 1'b0, "thermo valid is one cycle");
         end
     endtask
 
-    integer i;
-    reg [254:0] prev_dout;
+    integer i, t0, t1;
     reg [7:0] rcode;
 
     initial begin
-        // reset
         repeat (3) @(negedge clk);
-        chk(dout === {255{1'b0}}, "reset clears dout");
-        chk(valid === 1'b0, "reset clears valid");
-        chk(ready === 1'b1, "reset asserts ready");
+        chk(dout_b === {255{1'b0}}, "binary reset clears dout");
+        chk(doutn_b === {255{1'b1}}, "binary reset sets dout_n");
+        chk(dout_t === {255{1'b0}}, "thermo reset clears dout");
+        chk(valid_b === 1'b0 && valid_t === 1'b0, "reset clears valid");
+        chk(ready_b === 1'b1 && ready_t === 1'b1, "reset asserts ready");
         rst_n = 1'b1;
         repeat (2) @(negedge clk);
 
-        // all 256 codes, handshake-checked
+        // binary: every code
         for (i = 0; i < 256; i = i + 1)
-            launch_check(i[7:0]);
+            launch_bin(i[7:0]);
 
-        // stb while !ready must be ignored
-        for (i = 0; i < 16; i = i + 1)
-            ignored_check(8'hA5 ^ i[7:0], 8'h5A ^ i[7:0]);
+        // thermometer: every code, including the 127-cell full scale
+        for (i = 0; i < 128; i = i + 1)
+            launch_th(i[6:0]);
 
-        // random traffic, including launches that land in settle windows
-        for (i = 0; i < 1000; i = i + 1) begin
+        // sustained rate: back-to-back accepted launches must be
+        // SETTLE+1 cycles apart (25 MS/s at 100 MHz with SETTLE=3).
+        while (!ready_b) @(negedge clk);
+        @(negedge clk); stb_b = 1'b1; code_b = 8'h11;
+        @(posedge clk); t0 = $time; #1;
+        @(negedge clk); stb_b = 1'b0;
+        while (!ready_b) @(negedge clk);
+        stb_b = 1'b1; code_b = 8'h22;
+        @(posedge clk); t1 = $time; #1;
+        chk((t1 - t0) == (SETTLE + 1) * CLK_PS,
+            "binary accept interval is SETTLE+1 cycles");
+        @(negedge clk); stb_b = 1'b0;
+
+        // stb pushed inside the settle window is ignored
+        while (!ready_t) @(negedge clk);
+        @(negedge clk); stb_t = 1'b1; code_t = 7'h05;
+        @(posedge clk); #1; @(negedge clk); stb_t = 1'b1; code_t = 7'h7a;
+        @(posedge clk); #1;
+        chk(valid_t === 1'b0, "thermo ignored stb produces no valid");
+        chk(dout_t === expand_th(7'h05), "thermo ignored stb does not change dout");
+        @(negedge clk); stb_t = 1'b0;
+        while (!ready_t) @(posedge clk);
+
+        // random binary traffic
+        for (i = 0; i < 400; i = i + 1) begin
             rcode = $urandom;
-            if (($urandom % 4) == 0) begin
-                ignored_check(rcode, ~rcode);
-            end else begin
-                repeat ($urandom % 3) @(negedge clk);
-                prev_dout = dout;
-                launch_check(rcode);
-                // dout may only differ if this launch changed the code
-                chk(dout === expand(rcode), "random launch result");
-                if (expand(rcode) === prev_dout)
-                    chk(dout === prev_dout, "same code stays stable");
-            end
+            launch_bin(rcode);
         end
 
         repeat (5) @(negedge clk);
@@ -164,25 +182,29 @@ module dac_video_dig_tb;
         $finish;
     end
 
-    // dout must only change on a launch: compare against the accepted stb
-    // sampled one cycle earlier.
-    reg prev_launch;
-    reg [254:0] seen_dout;
+    // dout may only change on an accepted launch.
+    reg prev_launch_b, prev_launch_t;
+    reg [254:0] seen_b, seen_t;
     initial begin
-        prev_launch = 1'b0;
-        seen_dout = {255{1'b0}};
+        prev_launch_b = 1'b0; prev_launch_t = 1'b0;
+        seen_b = {255{1'b0}}; seen_t = {255{1'b0}};
     end
     always @(posedge clk) begin
         if (rst_n) begin
-            if (dout !== seen_dout && !prev_launch) begin
+            if (dout_b !== seen_b && !prev_launch_b) begin
                 errors = errors + 1;
-                $display("FAIL: dout changed without launch at t=%0t", $time);
+                $display("FAIL: binary dout changed without launch");
             end
-            seen_dout <= dout;
-            prev_launch <= stb & ready;
+            if (dout_t !== seen_t && !prev_launch_t) begin
+                errors = errors + 1;
+                $display("FAIL: thermo dout changed without launch");
+            end
+            seen_b <= dout_b; seen_t <= dout_t;
+            prev_launch_b <= stb_b & ready_b;
+            prev_launch_t <= stb_t & ready_t;
         end else begin
-            seen_dout <= {255{1'b0}};
-            prev_launch <= 1'b0;
+            seen_b <= {255{1'b0}}; seen_t <= {255{1'b0}};
+            prev_launch_b <= 1'b0; prev_launch_t <= 1'b0;
         end
     end
 

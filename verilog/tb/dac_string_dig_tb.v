@@ -56,10 +56,12 @@ module dac_string_dig_tb;
 	task check_invariants;
 		begin
 			check((d & dn), 0, "d and dn overlap");
-			if (en && (dut.code_q !== code)) begin
+			// en may be high for one cycle after the code bus moves; the
+			// applied code must equal the request latched at the break.
+			if (en && (dut.code_q !== dut.code_pend)) begin
 				fails = fails + 1;
-				$display("FAIL en high with stale code: code_q=%0d code=%0d",
-					dut.code_q, code);
+				$display("FAIL en high with stale code: code_q=%0d code_pend=%0d",
+					dut.code_q, dut.code_pend);
 			end
 		end
 	endtask
@@ -130,11 +132,14 @@ module dac_string_dig_tb;
 		code = 8'hF0;               // changes again during the break
 		@(posedge clk); #0.1;
 		check(en, 1, "en after back-to-back change");
-		check(d, 8'hF0, "applied code is the latched one");
+		check(d, 8'h0F, "applied code is the latched request");
 		check_invariants;
 		@(posedge clk); #0.1;
-		check(en, 1, "stays enabled");
-		check(d, 8'hF0, "final code");
+		check(bsy, 1, "a new break starts for the newer request");
+		check(en, 0, "en low in the new break");
+		@(posedge clk); #0.1;
+		check(en, 1, "stays enabled after the second make");
+		check(d, 8'hF0, "final code is the newer request");
 		check_invariants;
 
 		$display("PASS: %0d/%0d checks", checks - fails, checks);
