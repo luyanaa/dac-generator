@@ -91,7 +91,7 @@ Measured on the repaired GDS (`fingers=3`, `W=1`, `L=0.06`):
 | active beyond gate | 0.115 | 0.170 |
 | poly beyond active | 0.14 | 0.15 (below) / 0.33 (bus) |
 | M1 enclosure of CT | 0.025 | 0.025 (0.14 wide island) |
-| M1 area | 0.042 | 0.0448 (gate), >= 0.0896 (S/D) |
+| M1 area (tech LEF) | 0.042 | 0.0448 (gate), >= 0.0896 (S/D) |
 | M1 space | 0.09 | 0.11 |
 
 Two details that cost time and belong in the deck:
@@ -121,7 +121,7 @@ below are from the Calibre source, with line numbers):
 | ACT | width 0.08, space 0.10/0.11, enclosure of CT 0.015 | 2805, 2821/2827, 4911 |
 | GT | width, space 0.12/0.13, AA extension 0.115, poly extension 0.14 | 3795/3817, 3914, 3920 |
 | CT | size 0.09, space 0.11 (0.14 diff net), gate spacing 0.05, poly enclosure 0.04 | 4822, 4832/4855, 4900, 4944 |
-| M1 | width/space 0.09, enclosure of CT 0.025, area 0.042 | 5058/5063, 4961, LEF |
+| M1 | width/space 0.09, enclosure of CT 0.025; area 0.042 is a tech-LEF constraint, not a Calibre rule | 5058/5063, 4961, LEF |
 | V1-V4 | width, space, enclosure upper/lower | via modules |
 | metals M2-M5/T4 | width/space/area | metal modules |
 | antenna | the whole `.ant` module | `.ant` |
@@ -138,7 +138,8 @@ is the same process family with the full foundry collateral:
 
 * `DRC_ORI/...drc` + `.ant` - the rule source for section 3;
 * `techfile.tf` - layer *functions* and `currentDensity` (M1 1.6, CT 0.3
-  mA/um^2), `routingDirections`; geometric limits are in the Calibre deck;
+  mA/um^2), `routingDirections`; geometric limits are in the Calibre deck
+  (note the 0.042 um^2 figure is the GT island area rule, not M1);
 * `smic55llrf/<device>/layout/thumbnail_128x128.png` - a cheap sanity check
   of the intended topology (the n12ll thumbnail shows two separate M1
   islands either side of the gate, i.e. no S/D strap over the channel);
