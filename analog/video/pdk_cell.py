@@ -4,7 +4,7 @@
     ./pdk_cell.py --list
     ./pdk_cell.py sky130
     ./pdk_cell.py ihp-sg13g2
-    ./pdk_cell.py ics55        # refuses: the models are HSPICE-only
+    ./pdk_cell.py ics55        # 1.2 V core, foundry/ngspice model tree
 
 The P5 method is: the mirror and cascode keep the unit current flowing and an
 NMOS pair steers it, so the mirror's Vgs and Vds never move with the code.
@@ -68,21 +68,19 @@ PDKS: dict[str, dict] = {
         "vcp_cap_pf": 220.0,
     },
     "ics55": {
+        # The PDK ships a foundry ngspice variant (foundry/ngspice); its
+        # wrapper defaults mismod=0, so a plain op is deterministic.  The top
+        # .lib carries .option scale=0.9, which the wrapper's lef/wef
+        # expressions also apply - use the top lib, not the wrapper directly.
         "vdd": 1.2,
         "root": "/grid/icsprout55-pdk",
-        "lib": "{root}/libs.tech/spice/foundry/ngspice/model_wrapper1_hsp.lib",
-        "section": "tt",
+        "lib": ("{root}/libs.tech/spice/foundry/ngspice/"
+                "ICsprout_55LLULP1225_V1p1_hsp.lib"),
+        "section": "tt_mos",
         "pfet": "pm1p2_svt_lp",
         "nfet": "nm1p2_svt_lp",
         "fmt": "{n} {d} {g} {s} {b} {m} w={w:g}u l={l:g}u",
         "env": {},
-        "blocked": (
-            "the ICsprout 55 models are HSPICE-only: the .mdl cards select "
-            "their bin with .param expressions over the *instance* w/l "
-            "(wum = w*1e6, xbin = f(wum)), which ngspice cannot evaluate "
-            "('Undefined parameter [w]' -> 'could not find a valid "
-            "modelname').  The PDK's own readme says 'for hspice only'.  "
-            "Converting them is a model-porting job, not a sizing one"),
         "mir": (8.0, 1.0), "cas": (8.0, 0.5), "pair": (4.0, 0.28),
         "vcp_cap_pf": 220.0,
     },

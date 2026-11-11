@@ -1,99 +1,91 @@
-# ICsprout55 video DAC: state and blockers
+# ICsprout55 video DAC: cell study and next step
 
-Status: **the device and model blockers are cleared; the DRC deck is the
-remaining one.**  Re-analysis on 2026-11-12 (see
-`docs/ics55_pdk_repair.md`):
+Status 2026-11-12: **the device-level cell passes the P5 carry gate and the
+single-cell layout closes LVS and the partial DRC.**  The three recorded
+blockers are down to one:
 
-* models: the PDK ships `libs.tech/spice/foundry/ngspice/`, which ngspice 44
-  parses and runs deterministically (`mismod=0`); the "HSPICE-only" note was
-  stale.
-* PCell: the old Metal1 strap over the whole active did short source/drain
-  and the gate (the LVS extractor returned `M$1 $1 $2 $1`).  The cell is now
-  drawn against the Calibre rules of the same process family and extracts as
-  one device `M$1 $2 $3 $1 ... W=m*W` with `ICS55_LVS_COMPARE=PASS`
-  (`icsprout55-pdk` commit `47d237f`).
-* DRC: still a partial Calibre port (59 checks vs 516 `RULECHECK`s; FEOL
-  active has only the area rule), so a leaf cannot be signed off yet.
-
-The rest of this note is the record of what the *old* cell and deck produced;
-the commands still run, but the device geometry it describes has been fixed.
-
-## PCell works headless
-
-`libs.tech/klayout/pcells/ics55_mos_analog.py` is a normal KLayout
-`db.PCellDeclarationHelper`, so no cni host is needed:
-
-```python
-import sys
-sys.path.insert(0, "/grid/icsprout55-pdk/libs.tech/klayout/pcells")
-import klayout.db as db
-import ics55_mos_analog            # registers library "ICsprout55"
-ly = db.Layout(); ly.dbu = 0.001
-c = ly.create_cell("ics55_mos_analog", "ICsprout55",
-                   {"dev_type": "n", "w": 8.0, "l": 0.06,
-                    "fingers": 1, "guard_ring": 1, "ring_metal": 1})
-ly.flatten(c.cell_index())          # PCell geometry is dynamic
-```
-
-Note `klayout.db` (not `pya`) and that the PCell geometry only materialises
-after flattening.  Parameters here are plain floats in um, unlike the IHP
-`cni` wrapper which wants unit strings.
-
-## What the PCell draws (and why it cannot be signed off)
-
-For `nmos w=8 l=0.06 fingers=1 guard_ring=1` the cell is 3.5 x 11.1 um and
-contains:
-
-| layer | shape |
+| blocker | state |
 |---|---|
-| ACT 2/1 | device active + p+ guard-ring active |
-| POLY 41/1 | the gate stripe + a gate-contact extension |
-| NP 52/1 | n+ implant |
-| PP 53/1 | p+ implant (guard ring) |
-| CT 72/1 | two S/D contacts and one gate contact |
-| M1 81/1 | **one rectangle over the whole active** (`act + 0.05`), the gate pad, the ring strap |
+| models "HSPICE-only" | **cleared** — `libs.tech/spice/foundry/ngspice` parses in ngspice 44, `mismod=0`, deterministic |
+| PCell S/D short | **cleared** — fixed in `icsprout55-pdk` `b756fc8`; LVS extracts one device per finger group and passes |
+| DRC deck partial | **open** — 49 KLayout categories against 679 vendor rules; the device rules are checked by hand against the vendor ids (see `docs/ics55_pdk_repair.md`) |
 
-The M1 over the whole active is the problem: it straps source and drain
-together, so the device is a short, not a transistor.  No layout built on
-this PCell can pass LVS or simulate.  That is a PCell-template limitation,
-not a routing one; the LVS deck is available
-(`libs.tech/lvs`) but there is nothing meaningful to compare until the PCell
-is fixed (or replaced by a real device drawer).
+## Cell study (device level, no parasitics)
 
-## DRC deck is a partial source port
+`analog/video/pdk_cell.py ics55` now runs the same P5 method as gf180/IHP:
+255 unit cells + diode-connected replica, 37.5 ohm and 2 pF load, 20 ps edge,
+25 ps bit skew, 40 ns period.  The ics55 entry uses the 1.2 V core devices
+(`pm1p2_svt_lp` / `nm1p2_svt_lp`) with mirror 8/1, cascode 8/0.5, pair 4/0.28:
 
-`libs.tech/drc/ics55_drc.drc` runs under the stock KLayout:
-
-```bash
-klayout -b -r libs.tech/drc/ics55_drc.drc \
-    -rd input=ics_dev.gds -rd top=TOP -rd report=ics_dev.lyrdb
+```
+ics55: vdd 1.2 V, mirror (8.0, 1.0), cascode (8.0, 0.5), pair (4.0, 0.28)
+  127 -> 128:   127.953 LSB (err   -0.047), settle  2.03 ns, dvbp  -0.00 mV, dvcp  -0.00 mV
+    0 -> 255:   254.561 LSB (err   -0.439), settle  2.41 ns, dvbp  +0.12 mV, dvcp  +0.30 mV
+  dc: vbp 0.6134 V, vcp 0.0196 V, mirror drain 0.6146 V, tail 0.0836 V
+ics55: PASS  (worst 0.439 LSB, bias 0.30 mV)
 ```
 
-On the single 8/0.06 nmos it reports 3 items, all density:
-`ACT_D_1_min`, `PO_D_1_min`, `PO_D_2_min` (the density windows are 100 um
-squares around a 3.5 x 11.1 um cell).  With `-rd no_density=true` the same
-device is **0 items**, so the geometry rules the port implements are clean.
-The deck's own header says it is not Calibre-equivalent: a matched Calibre
-run is required before a DRC claim.
+That is the first ics55 DAC result: carry inside 0.05 LSB, full scale inside
+0.44 LSB, bias excursion 0.3 mV, settling 2.4 ns at 25 MS/s.
 
-## Models are HSPICE-only
+One design note for the layout/wrapper: at 1.2 V the replica forces
+`vcp = Vdd - Vsg(mirror) - Vsg(cascode) = 19.6 mV`, i.e. the cascode gate is
+almost at ground.  It works (the cascode still has Vsd ~0.53 V) and the bias
+excursion is tiny, but generating a 20 mV bias line is awkward; a wide-swing
+cascode bias branch or a wider cascode device would move `vcp` to a more
+comfortable 0.3-0.4 V.  Resize before layout if the bias generator is shared.
 
-The `.mdl` bins are selected by `.param` expressions over the instance `w/l`
-(`wum = w*1e6`); ngspice cannot evaluate them (`Undefined parameter [w]` /
-`could not find a valid modelname`), and the PDK readme says HSPICE-only.
-This is the same block recorded in `../video/README.md`: the DC transfer,
-mismatch and transient benches cannot run on this PDK in this environment.
+## What the PCell gives now
 
-## What would unblock it
+`libs.tech/klayout/pcells/ics55_mos_analog.py` (PDK commit `b756fc8`) draws,
+for `fingers=m`:
 
-1. A functional MOS PCell (S/D separated, with the gate contact and taps) or
-   a real device GDS; the current template's M1 short is fatal.
-2. Either HSPICE or an ngspice port of the `.mdl` bins; the leaf's sizing
-   (`../video/pdk_cell.py`) is blocked on this, which is why there are no
-   16 uA-device sizes for ics55 in the first place.
-3. A Calibre-equivalent DRC run (or acceptance of the partial port with its
-   documented exclusions).
+* one shared active strip, `m+1` contacts on a 0.26 um pitch
+  (`CT_S_4` 0.055 + CT 0.09 + 0.055), 0.03 active enclosure;
+* a poly bus tying every finger, one gate contact on a 0.17 um pad;
+* one M1 island per contact with interdigitated straps (even to a bus below,
+  odd to a bus above) and a separate gate island (0.042 um^2).
 
-The layout *shape* (dump-tail cell + 510 pads on the 3.75 um row) can be
-generated from the PCell at any time, but it would be a drawing, not a
-signoff; this directory records the state rather than pretending otherwise.
+For `fingers=1` the cell is 0.41 um wide (`L + 2*0.205`) and `W` tall, with
+two S/D islands at x = +/-0.13 um and the gate island above the active.  The
+array plan is the same as gf180/sky130: one row of 255 cells on a 7.5 um
+pitch, `d_`/`db_` pads on a 3.75 um grid, which is what the fixed cell has to
+be placed on.
+
+## Single-cell layout
+
+`gen_cell.py` places the four devices with the PDK PCell, wires them on M1/M2
+(`cd` needs one M2 crossing with 0.09 V1 / 0.17 M1 pad / 0.13 M2), labels the
+nine ports on M1, and writes `build/cell.gds`.  `cell.cdl` is the matching
+schematic (the PMOS bulk is written as the same `vdd` net as its source; the
+deck ties the n-well to the power alias).
+
+The ics55 LVS deck returns:
+
+```
+.SUBCKT CELL cd d db idump iout md vbp vcp vdd
+M$1 iout  d  cd  VSS NM1P2_SVT_LP L=0.28U W=4U
+M$2 idump db cd  VSS NM1P2_SVT_LP L=0.28U W=4U
+M$3 md    vbp vdd vdd PM1P2_SVT_LP L=1U   W=8U
+M$4 cd    vcp md  vdd PM1P2_SVT_LP L=0.5U W=8U
+```
+
+`ICS55_LVS_COMPARE=PASS` with `-rd strict_topology=true` (the default
+comparer trips over the well-tied bulk net; the strict path resolves it by
+pin name).  The partial KLayout DRC reports 0 items with `no_density=true`
+(the density windows are 100 um squares, meaningless for a 5 um cell).
+
+## Next step
+
+1. Generate the 255-cell row + replica with the same pad plan as
+   `analog/video_sky130/gen_gds.py` (7.5 um cell pitch, 510 M2 pads on a
+   3.75 um grid) and run the partial DRC plus the hand-rule checks
+   (CT/ACT/PO/MET1) that the deck does not yet emit.
+2. Re-run `pdk_cell.py ics55` on the extracted netlist once the row exists;
+   the PDK has no RCX ruleset for ics55, so this needs the Magic/KLayout
+   extractor path used by the other leaves.
+3. Resolve the `vcp = 20 mV` bias point (wide-swing cascode bias or a wider
+   cascode device) before the row is wired to a shared bias generator.
+
+The pre-fix record (M1 over the whole active, "no layout can pass LVS") is in
+the git history of this file; that geometry no longer exists in the PDK.
