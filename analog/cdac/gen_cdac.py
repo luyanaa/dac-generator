@@ -86,6 +86,46 @@ class CapModel:
         else:
             raise SystemExit(f"unknown cap backend {kind!r}")
         self.area = float(cfg.get("cu_area_um2", 0.63))
+        # 2-D small-signal tables (fF) on a (Vg,Vb) grid.  The well is fixed,
+        # so a 3-terminal MOSCAP is not described by C(Vg-Vb): the top-plate
+        # charge is a state function of both plates, with Cgg = dQg/dVg and
+        # Cgb = dQg/dVb (both measured by .ac, see measure_c2.py).  The device
+        # charge is path independent, but the .ac matrix is only symmetric,
+        # not integrable (BSIM4 charge non-conservation), so Q is built along
+        # one explicit path - see the qb loop below.
+        self.q_grid = None
+        tab_g = cfg.get("cgg_ff_vs_vg_vb")
+        tab_b = cfg.get("cgb_ff_vs_vg_vb")
+        if kind == "moscap" and tab_g and tab_b:
+            self.q_vg = [float(v) for v in tab_g["vg"]]
+            self.q_vb = [float(v) for v in tab_g["vb"]]
+            self.cgg = [[float(v) for v in row] for row in tab_g["c_ff"]]
+            self.cgb = [[float(v) for v in row] for row in tab_b["c_ff"]]
+            nv, nb = len(self.q_vg), len(self.q_vb)
+            qg = [[0.0] * nv for _ in range(nb)]
+            for j in range(nb):
+                acc = 0.0
+                for i in range(1, nv):
+                    acc += 0.5 * (self.cgg[j][i - 1] + self.cgg[j][i]) \
+                        * (self.q_vg[i] - self.q_vg[i - 1])
+                    qg[j][i] = acc
+            # The .ac capacitance matrix is symmetric but not exactly
+            # integrable (BSIM4 charge non-conservation), so Q has to be
+            # built along ONE path.  Use the vg integral at fixed vb plus
+            # the vb integral at vg=0:
+            #   Q(vg,vb) = int_0^vg Cgg(u,vb)du + int_0^vb Cgb(0,w)dw
+            # Each 1-D integral is verified against a device transient ramp
+            # to <0.01 fC (see xcheck_mos.py --ramps).
+            qb = [[0.0] * nv for _ in range(nb)]
+            acc = 0.0
+            for j in range(1, nb):
+                acc += 0.5 * (self.cgb[j - 1][0] + self.cgb[j][0]) \
+                    * (self.q_vb[j] - self.q_vb[j - 1])
+                for i in range(nv):
+                    qb[j][i] = acc
+            self.q_mat = [[qg[j][i] + qb[j][i] for i in range(nv)]
+                          for j in range(nb)]
+            self.q_grid = True
 
     def c(self, vdiff: float) -> float:
         if self.points is None:
@@ -100,6 +140,40 @@ class CapModel:
                 t = (vdiff - a) / (b - a)
                 return ca + t * (cb - ca)
         return xs[-1][1]
+
+    def _bilinear(self, mat, vg: float, vb: float) -> float:
+        vg = min(max(vg, self.q_vg[0]), self.q_vg[-1])
+        vb = min(max(vb, self.q_vb[0]), self.q_vb[-1])
+
+        def find(xs, v):
+            for i in range(len(xs) - 1):
+                if xs[i] <= v <= xs[i + 1]:
+                    return i, (v - xs[i]) / (xs[i + 1] - xs[i])
+            return len(xs) - 2, 1.0
+
+        i, tx = find(self.q_vg, vg)
+        j, ty = find(self.q_vb, vb)
+        m00 = mat[j][i]
+        m10 = mat[j][i + 1]
+        m01 = mat[j + 1][i]
+        m11 = mat[j + 1][i + 1]
+        return ((1 - tx) * (1 - ty) * m00 + tx * (1 - ty) * m10
+                + (1 - tx) * ty * m01 + tx * ty * m11)
+
+    def charge(self, vg: float, vb: float) -> float:
+        """Top-plate charge (fC) at (Vgate, Vbottom)."""
+        if self.q_grid is None:
+            if self.points is None:
+                return self.flat * (vg - vb)
+            # fall back to the 1-D differential table, integrated at fixed vb
+            return self.q(vg - vb)
+        return self._bilinear(self.q_mat, vg, vb)
+
+    def dcharge(self, vg: float, vb: float) -> float:
+        """dQ/dVg (fF) at (Vg,Vb)."""
+        if self.q_grid is None:
+            return self.flat if self.points is None else self.c(vg - vb)
+        return self._bilinear(self.cgg, vg, vb)
 
     def q(self, v: float) -> float:
         """Charge per unit: Q(v) = integral_0^v C(u) du (fF*V).
@@ -174,11 +248,11 @@ def side_top(cfg: dict, cap: CapModel, code: int, invert: bool,
     gains.append(factors[idx])
     assert idx + 1 == (1 << nbits), (idx, nbits)
 
-    # sampling: top plate held at Vcm; charge on the floating node.  The
-    # charge is the integral of the differential C(V), not C(V)*V.
+    # sampling: top plate held at Vcm; charge on the floating node.  With the
+    # 2-D table this is the device gate charge Q(Vg,Vb), not C(V)*V.
     q = 0.0
     for s, g in zip(sample, gains):
-        q += g * cap.q(vcm - s)
+        q += g * cap.charge(vcm, s)
 
     # conversion: solve sum_k Q_k(Vtop - Vbot_k) = Q_sample.  Q is monotonic
     # in Vtop, so Newton on F(V) = sum Q - q converges in a few steps.
@@ -187,8 +261,8 @@ def side_top(cfg: dict, cap: CapModel, code: int, invert: bool,
         f = -q
         df = 0.0
         for vb, g in zip(bots, gains):
-            f += g * cap.q(vtop - vb)
-            df += g * cap.c(vtop - vb)
+            f += g * cap.charge(vtop, vb)
+            df += g * cap.dcharge(vtop, vb)
         if abs(df) < 1e-15:
             break
         nv = vtop - f / df

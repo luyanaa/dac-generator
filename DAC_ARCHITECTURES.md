@@ -93,7 +93,7 @@ digital half (`_dig`) abutted in the wrapper:
 | 8-bit resistor string | `analog/string/` | `dac_string_dig` | pre-layout; layout class C |
 | 8-bit unit current steering (4+4 + DWA) | `analog/csteer/` | `dac_csteer_dig` | pre-layout + DEM model; layout class C, active I-V required |
 | 8-bit differential binary CDAC (SAR target) | `analog/cdac/` | `dac_cdac_dig` | model + digital half + 256-unit array macro; DRC 0, LVS/PEX clean; wrapper/comparator open |
-| 25 MS/s video current-steering (8-bit binary / 7-bit thermometer) | `analog/video/`, `analog/video_sky130/`, `analog/video_ihp/` | `dac_video_dig` (RESOLUTION/ENCODING params, 510 complementary outputs) | sky130 and IHP arrays DRC 0/LVS/PEX/DC/tran; sky130 7-bit thermometer DNL 0.174/INL 0.831, IHP 8-bit DNL 0.196/INL 0.122; GF180 model+macro; 510-pin digital hardening open |
+| 25 MS/s video current-steering (8-bit binary / 7-bit thermometer) | `analog/video/`, `analog/video_sky130/`, `analog/video_ihp/` | `dac_video_dig` (RESOLUTION/ENCODING params, 510 complementary outputs) | sky130 and IHP arrays DRC 0/LVS/PEX/DC/tran; sky130 7-bit thermometer DNL 0.174/INL 0.831, IHP 8-bit DNL 0.196/INL 0.122; GF180 model+macro; digital half hardened on sky130 (`openlane/dac_video_dig/`, 510 pins in analog pad order, DRC/LVS clean; exact 3.75 um abutment needs the DEF-template step, see LIBRELANE.md) |
 
 `./run-analog.sh <topology> <pdk> [prelayout\|gds\|drc\|all]` is the analog
 entry point and fails closed: it refuses a stage it cannot actually run

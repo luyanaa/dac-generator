@@ -31,37 +31,64 @@ differential, 1.8 V, 1 MS/s, bottom-plate sampling, moscap backend.
   the C(V) curve (dC/dV = 0), so the dummy is a first-order constant reference
   rather than another bias-dependent capacitor.
 
-## The model is charge based, not `C_u x code`
+## The model is a 2-D charge state function, not `C_u x code`
 
-A MOSCAP is not a constant. Measured on the flattened sky130 tt deck with the top plate (gate) held
-at Vcm and the bottom plate swept, the
-unit moves 2.673 fF at 0 V bias to 4.411 fF at -0.9 V and 3.541 fF at +0.9 V -
-exactly the range a 1.8 V bottom-plate array applies. The top plate floats, so
-capacitance and top-plate voltage solve each other:
+A MOSCAP is a 3-terminal device: the well is fixed, so the top-plate charge is
+a function of *both* plates, Q(vg, vb).  A 1-D C(Vg-Vb) table is not enough
+for a bottom-plate array, where the top plate moves during conversion.
+
+Two measurements on the flattened sky130 tt deck:
+
+* `c_ff_vs_vdiff` - the small-signal C with the gate held at Vcm and the
+  bottom swept (the budget view).  The unit moves 2.673 fF at 0 V to 4.411 fF
+  at -0.9 V and 3.541 fF at +0.9 V.
+* `cgg_ff_vs_vg_vb`, `cgb_ff_vs_vg_vb` - the full 19x19 small-signal matrix
+  over vg, vb = 0..1.8 V (`measure_c2.py`): Cgg = dQg/dVg at fixed Vb and
+  Cgb = dQg/dVb at fixed Vg.
+
+The state function is built along one path (the .ac matrix is symmetric but
+not exactly integrable - BSIM4 charge non-conservation):
 
 ```
-Q_sample = sum_k C_k(Vcm - Vbot_k)                        top plate held at Vcm
-Vtop     = (Q_sample + sum_k C_k(Vtop - Vbot_k) * Vbot_k)
-           / sum_k C_k(Vtop - Vbot_k)
+Q(vg,vb) = int_0^vg Cgg(u,vb) du + int_0^vb Cgb(0,w) dw
 ```
 
-that fixed point is iterated per code (`gen_cdac.py`), with the measured
-C(V) as a table. `--cap const` is the control: with a flat cap and no
-mismatch the transfer must be exactly linear, and it is (0.000 LSB).
+Each 1-D integral is checked against a device transient ramp to <0.01 fC, and
+the device charge is verified to be path independent (two ramp paths agree to
+0.001 fC): `./xcheck_mos.py --ramps`.  Sampling and conversion then solve
+
+```
+sum_k Q(Vtop, Vbot_k) = sum_k Q(Vcm, Vin)                 charge conservation
+```
+
+by Newton on the top plate (`gen_cdac.py`).  `xcheck_mos.py` builds the
+device-level equivalent (2^N unit MOSCAPs + ideal bottom-plate switches, top
+plate sampled at Vcm then floated) and compares the final top voltage with the
+model at the same code.
+
+`--cap const` is the control: with a flat cap and no mismatch the transfer
+must be exactly linear, and it is (0.000 LSB).
 
 ## Results (10 mismatch seeds, Pelgrom at the backend's own A_C)
 
 | backend | C_unit | DNL (LSB) | INL (LSB) | fs_max |
 |---|---|---|---|---|
 | const (control, no mismatch) | 2.673 fF | 0.000 | 0.000 | 48 MS/s |
-| MIM, A_C 0.3 %*um | 8.0 fF | -0.028 .. +0.040 | 0.034 | 17 MS/s |
-| moscap, A_C 0.234 %*um | 2.673 fF | -0.243 .. +0.310 | **+/-9.69** | 48 MS/s |
+| MIM, A_C 0.3 %*um | 8.0 fF | -0.043 .. +0.057 | 0.037 | 17 MS/s |
+| moscap, A_C 0.234 %*um | 2.673 fF | -0.185 .. +0.244 | **+/-5.86** | 48 MS/s |
 
 **The 8-bit limit is the moscap's bias dependence, not mismatch.** Mismatch
-alone is 0.04-0.06 LSB; the C(V) curve is worth 9.69 LSB of even-symmetric bow
-(+11.8 at 1/8 scale, 0 at mid-code), and it is a deterministic function of
-the code, so averaging does not remove it. DNL stays monotonic but exceeds the
-0.5 LSB target at the major carries.
+alone is 0.04-0.06 LSB; the 2-D charge curve is worth 5.86 LSB of bow
+(+5.21 at code 32, +5.60 at 64, +3.32 at 96, 0 at both ends), and it is a
+deterministic function of the code, so averaging does not remove it. DNL
+stays monotonic but exceeds the 0.5 LSB target at the major carries.
+
+The same bias dependence also compresses the transfer: the differential span
+is **1.558 V for a 1.8 V reference** (0.78 V per side), i.e. the moscap array
+delivers only ~43 % of the nominal full scale.  The device-level cross-check
+below confirms this independently (8-bit array: code 0 -> 0.516 V, code 255
+-> 1.293 V on one side, i.e. 0.777 V/side), so it is the device, not the
+model.
 
 The MIM row is a **flat-cap design that passes**, but its 8 fF/unit is the
 reference profile's assumption (2 fF/um^2, A_C 0.3 %*um), not a sky130
@@ -76,12 +103,36 @@ Budget at the nominal unit (constant-C view, moscap):
 | term | value |
 |---|---|
 | C_total (one side, 256 units) | 684 fF |
-| kT/C, differential | 110 uV rms = 0.016 LSB |
-| comparator (StrongArm, measured) | 500 uV rms = 0.071 LSB |
+| kT/C, differential | 110 uV rms = 0.016 LSB (nominal 7.03 mV LSB) |
+| comparator (StrongArm, measured) | 500 uV rms = 0.071 LSB (nominal) |
 | settling per bit | 1.66 ns |
 | sample | 6.6 ns |
 | convert | 20.7 ns -> 48 MS/s |
 | target | 1 MS/s |
+
+## Device cross-check (the model vs the full MOS circuit)
+
+`xcheck_mos.py` builds the device-level array (2^N unit MOSCAPs, ideal
+bottom-plate switches, the top plate sampled at Vcm and then floated) and
+compares the final top-plate voltage with the model at the same code:
+
+```
+./xcheck_mos.py --ramps                          # table + path independence
+./xcheck_mos.py --bits 4 --codes 0,1,8,15        # ~2 min/code
+./xcheck_mos.py --bits 8 --codes 0,1,64,128,192,255
+```
+
+* `--ramps`: every 1-D charge integral matches the device ramp to
+  **0.006 fC** and the two integration paths agree to **0.0008 fC**, i.e. the
+  device charge is a state function and the 2-D tables reproduce it.
+* 4-bit array: worst |model - device| = **1.7 mV = 0.015 LSB** over codes
+  0/1/8/15 (the 1-D model was 4.2 LSB off, which is why it was replaced).
+* 8-bit array (255 units + dummy): worst |model - device| = **1.41 mV =
+  0.20 LSB** over codes 0/1/64/128/192/255 (nominal 7.03 mV LSB).  The
+  residual is a smooth function of code (+0.19 at 0, -0.16 at 255), i.e. the
+  table's 0.1 V grid and the bilinear interpolation, not a model-form error.
+
+The remaining mismatch is the table's 0.1 V grid, not a model-form error.
 
 ## Digital half
 
@@ -104,6 +155,10 @@ drive -> break -> sample, and every code change goes through a break cycle:
 ./run.sh control         constant-C array == exact
 ./run.sh mim             flat-cap 8-bit design, gated on the SAR spec
 ./run.sh moscap          measured array, recorded study
+
+./measure_c2.py --write  re-measure Cgg/Cgb(Vg,Vb) into cdac.yaml (~5 min)
+./xcheck_mos.py --ramps  validate Q(vg,vb) against device charge ramps
+./xcheck_mos.py --bits 4 --codes 0,1,8,15   full MOS array vs model
 
 ../../run-analog.sh cdac sky130 [prelayout|gds|drc|all]
 ```

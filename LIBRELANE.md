@@ -10,7 +10,7 @@ profile). The legacy `openlane`/`flow.tcl` Docker flow is no longer used.
 ```
 
 - `macro`: `const_gen` · `config_reg_mux` · `audiodac` · `pwmdac` ·
-  `tempsense` · `all`
+  `tempsense` · `dac_r2r_dig` · `dac_video_dig` · `all`
 - results land in `results/<pdk-spec>/<macro>/` (Efabless layout) and the
   run dir in `openlane/<macro>/runs/<pdk-spec>/`
 
@@ -113,6 +113,36 @@ produces it does not converge on that deck; the GDS is still valid:
   converge) → no `lef` (`def`, `lib`, `spef` are present).
 - **`const_gen`/or1**: no `lib` (the OR1 deck has no MCSTA/RCX view);
   `lef`/`def`/`spef` are present.
+
+### Analog-leaf digital halves (`_dig`)
+
+`openlane/dac_*_dig/` are the standard-cell halves of the analog leaves. They
+are run explicitly (`./run.sh dac_video_dig sky130`), not from `all`, because
+their die area is the analog array's abutment row and their parameters are
+PDK-specific.
+
+`dac_video_dig` is the 25 MS/s video current-steering decoder. Its analog
+array is 255 cells on a 7.5 um pitch with `d_`/`db_` pads on an exact
+3.75 um grid at `x = 2.25 + j*3.75`; the macro is drawn 1912.5 um wide to
+match. `openlane/dac_video_dig/gen_pin_template.py` generates:
+
+* `pin_template_<pdk>.def` - the exact abutment row (510 outputs on met2 /
+  Metal2 at the analog pad coordinates, control pins on the north edge).
+* `pin_order_sky130.cfg` - the same pin order for `IO_PIN_ORDER_CFG`.
+
+The config uses `IO_PIN_ORDER_CFG` because LibreLane 3.0.14 cannot ingest the
+DEF template: `Odb.ApplyDEFTemplate` raises
+`KeyError: 'design__die__bbox'` (the string metric from
+`apply_def_template.py` is dropped by the metrics parser). The resulting row
+is therefore on the routing track grid: met2 pitch 0.46 um gives 3.68 um per
+pin instead of 3.75, i.e. the row spans 18.63..1891.75 um against the analog
+2.25..1911.0 um (max ~19 um misalignment at the ends). Pin *order* is exact
+(`d0, db0, d1, db1, ...`), so a wrapper can route the 510 nets; true
+abutment needs the DEF-template step fixed.
+
+The sky130 config synthesizes `RESOLUTION=7, ENCODING=1` (7-bit thermometer:
+127 of the 255 cells, the rest held off so their dump-tail pair still steers
+to idump); gf180 and ihp130 use `RESOLUTION=8, ENCODING=0`.
 
 ## Characterization
 

@@ -8,6 +8,7 @@
 #   make dac_cdac_dig   # binary-CDAC digital testbench
 #   make dac_video_dig  # video current-steering digital testbench
 #   make pwmdac         # PWM signed-word / centre-aligned testbench
+#   make dac_wrap       # backend-selective wrapper (PWM + delta-sigma)
 #   make lint         # Verilator lint of the RTL
 #   make wave         # regenerate and open the VCD (needs a viewer)
 #   make clean
@@ -38,6 +39,10 @@ CD_SRCS := $(RTL)/dac_cdac_dig.v
 CD_TB   := dac_cdac_dig_tb.v
 CD_OUT  := dac_cdac_dig_tb.vvp
 
+WR_SRCS := $(RTL)/dac_wrap.v
+WR_TB   := dac_wrap_tb.v
+WR_OUT  := dac_wrap_tb.vvp
+
 PW_SRCS := $(RTL)/pwmdac.v
 PW_TB   := pwmdac_tb.v
 PW_OUT  := pwmdac_tb.vvp
@@ -46,9 +51,9 @@ VID_SRCS := $(RTL)/dac_video_dig.v
 VID_TB   := dac_video_dig_tb.v
 VID_OUT  := dac_video_dig_tb.vvp
 
-.PHONY: all run lint clean wave dac_r2r_dig dac_string_dig dac_csteer_dig dac_cdac_dig dac_video_dig pwmdac
+.PHONY: all run lint clean wave dac_r2r_dig dac_string_dig dac_csteer_dig dac_cdac_dig dac_video_dig pwmdac dac_wrap
 
-all: run dac_r2r_dig dac_string_dig dac_csteer_dig dac_cdac_dig dac_video_dig pwmdac
+all: run dac_r2r_dig dac_string_dig dac_csteer_dig dac_cdac_dig dac_video_dig pwmdac dac_wrap
 
 $(OUT): $(TB) $(SRCS)
 	$(IVERILOG) -g2012 -Wall -I$(RTL) -o $@ -s audiodac_tb $(TB) $(SRCS)
@@ -79,6 +84,12 @@ $(CD_OUT): $(CD_TB) $(CD_SRCS)
 
 dac_cdac_dig: $(CD_OUT)
 	$(VVP) $(CD_OUT)
+
+$(WR_OUT): $(WR_TB) $(WR_SRCS)
+	$(IVERILOG) -g2012 -Wall -I$(RTL) -o $@ -s dac_wrap_tb $(WR_TB) $(WR_SRCS)
+
+dac_wrap: $(WR_OUT)
+	$(VVP) $(WR_OUT)
 
 $(PW_OUT): $(PW_TB) $(PW_SRCS)
 	$(IVERILOG) -g2012 -Wall -I$(RTL) -o $@ -s pwmdac_tb $(PW_TB) $(PW_SRCS)
@@ -114,4 +125,4 @@ wave: $(OUT)
 	@echo "wrote audiodac_tb.vcd"
 
 clean:
-	rm -f $(OUT) audiodac_tb.vcd $(R2R_OUT) $(STR_OUT) $(CS_OUT) $(CD_OUT) $(VID_OUT) $(PW_OUT)
+	rm -f $(OUT) audiodac_tb.vcd $(R2R_OUT) $(STR_OUT) $(CS_OUT) $(CD_OUT) $(VID_OUT) $(PW_OUT) $(WR_OUT)

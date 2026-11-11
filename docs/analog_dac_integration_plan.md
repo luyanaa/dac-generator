@@ -310,10 +310,10 @@ Target is the SAR reference spec `../saradc_auto/gen/spec/examples/sar8_sky130.j
 
 | Gate | State | Evidence |
 |---|---|---|
-| Device unit cap | closed (sky130, measured) | C(V) 19 points -0.9..+0.9 V: 4.411 / 2.673 / 3.541 fF; unit bench reproduces `cdac.yaml` to 0.002 % |
-| Charge model | closed | floating top plate, C(V) fixed point per code; constant-C control is exact (0.000 LSB) |
+| Device unit cap | closed (sky130, measured) | 1-D C(V) 19 points -0.9..+0.9 V: 4.411 / 2.673 / 3.541 fF; 2-D Cgg/Cgb(Vg,Vb) 19x19 tables over 0..1.8 V; unit bench reproduces `cdac.yaml` to 0.002 % |
+| Charge model | closed + device-validated | 2-D state function Q(vg,vb)=int Cgg dvg + int Cgb(0,.) dvb, Newton charge-conservation solve per code; device ramps match to 0.006 fC and are path-independent to 0.0008 fC; 4-bit full-MOS array cross-check worst 0.015 LSB; constant-C control exact (0.000 LSB) |
 | Mismatch model | closed, deterministic | measured Pelgrom A_C 0.234 %*um at 0.63 um^2 -> 0.295 %/unit |
-| DC linearity, moscap | **fails the 8-bit target** | DNL -0.243/+0.310, INL +/-9.69 LSB over 10 seeds; even-symmetric bow, not mismatch |
+| DC linearity, moscap | **fails the 8-bit target** | DNL -0.185/+0.244, INL +/-5.86 LSB over 10 seeds (bow peaking at 1/4 scale, 0 at both ends); differential span 1.558 V for a 1.8 V reference; not mismatch |
 | DC linearity, flat cap | closed (MIM assumption) | DNL -0.043/+0.057, INL 0.037 LSB; C_unit 8 fF is an assumption, not measured |
 | Digital half | closed | `dac_cdac_dig` 2082/2082 checks, 258 break cycles, lint clean, hardened config added |
 | Sampling/settling | closed (model) | 1.66 ns/bit, 20.7 ns convert -> 48 MS/s moscap, 17 MS/s MIM |
@@ -327,7 +327,7 @@ Target is the SAR reference spec `../saradc_auto/gen/spec/examples/sar8_sky130.j
 The result that sizes the leaf is a negative one: **at 8 bit and 1.8 V full
 scale, a bottom-plate moscap array is limited by the capacitor's bias
 dependence, not by matching.** Mismatch is 0.04-0.06 LSB; the C(V) curve is
-worth 9.69 LSB of code-dependent bow that no averaging removes, because it is
+worth 5.86 LSB of code-dependent bow that no averaging removes, because it is
 a deterministic function of the code. Consequences, in order of preference:
 
 * build the array from a flat cap (MIM/poly-poly) - the MIM design passes;
@@ -370,7 +370,7 @@ segmentation study.
 | Post-layout carry | **closed** | `run_transient_pex.py`: 510 PWL pads, 20 ps edges, 25 ps bit skew, 25 MS/s.  127->128 **128.000 LSB (+0.000), 0.5 LSB at 2.30 ns**; 128->127 and 63->64 likewise; full scale 0->255 **254.693 (-0.307), 2.72 ns**; `vbp`/`vcp` within 0.48 mV.  With the wrapper's 100 pF on `vcp`: without it the full-scale step lands at -4.3 LSB (device level), and that cap is a documented wrapper requirement |
 | Glitch | recorded, not gated | the steering pair's switching charge into the 2 pF output is a ~340-450 LSB spike decaying in ~3 ns (clear of the 40 ns sample); larger than the old cell's 103 LSB and a spec for the output filter |
 | Other PDKs (device level) | **ihp-sg13g2 closes the carry; sky130 sized at 3.3 V; icsprout55 blocked** | `analog/video/pdk_cell.py` applies the same cell to the other three processes.  IHP 1.8 V lv (PSP103, OSDI): the gf180 sizes fit (8/1 needs Vsg 0.57 V); carry **+0.024 LSB** with the bias flat, full scale **-0.412 LSB** with 220 pF on vcp (100 pF gives -0.86, so that PDK wants more decoupling).  sky130: the 1.8 V logic PMOS cannot stack two diodes at 16 uA (the replica's vcp goes negative), so the cell runs the 5 V g5v0d10v5 devices at 3.3 V; their bins reject l=1.0 and l=0.28 ("could not find a valid modelname"), so all three devices are 8/0.5 - 16 uA/cell at vbp 2.192 / vcp 0.843 V, full scale **+0.246 LSB** but the carry **+0.563 LSB** with the bias flat; doubling the pair changes it by 0.001 LSB and a 300 ns trace is flat at 128.563 from 10 ns, i.e. it is not settling: the static solution at code 128 is 128.000 and the transient rests at 128.563, so this sizing has two static states (the weak-device/startup issue again, tail node ~0.08 V) and needs a state fix before it is claimed.  icsprout55: **blocked at the models** - the .mdl bins are selected by .param expressions over the instance w/l (`wum = w*1e6`), which ngspice cannot evaluate, and the PDK readme says HSPICE-only.  Layouts: **sky130 is closed** (`analog/video_sky130/`: magic gencell 5 V devices, 255 cells + replica, DRC 0, LVS 1022 devices with the pad-pair walk, 510 pads, PEX 1022 instances/7.94 pF, DC 4.0996 mA, carry 0.001 LSB; mismatch 5.51 %/cell -> 8-bit binary DNL 2.65 / thermometer INL 1.52 LSB, so the leaf is specified as 7-bit thermometer (DNL 0.174 / INL 0.831 LSB)).  **ihp-sg13g2 is closed at DRC/LVS/pins** (`analog/video_ihp/`): the SG13_dev PCells run headless; the 255-cell array + replica is 1022 devices (512 pmos/510 nmos), DRC 0 on the full array, LVS 516 ports with the pad-pair walk on all 255 cells and all bulks vdd/vss, 510 pads, PEX 1022 instances/2.57 pF, DC 4.0815 mA at vbp/vcp 1.2318/0.6271 V, mismatch DNL 0.196/INL 0.122 LSB, carry 0.062 LSB with 220 pF vcp + 100 pF vbp.  **icsprout55 is not closable on this PDK state**: the pcell is a drawn template whose M1 straps the whole active (source=drain), the DRC deck is a partial Calibre port (geometry 0, density rules fail on a small macro), and the models are HSPICE-only. |
-| Digital half | **needs the complementary pair** | `dac_video_dig` supplies 255 one-hot lines; the dump-tail cell needs `d_`/`db_` (510 outputs).  Class C follow-up, like the wrapper |
+| Digital half | **closed at RTL + hardened macro** | `dac_video_dig` supplies the 510 complementary lines (`dout[254:0]`, `dout_n[254:0]`), `RESOLUTION`/`ENCODING` = 7-bit thermometer (sky130) or 8-bit binary (gf180/ihp), `SETTLE_CYCLES=3` = 25 MS/s at 100 MHz; tb 6280 checks.  `openlane/dac_video_dig/` hardens it with the 510-pin row in analog pad order (`gen_pin_template.py`); exact 3.75 um abutment needs the DEF-template step (blocked by a LibreLane 3.0.14 metric bug, see LIBRELANE.md), the track-grid row is 3.68 um with max ~19 um end-to-end drift |
 
 **Why the cell changed.** The first macro put a 0.5/0.28 PMOS in series with
 the mirror's source - true zero, no dump - and closed DC and matching
@@ -464,7 +464,7 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
 - **P4. DONE on sky130 (model + digital half + array macro).** 8-bit
   differential binary bottom-plate CDAC against the SAR reference spec.
   Charge-based C(V) model on the measured sky130 moscap. Mismatch costs
-  0.04-0.06 LSB; the moscap's 2.67 -> 4.41 fF bias dependence costs 9.69 LSB
+  0.04-0.06 LSB; the moscap's 2.67 -> 4.41 fF bias dependence costs 5.86 LSB
   INL, so the 8-bit design point is a flat cap (MIM, 0.037 LSB) and the
   moscap array is recorded as a study. `dac_cdac_dig` 2082/2082 checks, lint
   clean. The array macro is generated and signed off: `gen_gds.py` lays out
