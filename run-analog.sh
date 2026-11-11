@@ -123,10 +123,11 @@ cdac:sky130 | r2r:gf180 | string:gf180 | csteer:gf180 | video:gf180 | video:sky1
     postlayout | mm | tran)
         # Only the leaves that own a bench get these stages: the stage is
         # routed, never silently run against another leaf's netlist.
-        if [ "$PDK" = gf180 ]; then
+        if [ "$PDK" = gf180 ] || [ "$TOP:$PDK" = video:sky130 ] \
+                || [ "$TOP:$PDK" = video:ihp-sg13g2 ]; then
             "$SIGN" --stage "$STAGE"
         else
-            echo "error: video/$PDK has no $STAGE bench yet" >&2
+            echo "error: $TOP/$PDK has no $STAGE bench yet" >&2
             exit 2
         fi
         ;;

@@ -324,8 +324,13 @@ continuous bars across the row: at 7.5 um the nwell spacing rule (1.27 um)
 only passes if the wells are merged.  DRC is **0 items** on the full
 1536 x 27.6 um array; magic extraction is **1022 devices, 512 pfet / 510
 nfet, all pfet bulks vdd and all nfet bulks vss**; the pad-pair walk passes
-on all 255 cells; the drawn pads measure 510 on the 3.75 um grid.  The
-signoff is `analog/video_sky130/signoff.py` (build/drc/lvs/pins/pex).
+on all 255 cells; the drawn pads measure 510 on the 3.75 um grid.  PEX is
+1022 instances / 7.94 pF; the extracted DC is 4.0996 mA; the 127->128 carry
+settles to 0.001 LSB.  **Mismatch is the open finding**: the 5 V 8/0.5 cell's
+PDK-law sigma is 5.51 %/cell, so binary decode gives DNL 2.65 / INL 1.36 LSB
+(nonmonotonic) and even thermometer decode INL 1.52 LSB - the 8-bit target
+needs a larger-area mirror or a relaxed spec.  The signoff is
+`analog/video_sky130/signoff.py` (build/drc/lvs/pins/pex/dc/mm/tran).
 * **ihp-sg13g2 is closed at DRC/LVS/pins** (`analog/video_ihp/`).  The
   PDK's `SG13_dev` PCells run headless (import the library, set
   `technology_name`, unit-string params, flatten).  The array is 255 cells
@@ -337,8 +342,9 @@ signoff is `analog/video_sky130/signoff.py` (build/drc/lvs/pins/pex).
   cross the buses, vbp on met2 / vcp on met1 (a met2 vcp riser shorts to
   vbp), and the 0.19 um via rules.  PEX is magic's: **1022 instances, 8421
   caps, 2.57 pF**; the extracted DC gives **4.0815 mA (+0.036 %)** at
-  **vbp/vcp 1.2318/0.6271 V** (the study's 1.232/0.627 V).  Mismatch/transient
-  benches remain a bench port on the same netlist.
+  **vbp/vcp 1.2318/0.6271 V** (the study's 1.232/0.627 V).  Mismatch MC
+  (16 seeds) gives **DNL 0.196 / INL 0.122 LSB**; the 127->128 carry settles
+  to **0.062 LSB** with 220 pF on vcp + 100 pF on vbp (vcp only: 0.877 LSB).
 * **icsprout55**.  The KLayout cell
   `libs.tech/klayout/pcells/ics55_mos_analog.py` says in its own header that
   its geometry is a "DRAWN-TEMPLATE ... NOT foundry DRC rules (no DRC

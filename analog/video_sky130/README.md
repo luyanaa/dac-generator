@@ -72,3 +72,11 @@ and draws the rails:
 
 The 100 pF on vcp is a **wrapper** requirement (the benches model it with
 `--vcp-cap-pf`); it is not part of this macro.
+
+**Mismatch finding (16 seeds).**  The 5 V `g5v0d10v5` 8/0.5 cell is
+mismatch-limited: the PDK's own law gives sigma 5.51 %/cell, so the binary
+fanout transfer is nonmonotonic (DNL 2.65 LSB) and even a thermometer decode
+has INL 1.52 LSB.  DRC/LVS/PEX/DC and the carry transient are closed; the
+8-bit linearity target needs a larger-area mirror (roughly 4x for the
+thermometer INL, much more for binary) or a relaxed spec - a sizing/topology
+decision, not a layout fix.

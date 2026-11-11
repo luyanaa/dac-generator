@@ -88,14 +88,16 @@ def magic_tech(pdk: Path) -> Path:
     return pdk / "sky130A/libs.tech/magic"
 
 
+def cell_bit(j: int) -> int:
+    k = 0
+    while j >= 2 ** (k + 1) - 1:
+        k += 1
+    return k
+
+
 def cell_tags() -> list[str]:
-    tags = []
-    for j in range(N_CELLS):
-        k = 0
-        while j >= 2 ** (k + 1) - 1:
-            k += 1
-        tags.append(f"b{k}_{j - (2 ** k - 1)}")
-    return tags
+    return [f"b{cell_bit(j)}_{j - (2 ** cell_bit(j) - 1)}"
+            for j in range(N_CELLS)]
 
 
 def build() -> dict:
@@ -343,6 +345,90 @@ def lvs(pdk: Path) -> dict:
             "spice": str(spice)}
 
 
+def _tran_decks(pdk: Path):
+    lib = pdk / "sky130A/libs.tech/ngspice/sky130.lib.spice"
+    body = [ln for ln in (MAGIC_DIR / "pex.spice").read_text().splitlines()
+            if not ln.strip().startswith((".subckt", ".ends"))]
+    tags = cell_tags()
+    head = ["* sky130 carry 127 -> 128", f'.lib "{lib}" tt'] + body
+    head += ["Vdd vdd 0 3.3", "Vss vss 0 0", "Iref vcp 0 16u",
+             "Vdump idump 0 0", "Rl iout 0 37.5", "Cl iout 0 2p",
+             "Cvcp vcp 0 100p"]
+    op = list(head)
+    for j, t in enumerate(tags):
+        on = (128 >> cell_bit(j)) & 1
+        op += [f"Vd_{t} d_{t} 0 {3.3 if on else 0}",
+               f"Vdb_{t} db_{t} 0 {0 if on else 3.3}"]
+    op += [".op", ".control", "run", "print v(iout) v(vbp) v(vcp)",
+           ".endc", ".end"]
+    (BUILD / "tran_op.spice").write_text("\n".join(op) + "\n")
+    tr = list(head)
+    t0, edge, skew = 1e-9, 20e-12, 25e-12
+    for j, t in enumerate(tags):
+        k = cell_bit(j)
+        g0 = 3.3 if (127 >> k) & 1 else 0.0
+        g1 = 3.3 if (128 >> k) & 1 else 0.0
+        tt = t0 + k * skew
+        tr.append(f"Vd_{t} d_{t} 0 PWL(0 {g0} {tt} {g0} {tt + edge} {g1})")
+        tr.append(f"Vdb_{t} db_{t} 0 PWL(0 {3.3 - g0} {tt} {3.3 - g0} "
+                  f"{tt + edge} {3.3 - g1})")
+    tr += [".tran 5p 40n", ".control", "run",
+           f"wrdata {BUILD / 'tran.dat'} v(iout) v(vbp) v(vcp)",
+           ".endc", ".end"]
+    (BUILD / "tran.spice").write_text("\n".join(tr) + "\n")
+
+
+def tran(pdk: Path) -> dict:
+    """Carry 127 -> 128 on the extracted netlist with its capacitance."""
+    pex = MAGIC_DIR / "pex.spice"
+    if not pex.is_file():
+        die("no build/magic/pex.spice; run --stage pex first")
+    if pex.stat().st_mtime < GDS.stat().st_mtime:
+        die("pex.spice is older than the GDS; rerun --stage pex")
+    _tran_decks(pdk)
+    env = dict(os.environ)
+    env["PDK_ROOT"] = str(pdk)
+    env["PDK"] = "sky130A"
+    p = run(["ngspice", "-b", BUILD / "tran_op.spice"], cwd=BUILD, env=env,
+            timeout=3600)
+    (BUILD / "tran_op.log").write_text(p.stdout + p.stderr)
+    txt = p.stdout + p.stderr
+    def grab(name):
+        m = re.search(rf"v\({name}\)\s*=\s*([-+0-9.eE]+)", txt, re.I)
+        if not m:
+            die(f"tran op produced no v({name})")
+        return float(m.group(1))
+    iout0, vbp0, vcp0 = grab("iout"), grab("vbp"), grab("vcp")
+    p = run(["ngspice", "-b", BUILD / "tran.spice"], cwd=BUILD, env=env,
+            timeout=7200)
+    (BUILD / "tran.log").write_text(p.stdout + p.stderr)
+    rows = []
+    for ln in (BUILD / "tran.dat").read_text().splitlines():
+        f = ln.split()
+        if len(f) >= 6:
+            try:
+                rows.append([float(v) for v in f[:6]])
+            except ValueError:
+                pass
+    if not rows:
+        die("tran produced no samples")
+    # wrdata writes a scale column before each vector: t, iout, t, vbp,
+    # t, vcp.
+    t, iout, vbp, vcp = (rows[-1][0], rows[-1][1], rows[-1][3],
+                         rows[-1][5])
+    lsb_v = 16e-6 * 37.5
+    err_lsb = abs(iout - iout0) / lsb_v
+    ok = (abs(t - 40e-9) < 1e-9 and err_lsb <= 0.5
+          and abs(vbp - vbp0) <= 2e-3 and abs(vcp - vcp0) <= 2e-3)
+    return {"ok": ok, "t_ns": round(t * 1e9, 2),
+            "iout_mV": round(iout * 1e3, 4),
+            "iout_dc_mV": round(iout0 * 1e3, 4),
+            "settle_lsb": round(err_lsb, 3),
+            "vbp_mV_drift": round((vbp - vbp0) * 1e3, 3),
+            "vcp_mV_drift": round((vcp - vcp0) * 1e3, 3),
+            "log": str(BUILD / "tran.log")}
+
+
 def pins() -> dict:
     out = BUILD / "pinplan.json"
     p = run([KLAYOUT_BUILD, "-b", "-r", ROOT / "pinplan.py",
@@ -412,6 +498,126 @@ def pex(pdk: Path) -> dict:
     return {"ok": ok, "instances": len(x), "caps": len(caps),
             "cap_ff": round(total * 1e15, 1), "floating": len(floating),
             "spice": str(spice)}
+
+
+def _tags() -> list[str]:
+    return cell_tags()
+
+
+def _mm_deck(pdk: Path, seed: int, mismatch: bool, dat: Path) -> Path:
+    lib = pdk / "sky130A/libs.tech/ngspice/sky130.lib.spice"
+    src = (MAGIC_DIR / "lvs.spice").read_text().splitlines()
+    devs = [ln for ln in src if ln.startswith("X")]
+    out = ["* sky130 one-hot mismatch sweep",
+           f'.lib "{lib}" tt',
+           f".param mc_mm_switch={1 if mismatch else 0}", ""] + devs
+    out += ["Vdd vdd 0 3.3", "Vss vss 0 0", "Iref vcp 0 16u",
+            "Vdump idump 0 0", "Vsel sel 0 0"]
+    for j, t in enumerate(_tags()):
+        on = f"(abs(v(sel)-{j})<0.5)"
+        out += [f"Bd_{t} d_{t} 0 V = 3.3*{on}",
+                f"Bdb_{t} db_{t} 0 V = 3.3*(1-{on})"]
+    out += ["Vmi iout 0 0", ".control", f"setseed {seed}",
+            "dc Vsel 0 254 1", f"wrdata {dat} i(Vmi)", ".endc", ".end"]
+    deck = BUILD / (f"mm_seed{seed}.spice" if mismatch else "mm_base.spice")
+    deck.write_text("\n".join(out) + "\n")
+    return deck
+
+
+def _mm_cells(dat: Path) -> list[float]:
+    rows = []
+    for ln in dat.read_text().splitlines():
+        f = ln.split()
+        if len(f) >= 2:
+            try:
+                rows.append(abs(float(f[1])))
+            except ValueError:
+                pass
+    if len(rows) < 255:
+        die(f"{dat.name}: {len(rows)} points, want 255")
+    return rows[:255]
+
+
+def _transfer(cells: list[float], decode: str = "binary") -> list[float]:
+    out = []
+    for code in range(256):
+        if decode == "thermo":
+            out.append(sum(cells[:code]))
+        else:
+            out.append(sum(cells[j] for j in range(255)
+                           if (code >> cell_bit(j)) & 1))
+    return out
+
+
+def _dnl_inl(vals: list[float]) -> tuple[list[float], list[float]]:
+    i0, fs = vals[0], vals[-1] - vals[0]
+    if fs <= 0:
+        die("mismatch transfer full scale is not positive")
+    lsb = fs / 255.0
+    dnl = [(vals[c + 1] - vals[c]) / lsb - 1.0 for c in range(255)]
+    inl = [(vals[c] - i0 - c * lsb) / lsb for c in range(256)]
+    return dnl, inl
+
+
+def mm(pdk: Path, samples: int = 16, seed0: int = 0) -> dict:
+    """Static mismatch Monte Carlo on the PDK's own statistical model."""
+    lvs = MAGIC_DIR / "lvs.spice"
+    if not lvs.is_file():
+        die("no build/magic/lvs.spice; run --stage lvs first")
+    if lvs.stat().st_mtime < GDS.stat().st_mtime:
+        die("lvs.spice is older than the GDS; rerun --stage lvs")
+    env = dict(os.environ)
+    env["PDK_ROOT"] = str(pdk)
+    env["PDK"] = "sky130A"
+
+    base = _mm_deck(pdk, 0, False, BUILD / "mm_base.dat")
+    p = run(["ngspice", "-b", base], cwd=BUILD, env=env, timeout=3600)
+    (BUILD / "mm_base.log").write_text(p.stdout + p.stderr)
+    cells0 = _mm_cells(BUILD / "mm_base.dat")
+    want = 16e-6
+    base_err = max(abs(c / want - 1) for c in cells0)
+    if base_err > 0.02:
+        die(f"zero-mismatch cells deviate {base_err * 100:.2f}% from 16 uA")
+
+    spreads, dnl_max, inl_max, bad = [], [], [], []
+    dnl_b, inl_b, bad_b = [], [], []
+    for s in range(samples):
+        seed = seed0 + s
+        dat = BUILD / f"mm_seed{seed}.dat"
+        deck = _mm_deck(pdk, seed, True, dat)
+        p = run(["ngspice", "-b", deck], cwd=BUILD, env=env, timeout=3600)
+        (BUILD / f"mm_seed{seed}.log").write_text(p.stdout + p.stderr)
+        cells = _mm_cells(dat)
+        vals = _transfer(cells, "thermo")
+        dnl, inl = _dnl_inl(vals)
+        spreads.append((max(cells) - min(cells)) / (sum(cells) / len(cells)))
+        dnl_max.append(max(abs(v) for v in dnl))
+        inl_max.append(max(abs(v) for v in inl))
+        if any(vals[c + 1] < vals[c] for c in range(255)):
+            bad.append(seed)
+        vb = _transfer(cells, "binary")
+        db, ib = _dnl_inl(vb)
+        dnl_b.append(max(abs(v) for v in db))
+        inl_b.append(max(abs(v) for v in ib))
+        if any(vb[c + 1] < vb[c] for c in range(255)):
+            bad_b.append(seed)
+    mean = sum(cells0) / len(cells0)
+    import statistics
+    sigma = statistics.pstdev(_mm_cells(BUILD / "mm_seed0.dat")) / mean
+    ok = (not bad and max(dnl_max) <= 0.5 and max(inl_max) <= 1.0
+          and 0.001 < sigma < 0.05)
+    return {"ok": ok, "samples": samples,
+            "decode": "thermometer (array physical linearity)",
+            "zero_mismatch_cell_error_pct": round(base_err * 100, 3),
+            "cell_sigma_pct": round(sigma * 100, 3),
+            "spread_pct_max": round(max(spreads) * 100, 3),
+            "dnl_max_lsb": round(max(dnl_max), 4),
+            "inl_max_lsb": round(max(inl_max), 4),
+            "nonmonotonic_seeds": bad,
+            "binary_dnl_max_lsb": round(max(dnl_b), 4),
+            "binary_inl_max_lsb": round(max(inl_b), 4),
+            "binary_nonmonotonic_seeds": bad_b,
+            "log": str(BUILD / "mm_seed0.log")}
 
 
 def dc(pdk: Path) -> dict:
@@ -510,22 +716,30 @@ def selftest() -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", default="all",
-                    choices=["all", "build", "drc", "lvs", "pins", "pex", "dc"])
+                    choices=["all", "build", "drc", "lvs", "pins", "pex", "dc", "mm", "tran"])
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--samples", type=int, default=16)
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
     pdk = find_pdk()
     report = {}
-    stages = (["build", "drc", "lvs", "pins", "pex", "dc"] if a.stage == "all"
+    stages = (["build", "drc", "lvs", "pins", "pex", "dc", "mm", "tran"] if a.stage == "all"
               else [a.stage])
     rc = 0
     for st in stages:
         fn = {"build": build, "drc": drc, "lvs": lvs,
-              "pins": pins, "pex": pex, "dc": dc}[st]
+              "pins": pins, "pex": pex, "dc": dc, "mm": mm,
+              "tran": tran}[st]
         try:
-            res = build() if st == "build" else (pins() if st == "pins"
-                                                 else fn(pdk))
+            if st == "build":
+                res = build()
+            elif st == "pins":
+                res = pins()
+            elif st == "mm":
+                res = mm(pdk, a.samples)
+            else:
+                res = fn(pdk)
         except SystemExit:
             raise
         report[st] = res
