@@ -31,9 +31,19 @@ That is the first ics55 DAC result: carry inside 0.05 LSB, full scale inside
 One design note for the layout/wrapper: at 1.2 V the replica forces
 `vcp = Vdd - Vsg(mirror) - Vsg(cascode) = 19.6 mV`, i.e. the cascode gate is
 almost at ground.  It works (the cascode still has Vsd ~0.53 V) and the bias
-excursion is tiny, but generating a 20 mV bias line is awkward; a wide-swing
-cascode bias branch or a wider cascode device would move `vcp` to a more
-comfortable 0.3-0.4 V.  Resize before layout if the bias generator is shared.
+excursion is tiny, but generating a 20 mV bias line is awkward.  Sizing
+sweep at the same 16 uA/cell (`--op-only`):
+
+| mirror | cascode | vbp | vcp |
+|---|---|---|---|
+| 8/1 | 8/0.5 | 0.613 | **0.020** |
+| 32/1 | 16/0.5 | 0.726 | 0.191 |
+| 32/1 | 32/0.5 | 0.726 | 0.230 |
+| 64/1 | 32/0.5 | 0.766 | 0.274 |
+
+Wider devices buy bias headroom at area cost; a wide-swing cascode bias
+branch is the other option.  Decide before the row is wired to a shared
+bias generator.
 
 ## What the PCell gives now
 
