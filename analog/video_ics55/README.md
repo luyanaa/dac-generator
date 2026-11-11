@@ -1,12 +1,22 @@
 # ICsprout55 video DAC: state and blockers
 
-Status: **not a closable leaf on this PDK state**.  The PCell and the DRC deck
-run headlessly, but the PCell is a drawn template whose Metal1 is
-`ACT + 0.05 um`, i.e. source and drain are shorted by construction, the DRC
-deck is a partial Calibre source port, and the transistor models are
-HSPICE-only.  Per the earlier decision we still use the PDK's PCell (there is
-no other device source); what follows is exactly what that buys and what it
-does not.
+Status: **the device and model blockers are cleared; the DRC deck is the
+remaining one.**  Re-analysis on 2026-11-12 (see
+`docs/ics55_pdk_repair.md`):
+
+* models: the PDK ships `libs.tech/spice/foundry/ngspice/`, which ngspice 44
+  parses and runs deterministically (`mismod=0`); the "HSPICE-only" note was
+  stale.
+* PCell: the old Metal1 strap over the whole active did short source/drain
+  and the gate (the LVS extractor returned `M$1 $1 $2 $1`).  The cell is now
+  drawn against the Calibre rules of the same process family and extracts as
+  one device `M$1 $2 $3 $1 ... W=m*W` with `ICS55_LVS_COMPARE=PASS`
+  (`icsprout55-pdk` commit `47d237f`).
+* DRC: still a partial Calibre port (59 checks vs 516 `RULECHECK`s; FEOL
+  active has only the area rule), so a leaf cannot be signed off yet.
+
+The rest of this note is the record of what the *old* cell and deck produced;
+the commands still run, but the device geometry it describes has been fixed.
 
 ## PCell works headless
 
