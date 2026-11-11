@@ -4,9 +4,12 @@
 under the PDK's own law (sigma 5.51 %/cell): an 8-bit binary decode gives DNL
 2.65 / INL 1.36 LSB (nonmonotonic) and 8-bit thermometer INL 1.52 LSB.  The
 leaf is therefore specified as **7-bit thermometer**: 127 of the 255 drawn
-cells are used, one per code step.  The 7-bit transfer passes (DNL 0.174 /
-INL 0.831 LSB, 16 seeds); the 8-bit numbers are kept below as the record of
-why the spec changed.
+cells are used, one per code step.  The remaining 128 cells are held at
+`dout=0` / `dout_n=1`, i.e. their dump-tail pair still conducts and steers
+the tail to idump: the mirror/cascode bias and the 4.08 mA vdd current are
+unchanged, only the output current is the 127-cell full scale.  The 7-bit
+transfer passes (DNL 0.174 / INL 0.831 LSB, 16 seeds); the 8-bit numbers are
+kept below as the record of why the spec changed.
 
 The P5 cell on sky130A.  It exists because the device study showed the 1.8 V
 logic PMOS cannot stack two diodes at 16 uA inside 1.8 V (the replica's `vcp`

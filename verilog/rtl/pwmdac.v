@@ -142,8 +142,17 @@ module pwmdac #(
 	assign period_end = (shadow_cnt == frame_max);
 	assign data_ack_o = period_end;
 
-	// 1-LSB dither, saturating at full scale (the old +1 wrapped to 0).
-	wire [BW-1:0] duty_dith = (dith_i && (duty_reg != {BW{1'b1}}))
+	// Pseudo-random 1-LSB dither from a maximal-length LFSR (x^16+x^14+x^13
+	// +x^11+1); it saturates at full scale instead of wrapping to 0.
+	reg [15:0] lfsr;
+	always @(posedge clk_i or negedge rst_n_i) begin
+		if (!rst_n_i)
+			lfsr <= 16'hACE1;
+		else
+			lfsr <= {lfsr[14:0], lfsr[15] ^ lfsr[13] ^ lfsr[12] ^ lfsr[10]};
+	end
+	wire dith_bit = dith_i & lfsr[0];
+	wire [BW-1:0] duty_dith = (dith_bit && (duty_reg != {BW{1'b1}}))
 		? duty_reg + 1'b1 : duty_reg;
 
 	// the PWM core does the counter+compare
