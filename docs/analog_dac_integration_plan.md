@@ -505,14 +505,16 @@ trimming/calibration: switch Ron and resistor mismatch dominate well before
   instances/7912 C entries, 516 labelled ports.  `signoff.py --selftest`
   rejects 12 LVS, 5 pin and 1 rail mutation.
   `run-analog.sh video gf180 gds|drc|lvs|pex|pins|postlayout|mm|tran|all`
-  drives it.  Still open, and class C: the digital macro (the RTL still drives
-  255 one-hot lines, not the cell's 510 complementary pair), the wrapper and
-  its pin script, the output pad/ESD/cable driver, and placing that 100 pF
-  `vcp` cap.  The same cell is now sized for the other three PDKs at the
-  device level (`analog/video/pdk_cell.py`, see 7.5): IHP 1.8 V closes the
-  carry (+0.023 LSB), sky130 moves to the 5 V devices at 3.3 V because the
-  1.8 V PMOS cannot stack two diodes at 16 uA, and icsprout55 is blocked at
-  the models (HSPICE-only).  Their layouts are the next step.  CML/HBT
+  drives it.  Still open, and class C: the wrapper and its 510-net pin
+  script, the output pad/ESD/cable driver, and placing that 100 pF `vcp` cap.
+  The digital half is no longer one of the gaps: `dac_video_dig` now drives
+  the cell's 510 complementary lines (RESOLUTION/ENCODING parameters) and is
+  hardened on sky130 (see LIBRELANE.md).  The same cell is now sized for the
+  other three PDKs at the device level (`analog/video/pdk_cell.py`, see 7.5):
+  IHP 1.8 V closes the carry (+0.023 LSB), sky130 moves to the 5 V devices at
+  3.3 V because the 1.8 V PMOS cannot stack two diodes at 16 uA, and
+  icsprout55 is blocked at the models (HSPICE-only).  The sky130 and IHP
+  layouts are closed (7.5); the gf180 array is the remaining layout.  CML/HBT
   remains blocked: ihp130 has no installed HBT models, so there is no SiGe
   device to build from.
 
