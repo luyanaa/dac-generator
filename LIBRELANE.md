@@ -92,6 +92,11 @@ under `results/<pdk>/<macro>/gds/`:
 
 Delivered views are `gds` everywhere plus `lef/def/lib`/`spef` where the
 sign-off steps that generate them could run (see the gaps below).
+
+The analog-leaf digital halves (`dac_r2r_dig`, `dac_string_dig`,
+`dac_csteer_dig`, `dac_cdac_dig`, `dac_video_dig`) are not in this matrix:
+they are separate macros with per-leaf die areas and are run explicitly.  Only
+`dac_video_dig` has been hardened in this repo so far (sky130, below).
 Numbers per combo: `docs/characterization.md`.
 
 ### View gaps (deliberate, sign-off steps disabled)
@@ -143,6 +148,27 @@ abutment needs the DEF-template step fixed.
 The sky130 config synthesizes `RESOLUTION=7, ENCODING=1` (7-bit thermometer:
 127 of the 255 cells, the rest held off so their dump-tail pair still steers
 to idump); gf180 and ihp130 use `RESOLUTION=8, ENCODING=0`.
+
+sky130 hardening result (`./run.sh dac_video_dig sky130`, 80 steps):
+
+| metric | value |
+|---|---|
+| die | 1912.5 x 80 um (core 1901 x 57 um) |
+| instances | 28 578 (2 856 stdcells, 116 hold buffers, 39 antenna diodes) |
+| utilization | 11.5 % (the die is the analog abutment row, not a compact block) |
+| pins | 524 LEF pins: 510 outputs on met2 in analog pad order (3.68 um pitch, x 18.63..1891.75 um), 12 control + 2 power on the north edge |
+| DRC | 0 (magic + klayout), XOR 0 |
+| LVS | passed, 0 errors |
+| antenna | passed (3 repair iterations left 3 nets over the limit; 8 clears it) |
+| timing | setup +1.93 ns / hold +0.126 ns at `nom_tt`; +1.98 / +1.04 at `nom_ss`; +5.94 / +0.140 at `min_ff` |
+| power | 1.62 mW (0.96 internal + 0.66 switching) |
+| IR drop | 0.4 mV worst on vccd1 |
+
+The boundary budget is explicit in `dac_video_dig.sdc` (inputs: 2.0 ns max /
+1.0 ns min). With the generic fallback SDC every input has a 0 ns min delay
+and the ss corners reported 14 I/O hold violations even though every
+register-to-register hold path was positive; the macro SDC fixes that and
+states the contract the wrapper must honour.
 
 ## Characterization
 
