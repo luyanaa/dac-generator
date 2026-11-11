@@ -3,27 +3,25 @@
 Status: 2026-11-12. The earlier note said ics55 was blocked on three things
 (the PCell shorted source/drain, a partial DRC port, HSPICE-only models). This
 re-checks each against the *current* PDK (`/grid/icsprout55-pdk`,
-`v1.10.102-31-g3beae16`) and against the full foundry PDK of the same lineage
+`v1.10.102-31-g3beae16`, PDK commit `b756fc8`), the vendor Calibre deck that ships in it
+(`pv/DRC/`), and the full foundry PDK of the same lineage
 (`/shared/SMIC/SMIC55LL_ULP_RF/SPDK55LL_ULP_RF_09121825_OA_CDS_V1.16_2`).
 
 | blocker | verdict | evidence |
 |---|---|---|
-| HSPICE-only models | **stale — no longer a blocker** | the PDK now ships `libs.tech/spice/foundry/ngspice/`; ngspice 44 parses it and two runs give the same `id = 2.18971e-05 A` |
-| PCell shorts S/D | **confirmed, fixed and validated** | the drawn M1 covered the whole active; the LVS extractor returned `M$1 $1 $2 $1` (S=D). After the fix: one device `M$1 $2 $3 $1 ... W=3U`, `ICS55_LVS_COMPARE=PASS` |
-| partial DRC deck | **confirmed, still open** | the KLayout port emits 59 checks against 516 active Calibre `RULECHECK`s; the FEOL active module has 1 of 19 rules (area only) and lists the other 18 as unsupported |
+| HSPICE-only models | **stale — no longer a blocker** | the PDK ships `libs.tech/spice/foundry/ngspice/`; ngspice 44 parses it and two runs give the same `id = 2.18971e-05 A` |
+| PCell shorts S/D | **confirmed, fixed and validated** | the drawn M1 covered the whole active; LVS returned `M$1 $1 $2 $1` (S=D). After the fix: one device `M$1 $2 $3 $1 ... W=3U`, `ICS55_LVS_COMPARE=PASS` |
+| partial DRC deck | **confirmed; the stored crosswalk is also stale** | the vendor deck has 679 rules (499 `RULECHECK` + 180 block-style); the stored crosswalk covers 466 and misses every block-style family (all 23 CT rules); the KLayout deck emits 49 categories |
 
 ## 1. Models: use `foundry/ngspice`, not the HSPICE tree
 
-The PDK's `libs.tech/spice/README.md` already states the position, and it is
-measurable:
-
 ```
-.lib "/grid/icsprout55-pdk/libs.tech/spice/foundry/ngspice/ICsprout_55LLULP1225_V1p1_hsp.lib" tt_mos
+.lib ".../libs.tech/spice/foundry/ngspice/ICsprout_55LLULP1225_V1p1_hsp.lib" tt_mos
 X1 d g s b nm1p2_svt_lp w=1u l=0.1u
 ```
 
-gives `id = 2.18971e-05 A`, `vth = 0.399443 V` at Vgs 0.6 / Vds 1.2, and the
-same number on a repeat run. Points that matter for a leaf:
+gives `id = 2.18971e-05 A`, `vth = 0.399443 V` at Vgs 0.6 / Vds 1.2, identical
+on a repeat run. Points that matter for a leaf:
 
 * use the `ngspice/` tree: its wrapper defaults `mismod=0`, so the `agauss`
   mismatch terms are multiplied by zero and an `op` is deterministic. The
@@ -44,7 +42,7 @@ same number on a repeat run. Points that matter for a leaf:
   (`Region(act).sized(CT_M1_OV)`) - that is the source/drain short;
 * the gate M1 strap *inside* that rectangle, so the gate joined the same net;
 * two contacts per finger instead of `m+1` shared contacts: the inner pair
-  sat 0.07 um apart (rule 0.11) and 0.015 um from the gate (rule 0.05);
+  sat 0.07 um apart (rule 0.11) and 0.015 um from the gate (rule 0.055);
 * three separate gate stripes with a contact on the middle one only, so the
   outer fingers floated.
 
@@ -58,14 +56,13 @@ M$3 $1 $3 $1 VSS NM1P2_SVT_LP ...     S = D
 
 The repaired cell draws:
 
-* one shared active strip, `m+1` contacts on a 0.25 um pitch, first contact
-  `ACT_OV` from the active edge, so every contact has 0.05 to the gate and
-  0.03 active enclosure;
+* one shared active strip, `m+1` contacts on a **0.26 um** pitch
+  (`0.055 + 0.09 + 0.055`), first contact `ACT_OV` from the active edge;
 * a poly bus above the active tying all gates, with a 0.17 um pad and one
   contact (0.04 poly enclosure);
 * one M1 island per contact and two interdigitated straps (even contacts to a
-  bus below, odd to a bus above), plus a separate gate island grown upward to
-  meet the 0.042 um^2 M1 area.
+  bus below, odd to a bus above), plus a separate gate island sized for the
+  0.042 um^2 M1 area.
 
 Extraction after the fix, for 1/2/3/4 fingers:
 
@@ -80,19 +77,21 @@ and with a matching schematic (`w=3u l=0.06u`) the deck returns
 `ICS55_LVS_COMPARE=PASS`. PMOS extracts as `PM1P2_SVT_LP` with bulk `VDD`,
 and the guard-ring variant is also clean.
 
-Measured on the repaired GDS (`fingers=3`, `W=1`, `L=0.06`):
+Measured on the repaired GDS (`fingers=3`, `W=1`, `L=0.06`), against the
+vendor deck in `pv/DRC/`:
 
-| check | rule | drawn |
+| check | rule (vendor id) | drawn |
 |---|---|---|
-| CT size | 0.09 square | 0.09 x 0.09 |
-| CT space (same/diff net) | 0.11 / 0.14 | 0.16 |
-| CT to gate edge | 0.05 | 0.050 |
-| active enclosure of CT | 0.015 | 0.030 |
-| active beyond gate | 0.115 | 0.170 |
-| poly beyond active | 0.14 | 0.15 (below) / 0.33 (bus) |
-| M1 enclosure of CT | 0.025 | 0.025 (0.14 wide island) |
-| M1 area (tech LEF) | 0.042 | 0.0448 (gate), >= 0.0896 (S/D) |
-| M1 space | 0.09 | 0.11 |
+| CT size | 0.09 square (`CT_W_1`) | 0.09 x 0.09 |
+| CT space | 0.11, 0.14 for 3-neighbour arrays (`CT_S_1`/`CT_S_1a`), 0.12 diff net (`CT_S_2`) | 0.17 |
+| CT to gate edge | 0.055 for 0.9/1.2 V (`CT_S_4`) | 0.055 |
+| AA to CT on poly | 0.065 (`CT_S_3`) | 0.21 (gate contact is above the active) |
+| active enclosure of CT | 0.015 (`CT_EN_2a`) | 0.030 |
+| poly enclosure of gate CT | 0.01 / 0.04 / 0.025 all sides (`CT_EN_3a_3b_3c`) | 0.04 |
+| M1 enclosure of CT | 0 / 0.04 two sides / 0.025 all sides (`CT_EN_4a_4b_4c`) | 0.025 |
+| M1 width / space / area | 0.09 / 0.09 / 0.042 (`MET1_W_1`/`MET1_S_1`/`MET1_A_1`) | 0.14 / 0.12 / 0.0448 min |
+| active width / beyond gate | 0.08 / 0.115 (`ACT_W_1`/`ACT_EN_1`) | 0.93 / 0.175 |
+| poly width / space | 0.06 / 0.12-0.13 (`PO_W_1`/`PO_S_1`/`PO_S_3`) | 0.06 / 0.20 |
 
 Two details that cost time and belong in the deck:
 
@@ -104,45 +103,84 @@ Two details that cost time and belong in the deck:
 The demo script also had a hard-coded `/Users/yanlu/...` path, so it could not
 run on this machine; it now uses `__file__` and honours `-rd gds=<path>`.
 
-## 3. DRC: what is missing, in the order that gates the leaf
+## 3. Direct comparison: vendor deck vs crosswalk vs KLayout port
 
-The Calibre source is `DRC_ORI/SMIC_CalDRC_55LLULPGE_0912182533_V1.13_REV1_0`
-(13 153 lines, 516 active `RULECHECK`s, plus a separate 993-line `.ant`).
-The KLayout port (`libs.tech/drc/`) emits 59 `output()` checks. The FEOL
-modules are explicit about it, e.g. `02_active.drc` keeps only `ACT_A_1`
-(area) and lists `ACT_W_1..3b`, `ACT_L_1..2`, `ACT_S_1..8`, `ACT_EN_1..2a`,
-`ACT_R_1/3` as unsupported.
+The vendor reference is the Calibre deck shipped in this repo:
 
-Priority for a leaf macro (each one is a small KLayout predicate; the values
-below are from the Calibre source, with line numbers):
+* `pv/DRC/ICsprout_CalDRC_55LLULP1233_REV1_0_OS.drc` - 9723 lines,
+  `#! tvf`, frozen profile `total_metal=6`, `top_metal=1`;
+* `pv/DRC/ICsprout_CalDRC_55LLULP1233_REV1_0_OS.ant` - 1095 lines, the
+  antenna deck (the KLayout port has no antenna module).
 
-| family | rules to port | source |
-|---|---|---|
-| ACT | width 0.08, space 0.10/0.11, enclosure of CT 0.015 | 2805, 2821/2827, 4911 |
-| GT | width, space 0.12/0.13, AA extension 0.115, poly extension 0.14 | 3795/3817, 3914, 3920 |
-| CT | size 0.09, space 0.11 (0.14 diff net), gate spacing 0.05, poly enclosure 0.04 | 4822, 4832/4855, 4900, 4944 |
-| M1 | width/space 0.09, enclosure of CT 0.025; area 0.042 is a tech-LEF constraint, not a Calibre rule | 5058/5063, 4961, LEF |
-| V1-V4 | width, space, enclosure upper/lower | via modules |
-| metals M2-M5/T4 | width/space/area | metal modules |
-| antenna | the whole `.ant` module | `.ant` |
+It uses **two rule syntaxes**, and that is where the stored comparison breaks:
 
-Until that is done the port cannot catch a pcell violation: the old cell
-passed it with **0 items** while shorting G/S/D. That is the argument for
-porting the FEOL/BEOL width/space families *before* any further analog work
-on this PDK.
+```
+RULECHECK MET1_A_1 { ... }     499 rules
+CT_S_4 { ... }                 180 rules, block style
+```
 
-## 4. What to take from the SMIC reference
+All 23 CT rules, 17 PP, 15 NP, 15 TG, 14 DG, 14 ULLD, 14 SAB, the PVT/NVT
+implant families and the RV/RDL rules are block style. The stored crosswalk
+`tests/regression/official/drc_rule_comparison.json` only knows
+`RULECHECK`, so those families are absent from it entirely.
 
-`/shared/SMIC/SMIC55LL_ULP_RF/.../smic55ll_ulp_rf_09121825_oa_cds_v1.16_2`
-is the same process family with the full foundry collateral:
+`tests/regression/official/compare_current.py` recomputes the comparison:
 
-* `DRC_ORI/...drc` + `.ant` - the rule source for section 3;
-* `techfile.tf` - layer *functions* and `currentDensity` (M1 1.6, CT 0.3
-  mA/um^2), `routingDirections`; geometric limits are in the Calibre deck
-  (note the 0.042 um^2 figure is the GT island area rule, not M1);
-* `smic55llrf/<device>/layout/thumbnail_128x128.png` - a cheap sanity check
-  of the intended topology (the n12ll thumbnail shows two separate M1
-  islands either side of the gate, i.e. no S/D strap over the channel);
+```
+vendor deck      : ICsprout_CalDRC_55LLULP1233_REV1_0_OS.drc
+  RULECHECK      : 499
+  block style    : 180  (CT 23, PP 17, NP 15, TG 15, ULLD 14, DG 14)
+  unique rules   : 679
+KLayout deck     : 49 emitted categories
+crosswalk        : 466 ids, 90 covered, 376 missing
+  covered and still emitted : 30
+  covered but category gone : 60
+  vendor ids not in crosswalk: 218
+
+family view (vendor rules / crosswalk covered / still emitted):
+  SRCK        46 /  0 /  0
+  PO          45 / 40 / 22
+  ACT         31 / 26 /  2
+  CT          23 /  0 /  0
+  ...
+```
+
+So the direct comparison says three separate things:
+
+1. **The crosswalk is stale.** 60 of its 90 "covered" rows point at KLayout
+   categories that the current deck no longer emits (e.g. `active.act.width`
+   and `active.act.space` were removed; the FEOL active module now keeps only
+   the area check and lists `ACT_W_1`/`ACT_S_1` as unsupported).
+2. **The crosswalk is structurally blind to block-style rules.** Every CT
+   rule is missing from it, and CT is the family that gates the device
+   geometry. This is why the old pcell passed the port with **0 items** while
+   shorting G/S/D and violating CT space by 40 nm.
+3. **The KLayout deck is still a partial port**: 49 emitted categories for
+   679 vendor rules, with the FEOL/BEOL width/space/enclosure families
+   omitted by design.
+
+The comparison is source-level only: no Calibre run/report exists on this
+machine, so `differential_status` stays `BLOCKED`. Regenerate the inventory
+with `python3 tests/regression/official/compare_current.py` after any deck
+change; do not use the stored JSON as a gate until it is regenerated with a
+parser that reads both syntaxes.
+
+## 4. What the SMIC reference adds
+
+`/shared/SMIC/SMIC55LL_ULP_RF/...` is the same process family with the full
+foundry collateral:
+
+* `DRC_ORI/...drc` (13 153 lines, 517 `RULECHECK` + 513 block-style = 1030
+  rules) and `.ant` - a superset of the repo deck, useful for rules the OS
+  release omits, but **the two decks do not always agree**: e.g. M1 area is
+  0.042 in the OS deck and 0.027 in the SMIC deck; gate-to-contact is 0.055
+  (OS, `CT_S_4`) vs 0.05 (SMIC, `CT_4a`). The PDK's own `pv/DRC` deck is the
+  arbiter for this PDK; use SMIC to cross-check, not to override.
+* `techfile.tf` - layer functions, `currentDensity` (M1 1.6, CT 0.3 mA/um^2),
+  `routingDirections`; geometric limits are in the Calibre decks.
+* `smic55llrf/<device>/layout/thumbnail_128x128.png` - a cheap topology check
+  (the n12ll thumbnail shows two separate M1 islands either side of the gate,
+  i.e. no strap over the channel).
 * `models/hspice` and `models/spectre` - cross-checks for the vendor model
   set the open PDK already ships; the open PDK's `foundry/ngspice` is the
   runnable one here.
@@ -152,11 +190,13 @@ source; the Calibre rules plus the thumbnails are.
 
 ## 5. Remaining work
 
-1. Port the FEOL families (ACT/GT/CT) and M1/V1 from the Calibre deck; gate
-   the pcell on them. This is the item that unblocks analog layout.
-2. Re-run the pcell matrix (n/p, 1..8 fingers, ring on/off) through the new
-   rules; add it to `tests/regression`.
-3. `ics55_res_poly` / `ics55_mom` still need the same rule-based review
-   (the resistor draws its own M1 heads, the MOM has no DRC beyond area).
-4. Only then re-attempt the video leaf: the cell needs a 4-terminal MOS with
-   correct S/D straps, which is exactly what this repair provides.
+1. Regenerate the crosswalk with a parser that reads both `RULECHECK` and
+   block-style rules, then diff the 679 vendor rules against the 49 emitted
+   categories to get a truthful gap list.
+2. Port the FEOL families (ACT/PO/CT) and M1/V1 first - they gate the pcell;
+   then the metal width/space families and the antenna module.
+3. Re-run the pcell matrix (n/p, 1..8 fingers, ring on/off) through the new
+   rules and add it to `tests/regression`.
+4. `ics55_res_poly` / `ics55_mom` still need the same rule-based review.
+5. Only then re-attempt the video leaf: the cell needs a 4-terminal MOS with
+   correct S/D straps, which is what this repair provides.
