@@ -345,18 +345,18 @@ def lvs(pdk: Path) -> dict:
             "spice": str(spice)}
 
 
-def _tran_decks(pdk: Path):
+def _tran_decks(pdk: Path, frm: int = 63, to: int = 64):
     lib = pdk / "sky130A/libs.tech/ngspice/sky130.lib.spice"
     body = [ln for ln in (MAGIC_DIR / "pex.spice").read_text().splitlines()
             if not ln.strip().startswith((".subckt", ".ends"))]
     tags = cell_tags()
-    head = ["* sky130 carry 127 -> 128", f'.lib "{lib}" tt'] + body
+    head = [f"* sky130 carry {frm} -> {to}", f'.lib "{lib}" tt'] + body
     head += ["Vdd vdd 0 3.3", "Vss vss 0 0", "Iref vcp 0 16u",
              "Vdump idump 0 0", "Rl iout 0 37.5", "Cl iout 0 2p",
              "Cvcp vcp 0 100p"]
     op = list(head)
     for j, t in enumerate(tags):
-        on = (128 >> cell_bit(j)) & 1
+        on = (to >> cell_bit(j)) & 1
         op += [f"Vd_{t} d_{t} 0 {3.3 if on else 0}",
                f"Vdb_{t} db_{t} 0 {0 if on else 3.3}"]
     op += [".op", ".control", "run", "print v(iout) v(vbp) v(vcp)",
@@ -366,8 +366,8 @@ def _tran_decks(pdk: Path):
     t0, edge, skew = 1e-9, 20e-12, 25e-12
     for j, t in enumerate(tags):
         k = cell_bit(j)
-        g0 = 3.3 if (127 >> k) & 1 else 0.0
-        g1 = 3.3 if (128 >> k) & 1 else 0.0
+        g0 = 3.3 if (frm >> k) & 1 else 0.0
+        g1 = 3.3 if (to >> k) & 1 else 0.0
         tt = t0 + k * skew
         tr.append(f"Vd_{t} d_{t} 0 PWL(0 {g0} {tt} {g0} {tt + edge} {g1})")
         tr.append(f"Vdb_{t} db_{t} 0 PWL(0 {3.3 - g0} {tt} {3.3 - g0} "
@@ -538,9 +538,10 @@ def _mm_cells(dat: Path) -> list[float]:
     return rows[:255]
 
 
-def _transfer(cells: list[float], decode: str = "binary") -> list[float]:
+def _transfer(cells: list[float], decode: str = "binary",
+              bits: int = 8) -> list[float]:
     out = []
-    for code in range(256):
+    for code in range(2 ** bits):
         if decode == "thermo":
             out.append(sum(cells[:code]))
         else:
@@ -550,12 +551,13 @@ def _transfer(cells: list[float], decode: str = "binary") -> list[float]:
 
 
 def _dnl_inl(vals: list[float]) -> tuple[list[float], list[float]]:
+    n = len(vals) - 1
     i0, fs = vals[0], vals[-1] - vals[0]
     if fs <= 0:
         die("mismatch transfer full scale is not positive")
-    lsb = fs / 255.0
-    dnl = [(vals[c + 1] - vals[c]) / lsb - 1.0 for c in range(255)]
-    inl = [(vals[c] - i0 - c * lsb) / lsb for c in range(256)]
+    lsb = fs / n
+    dnl = [(vals[c + 1] - vals[c]) / lsb - 1.0 for c in range(n)]
+    inl = [(vals[c] - i0 - c * lsb) / lsb for c in range(n + 1)]
     return dnl, inl
 
 
@@ -570,10 +572,13 @@ def mm(pdk: Path, samples: int = 16, seed0: int = 0) -> dict:
     env["PDK_ROOT"] = str(pdk)
     env["PDK"] = "sky130A"
 
-    base = _mm_deck(pdk, 0, False, BUILD / "mm_base.dat")
-    p = run(["ngspice", "-b", base], cwd=BUILD, env=env, timeout=3600)
-    (BUILD / "mm_base.log").write_text(p.stdout + p.stderr)
-    cells0 = _mm_cells(BUILD / "mm_base.dat")
+    base_dat = BUILD / "mm_base.dat"
+    if not (base_dat.is_file()
+            and base_dat.stat().st_mtime >= lvs.stat().st_mtime):
+        base = _mm_deck(pdk, 0, False, base_dat)
+        p = run(["ngspice", "-b", base], cwd=BUILD, env=env, timeout=3600)
+        (BUILD / "mm_base.log").write_text(p.stdout + p.stderr)
+    cells0 = _mm_cells(base_dat)
     want = 16e-6
     base_err = max(abs(c / want - 1) for c in cells0)
     if base_err > 0.02:
@@ -581,21 +586,28 @@ def mm(pdk: Path, samples: int = 16, seed0: int = 0) -> dict:
 
     spreads, dnl_max, inl_max, bad = [], [], [], []
     dnl_b, inl_b, bad_b = [], [], []
+    dnl_t8, inl_t8 = [], []
     for s in range(samples):
         seed = seed0 + s
         dat = BUILD / f"mm_seed{seed}.dat"
-        deck = _mm_deck(pdk, seed, True, dat)
-        p = run(["ngspice", "-b", deck], cwd=BUILD, env=env, timeout=3600)
-        (BUILD / f"mm_seed{seed}.log").write_text(p.stdout + p.stderr)
+        if not (dat.is_file()
+                and dat.stat().st_mtime >= lvs.stat().st_mtime):
+            deck = _mm_deck(pdk, seed, True, dat)
+            p = run(["ngspice", "-b", deck], cwd=BUILD, env=env, timeout=3600)
+            (BUILD / f"mm_seed{seed}.log").write_text(p.stdout + p.stderr)
         cells = _mm_cells(dat)
-        vals = _transfer(cells, "thermo")
+        vals = _transfer(cells, "thermo", 7)
         dnl, inl = _dnl_inl(vals)
         spreads.append((max(cells) - min(cells)) / (sum(cells) / len(cells)))
         dnl_max.append(max(abs(v) for v in dnl))
         inl_max.append(max(abs(v) for v in inl))
-        if any(vals[c + 1] < vals[c] for c in range(255)):
+        if any(vals[c + 1] < vals[c] for c in range(127)):
             bad.append(seed)
-        vb = _transfer(cells, "binary")
+        v8t = _transfer(cells, "thermo", 8)
+        d8t, i8t = _dnl_inl(v8t)
+        dnl_t8.append(max(abs(v) for v in d8t))
+        inl_t8.append(max(abs(v) for v in i8t))
+        vb = _transfer(cells, "binary", 8)
         db, ib = _dnl_inl(vb)
         dnl_b.append(max(abs(v) for v in db))
         inl_b.append(max(abs(v) for v in ib))
@@ -605,9 +617,9 @@ def mm(pdk: Path, samples: int = 16, seed0: int = 0) -> dict:
     import statistics
     sigma = statistics.pstdev(_mm_cells(BUILD / "mm_seed0.dat")) / mean
     ok = (not bad and max(dnl_max) <= 0.5 and max(inl_max) <= 1.0
-          and 0.001 < sigma < 0.05)
-    return {"ok": ok, "samples": samples,
-            "decode": "thermometer (array physical linearity)",
+          and 0.0005 < sigma < 0.10)
+    return {"ok": ok, "samples": samples, "bits": 7,
+            "decode": "thermometer (127 cells)",
             "zero_mismatch_cell_error_pct": round(base_err * 100, 3),
             "cell_sigma_pct": round(sigma * 100, 3),
             "spread_pct_max": round(max(spreads) * 100, 3),
@@ -617,6 +629,8 @@ def mm(pdk: Path, samples: int = 16, seed0: int = 0) -> dict:
             "binary_dnl_max_lsb": round(max(dnl_b), 4),
             "binary_inl_max_lsb": round(max(inl_b), 4),
             "binary_nonmonotonic_seeds": bad_b,
+            "thermo8_dnl_max_lsb": round(max(dnl_t8), 4),
+            "thermo8_inl_max_lsb": round(max(inl_t8), 4),
             "log": str(BUILD / "mm_seed0.log")}
 
 

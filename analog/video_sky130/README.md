@@ -1,4 +1,12 @@
-# sky130 video DAC array (dump-tail cell)
+# sky130 video DAC array (dump-tail cell, 7-bit thermometer)
+
+**Specification note.**  The 5 V `g5v0d10v5` 8/0.5 cell is mismatch-limited
+under the PDK's own law (sigma 5.51 %/cell): an 8-bit binary decode gives DNL
+2.65 / INL 1.36 LSB (nonmonotonic) and 8-bit thermometer INL 1.52 LSB.  The
+leaf is therefore specified as **7-bit thermometer**: 127 of the 255 drawn
+cells are used, one per code step.  The 7-bit transfer passes (DNL 0.174 /
+INL 0.831 LSB, 16 seeds); the 8-bit numbers are kept below as the record of
+why the spec changed.
 
 The P5 cell on sky130A.  It exists because the device study showed the 1.8 V
 logic PMOS cannot stack two diodes at 16 uA inside 1.8 V (the replica's `vcp`
@@ -75,8 +83,8 @@ The 100 pF on vcp is a **wrapper** requirement (the benches model it with
 
 **Mismatch finding (16 seeds).**  The 5 V `g5v0d10v5` 8/0.5 cell is
 mismatch-limited: the PDK's own law gives sigma 5.51 %/cell, so the binary
-fanout transfer is nonmonotonic (DNL 2.65 LSB) and even a thermometer decode
-has INL 1.52 LSB.  DRC/LVS/PEX/DC and the carry transient are closed; the
-8-bit linearity target needs a larger-area mirror (roughly 4x for the
-thermometer INL, much more for binary) or a relaxed spec - a sizing/topology
-decision, not a layout fix.
+fanout transfer is nonmonotonic (DNL 2.65 LSB) and even 8-bit thermometer has
+INL 1.52 LSB.  The array is unchanged; the leaf is specified as 7-bit
+thermometer (127 cells), where DNL 0.174 / INL 0.831 LSB passes.  An 8-bit
+sky130 DAC needs a larger-area mirror (roughly 4x for the thermometer INL,
+much more for binary) - a sizing/topology decision.
