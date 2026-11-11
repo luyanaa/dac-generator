@@ -188,9 +188,12 @@ def main():
                     (-10.0, "iout"), (-10.6, "idump")):
         r.text(L_M2, name, bus_x0 + 1.5, y)
 
-    r.top.flatten(-1, True)
+    if not os.environ.get("KEEP_HIER"):
+        r.top.flatten(-1, True)
     out = os.environ.get("OUT", os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "build", "video_ics55.gds"))
+        os.path.dirname(os.path.abspath(__file__)), "build",
+        "video_ics55_hier.gds" if os.environ.get("KEEP_HIER")
+        else "video_ics55.gds"))
     r.ly.write(out)
     print(f"wrote {out}: {N} cells + replica, {2*N} pads, "
           f"row {N*PITCH:.1f} x {PAD_Y[0]:.1f} um")

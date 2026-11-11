@@ -113,12 +113,19 @@ then sees no MOS at all.
 
 ## Next step
 
-1. Carry on the extracted netlist: the PDK has no KLayout RCX ruleset, but
-   its magic tech *does* extract area/perimeter capacitance with
-   `ext2spice cthresh 0`, so `pex_carry.py` runs the P5 carry on the Magic
-   PEX of the row (wells tied to vdd, 16 uA on vcp).  The KLayout
-   `row_ext.cir` carries the devices only; its W/L match the schematic
-   exactly (`check_netlist.py`).
+1. Carry on the extracted netlist: `extracted_carry.py` runs it on the
+   KLayout LVS extraction (`row_ext.cir`, converted M->X for the subcircuit
+   models):
+
+   ```
+   127 -> 128:   127.951 LSB (err   -0.049)
+     0 -> 255:   254.561 LSB (err   -0.439)
+   ```
+
+   i.e. the layout's devices reproduce the schematic study.  The Magic PEX
+   of the full row does not finish in a practical time (flat: >60 min;
+   hierarchical with `drc off`: >40 min), so the *parasitic* carry is still
+   open; `pex_carry.py` is the runner for it once the extraction is solved.
 2. PDK-side: the DRC deck still needs the FEOL/BEOL width/space families
    (see `docs/ics55_pdk_repair.md`); the hand checks cover the device rules
    in the meantime.
