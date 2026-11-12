@@ -246,7 +246,7 @@ def unit_factors_pair(cfg: dict, sigma: float, seed: int, n_units: int):
     Returns (factors_p, factors_n), each a list of multiplicative gains.
     """
     mm = cfg.get("mismatch_model", {}) or {}
-    rho = float(mm.get("correlation_pn", 0.0))
+    rho = min(1.0, max(0.0, float(mm.get("correlation_pn", 0.0))))
     corr_len = float(mm.get("corr_len", 0.0))
     grad = float(mm.get("gradient", 0.0))
     if sigma <= 0.0 and grad == 0.0:

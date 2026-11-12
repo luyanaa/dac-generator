@@ -192,11 +192,13 @@ def main(argv=None) -> int:
     ap.add_argument("--brief", action="store_true")
     ap.add_argument("--ramps", action="store_true",
                     help="validate Q(vg,vb) with device charge ramps")
+    ap.add_argument("--config", default=None,
+                    help="cdac.yaml override (used to exercise the gate)")
     ap.add_argument("--corner", default=None,
                     help="corner name for the acceptance limit (default: "
                          "the PDK corner in cdac.yaml, else tt)")
     a = ap.parse_args(argv)
-    cfg = g.load_cfg()
+    cfg = g.load_cfg(a.config)
     corner = a.corner or str(
         cfg.get("pdk", {}).get("sky130", {}).get("corner", "tt"))
     mc = cfg.get("model_check", {}) or {}
