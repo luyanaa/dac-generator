@@ -29,7 +29,11 @@
 //   stb   : launch request, one cycle, ignored while !ready
 //   code  : asynchronous input bus, only sampled on an accepted stb
 //   dout  : registered analog switch bus, stable between launches
-//   dout_n: complementary switch bus (same register, inverted)
+//   dout_n: complementary switch bus, registered in the same always block
+//           as dout so both pins have the same clock-to-Q (an inverted wire
+//           after the flop would add one gate delay and skew the steering
+//           pair; the physical dead time still needs the gate-level/analog
+//           co-simulation, this only removes the RTL-level asymmetry)
 //   valid : one-cycle pulse on an accepted launch
 //   ready : high when the last code has had its settle window
 `timescale 1ns / 1ps
@@ -45,7 +49,7 @@ module dac_video_dig #(
     input  wire                    stb,
     input  wire [RESOLUTION-1:0]   code,
     output reg  [254:0]            dout,
-    output wire [254:0]            dout_n,
+    output reg  [254:0]            dout_n,
     output reg                     valid,
     output reg                     ready
 );
@@ -83,19 +87,19 @@ module dac_video_dig #(
         end
     endgenerate
 
-    assign dout_n = ~dout;
-
     always @(posedge clk) begin
         if (!rst_n) begin
-            dout  <= {255{1'b0}};
+            dout   <= {255{1'b0}};
+            dout_n <= {255{1'b1}};
             valid <= 1'b0;
             ready <= 1'b1;
             timer <= {CW{1'b0}};
         end else begin
             valid <= 1'b0;
             if (launch) begin
-                dout  <= dout_dec;
-                valid <= 1'b1;
+                dout   <= dout_dec;
+                dout_n <= ~dout_dec;
+                valid  <= 1'b1;
                 timer <= {CW{1'b0}};
                 ready <= (SETTLE_CYCLES == 0);
             end else if (!ready) begin

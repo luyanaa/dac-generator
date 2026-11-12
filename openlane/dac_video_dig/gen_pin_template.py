@@ -72,11 +72,16 @@ def main(argv=None) -> int:
     for k in range(N_CELLS):
         for suffix, net, x in (("", f"dout[{k}]", k * PITCH + PIN_A),
                                ("_n", f"dout_n[{k}]", k * PITCH + PIN_B)):
+            # DEF pin geometry is *relative* to the placement point: a
+            # rectangle that also carried the absolute x would be shifted
+            # twice by odb (it applies PLACED to the box).  Keep the box
+            # centred on the origin and put the absolute position in PLACED.
             pins.append(
                 f"    - {net} + NET {net} + DIRECTION OUTPUT + USE SIGNAL\n"
-                f"      + LAYER {layer} ( {u(x - PAD_W / 2)} 0 ) "
-                f"( {u(x + PAD_W / 2)} {u(PAD_W)} )\n"
-                f"      + PLACED ( {u(x)} 0 ) N ;")
+                f"      + PORT\n"
+                f"        + LAYER {layer} ( {u(-PAD_W / 2)} 0 ) "
+                f"( {u(PAD_W / 2)} {u(PAD_W)} )\n"
+                f"        + PLACED ( {u(x)} 0 ) N ;")
     # control pins on the north edge, evenly spaced
     ctrl = [("clk", "INPUT"), ("rst_n", "INPUT"), ("stb", "INPUT"),
             ("valid", "OUTPUT"), ("ready", "OUTPUT")]
@@ -87,9 +92,10 @@ def main(argv=None) -> int:
         y = a.die_h - PAD_W
         pins.append(
             f"    - {net} + NET {net} + DIRECTION {direction} + USE SIGNAL\n"
-            f"      + LAYER {layer} ( {u(-PAD_W / 2)} {u(-PAD_W / 2)} ) "
+            f"      + PORT\n"
+            f"        + LAYER {layer} ( {u(-PAD_W / 2)} {u(-PAD_W / 2)} ) "
             f"( {u(PAD_W / 2)} {u(PAD_W / 2)} )\n"
-            f"      + PLACED ( {u(x)} {u(a.die_h)} ) N ;")
+            f"        + PLACED ( {u(x)} {u(a.die_h)} ) N ;")
     lines.append(f"PINS {len(pins)} ;")
     lines += pins
     lines.append("END PINS")
