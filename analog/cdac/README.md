@@ -74,11 +74,11 @@ must be exactly linear, and it is (0.000 LSB).
 | backend | C_unit | DNL (LSB) | INL (LSB) | fs_max |
 |---|---|---|---|---|
 | const (control, no mismatch) | 2.673 fF | 0.000 | 0.000 | 48 MS/s |
-| MIM, A_C 0.3 %*um | 8.0 fF | -0.043 .. +0.057 | 0.037 | 17 MS/s |
-| moscap, A_C 0.234 %*um | 2.673 fF | -0.185 .. +0.244 | **+/-5.86** | 48 MS/s |
+| MIM, A_C 0.3 %*um | 8.0 fF | -0.022 .. +0.027 | 0.021 | 17 MS/s |
+| moscap, A_C 0.234 %*um | 2.673 fF | -0.154 .. +0.263 | **+/-6.00** | 48 MS/s |
 
 **The 8-bit limit is the moscap's bias dependence, not mismatch.** Mismatch
-alone is 0.04-0.06 LSB; the 2-D charge curve is worth 5.86 LSB of bow
+alone is 0.02-0.03 LSB; the 2-D charge curve is worth 6.00 LSB of bow
 (+5.21 at code 32, +5.60 at 64, +3.32 at 96, 0 at both ends), and it is a
 deterministic function of the code, so averaging does not remove it. DNL
 stays monotonic but exceeds the 0.5 LSB target at the major carries.
@@ -92,7 +92,9 @@ model.
 
 The MIM row is a **flat-cap design that passes**, but its 8 fF/unit is the
 reference profile's assumption (2 fF/um^2, A_C 0.3 %*um), not a sky130
-measurement, and it costs 3x the sampling capacitance. The honest conclusion
+measurement, and it costs 3x the sampling capacitance.  It is a control, not
+a signoff of a physical sky130 MIM CDAC: no MIM C(V) curve, measured MIM
+mismatch or PEX is in this bench yet. The honest conclusion
 for an 8-bit full-scale moscap CDAC is: either build it from a flat cap, or
 restrict the array's voltage excursion / add capacitor calibration. The
 regression gates the flat-cap design and records the moscap result as a study
@@ -123,16 +125,30 @@ compares the final top-plate voltage with the model at the same code:
 ```
 
 * `--ramps`: every 1-D charge integral matches the device ramp to
-  **0.006 fC** and the two integration paths agree to **0.0008 fC**, i.e. the
+  **0.0022 fC** and the two integration paths agree to **0.0008 fC**, i.e. the
   device charge is a state function and the 2-D tables reproduce it.
-* 4-bit array: worst |model - device| = **1.7 mV = 0.015 LSB** over codes
-  0/1/8/15 (the 1-D model was 4.2 LSB off, which is why it was replaced).
-* 8-bit array (255 units + dummy): worst |model - device| = **1.41 mV =
-  0.20 LSB** over codes 0/1/64/128/192/255 (nominal 7.03 mV LSB).  The
-  residual is a smooth function of code (+0.19 at 0, -0.16 at 255), i.e. the
-  table's 0.1 V grid and the bilinear interpolation, not a model-form error.
+* 4-bit array: worst |model - device| = **0.84 mV = 0.0075 LSB** over codes
+  0/1/7/8/15 (the 1-D model was 4.2 LSB off, which is why it was replaced).
+* 8-bit array (255 units + dummy): worst |model - device| = **0.64 mV =
+  0.0905 LSB** over codes 0/1/64/128/192/255 (nominal 7.03 mV LSB).  The
+  0.05 V table (37x37) roughly halved the residual from the old 0.1 V table
+  (0.20 LSB), so what remains is interpolation, not a model-form error.
 
-The remaining mismatch is the table's 0.1 V grid, not a model-form error.
+`xcheck_mos.py` is now a gate, not a report: it returns non-zero when the
+worst error exceeds `model_check.max_error_lsb` (0.02 LSB at 4 bit, 0.10 LSB
+at 8 bit), when the ramp/path errors exceed 0.05 fC, or when the requested
+corner does not match `model_check.table_corner`.  The Cgg/Cgb tables are
+measured at tt; an ss/ff claim must re-run `measure_c2.py --corner` first.
+
+The differential mismatch is no longer fully correlated between the two
+sides.  `unit_factors_pair()` draws independent P/N fields and
+`mismatch_model` in `cdac.yaml` can set `correlation_pn`, an AR(1)
+`corr_len` and a deterministic `gradient`; the 10-seed numbers above are
+with independent sides.  (The old shared-factor run was optimistic: it made
+every P/N unit pair identical.)  The Newton solve now checks the charge
+residual (1 aC) and raises on non-convergence, and the conversion
+capacitance is the 2-D `Cgg(Vtop,Vbot)` sum, not the 1-D `C(Vtop-Vbot)`
+curve.
 
 ## Digital half
 

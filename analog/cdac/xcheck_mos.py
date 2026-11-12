@@ -174,10 +174,15 @@ def ramps(cfg: dict) -> int:
               f"delta {d:+.4f} fC")
     a = got[(0.0, 0.0, "b")] + got[(0.0, 1.8, "g")]
     b = got[(0.0, 0.0, "g")] + got[(1.8, 0.0, "b")]
+    mc = cfg.get("model_check", {}) or {}
+    ramp_lim = float(mc.get("max_ramp_fc", 0.05))
+    path_lim = float(mc.get("max_path_fc", 0.05))
+    ok = worst <= ramp_lim and abs(a - b) <= path_lim
     print(f"-- path independence: vb->vg {a:+.4f}  vg->vb {b:+.4f}  "
-          f"difference {a - b:+.4f} fC")
-    print(f"worst |model - device| = {worst:.4f} fC")
-    return 0 if worst < 0.05 and abs(a - b) < 0.05 else 1
+          f"difference {a - b:+.4f} fC (limit {path_lim:.3f})")
+    print(f"worst |model - device| = {worst:.4f} fC (limit {ramp_lim:.3f})")
+    print(f"ramp check: {'PASS' if ok else 'FAIL'}")
+    return 0 if ok else 1
 
 
 def main(argv=None) -> int:
@@ -187,8 +192,27 @@ def main(argv=None) -> int:
     ap.add_argument("--brief", action="store_true")
     ap.add_argument("--ramps", action="store_true",
                     help="validate Q(vg,vb) with device charge ramps")
+    ap.add_argument("--corner", default=None,
+                    help="corner name for the acceptance limit (default: "
+                         "the PDK corner in cdac.yaml, else tt)")
     a = ap.parse_args(argv)
     cfg = g.load_cfg()
+    corner = a.corner or str(
+        cfg.get("pdk", {}).get("sky130", {}).get("corner", "tt"))
+    mc = cfg.get("model_check", {}) or {}
+    limits = mc.get("max_error_lsb", {}) or {}
+    per_corner = (mc.get("corner_max_error_lsb", {}) or {}).get(corner, {})
+    table_corner = str(mc.get("table_corner", corner))
+    if corner != table_corner:
+        print(f"error: Cgg/Cgb tables are measured at {table_corner}, not "
+              f"{corner}; re-run measure_c2.py at {corner} before using its "
+              f"limit", file=sys.stderr)
+        return 2
+    lim = per_corner.get(a.bits, limits.get(a.bits))
+    if lim is None:
+        print(f"error: no model_check.max_error_lsb entry for {a.bits} bits",
+              file=sys.stderr)
+        return 2
     if a.ramps:
         return ramps(cfg)
     cap = g.CapModel(cfg, "moscap")
@@ -223,8 +247,12 @@ def main(argv=None) -> int:
             print(f"   MOS   : {vsp:.6f} V")
             print(f"   model : {vmod:.6f} V")
             print(f"   delta : {d:+.3f} mV = {d/1e3/lsb:+.4f} LSB")
-    print(f"worst |delta| = {worst:.3f} mV = {worst/1e3/lsb:.4f} LSB")
-    return 0
+    worst_lsb = worst / 1e3 / lsb
+    ok = worst_lsb <= float(lim)
+    print(f"worst |delta| = {worst:.3f} mV = {worst_lsb:.4f} LSB "
+          f"({a.bits} bit, corner {corner}, limit {float(lim):.3f} LSB)")
+    print(f"model check: {'PASS' if ok else 'FAIL'}")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

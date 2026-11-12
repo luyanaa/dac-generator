@@ -205,13 +205,70 @@ class CapModel:
         return ac / 100.0 / math.sqrt(area)
 
 
+def _ar1(rnd: random.Random, n: int, corr_len: float) -> list[float]:
+    """Unit-variance AR(1) field with correlation length `corr_len` units.
+
+    corr_len <= 0 gives independent samples.  The field is normalised to unit
+    variance so `sigma` keeps its Pelgrom meaning regardless of correlation.
+    """
+    if corr_len <= 0.0:
+        return [rnd.gauss(0.0, 1.0) for _ in range(n)]
+    phi = math.exp(-1.0 / corr_len)
+    out = []
+    prev = rnd.gauss(0.0, 1.0)
+    for _ in range(n):
+        prev = phi * prev + math.sqrt(max(0.0, 1.0 - phi * phi)) * \
+            rnd.gauss(0.0, 1.0)
+        out.append(prev)
+    var = sum(v * v for v in out) / max(1, n)
+    if var > 0.0:
+        out = [v / math.sqrt(var) for v in out]
+    return out
+
+
+def _gradient(n: int, amplitude: float) -> list[float]:
+    """Deterministic linear gradient across the array (relative units)."""
+    if amplitude == 0.0 or n <= 1:
+        return [0.0] * n
+    return [amplitude * (i / (n - 1) - 0.5) for i in range(n)]
+
+
+def unit_factors_pair(cfg: dict, sigma: float, seed: int, n_units: int):
+    """Per-unit gain errors for the P and N arrays.
+
+    The two physical arrays are separate capacitors: by default their
+    mismatch is independent.  `mismatch_model` in cdac.yaml can set
+
+      correlation_pn : 0..1, shared fraction between the two sides
+      corr_len       : AR(1) correlation length in unit indices (0 = white)
+      gradient       : deterministic linear gradient, relative
+
+    Returns (factors_p, factors_n), each a list of multiplicative gains.
+    """
+    mm = cfg.get("mismatch_model", {}) or {}
+    rho = float(mm.get("correlation_pn", 0.0))
+    corr_len = float(mm.get("corr_len", 0.0))
+    grad = float(mm.get("gradient", 0.0))
+    if sigma <= 0.0 and grad == 0.0:
+        return [1.0] * n_units, [1.0] * n_units
+    rnd = random.Random(seed)
+    common = _ar1(rnd, n_units, corr_len)
+    ip = _ar1(rnd, n_units, corr_len)
+    inn = _ar1(rnd, n_units, corr_len)
+    g = _gradient(n_units, grad)
+    root = math.sqrt(max(0.0, 1.0 - rho * rho))
+    p = [1.0 + sigma * (rho * common[i] + root * ip[i]) + g[i]
+         for i in range(n_units)]
+    n = [1.0 + sigma * (rho * common[i] + root * inn[i]) + g[i]
+         for i in range(n_units)]
+    return p, n
+
+
 def unit_factors(cfg: dict, cap: CapModel, sigma: float, seed: int,
                  n_units: int):
-    """Per-unit multiplicative gain errors, one draw per physical unit."""
-    if sigma <= 0.0:
-        return [1.0] * n_units
-    rnd = random.Random(seed)
-    return [1.0 + rnd.gauss(0.0, sigma) for _ in range(n_units)]
+    """Backward-compatible single-side draw (kept for external callers)."""
+    p, _ = unit_factors_pair(cfg, sigma, seed, n_units)
+    return p
 
 
 # --------------------------------------------------------------------------
@@ -257,26 +314,46 @@ def side_top(cfg: dict, cap: CapModel, code: int, invert: bool,
     # conversion: solve sum_k Q_k(Vtop - Vbot_k) = Q_sample.  Q is monotonic
     # in Vtop, so Newton on F(V) = sum Q - q converges in a few steps.
     vtop = vcm
+    q_tol = 1e-6                 # fC; 1 aC is far below the model's own error
+    converged = False
     for _ in range(60):
         f = -q
         df = 0.0
         for vb, g in zip(bots, gains):
             f += g * cap.charge(vtop, vb)
             df += g * cap.dcharge(vtop, vb)
+        if abs(f) <= q_tol:
+            converged = True
+            break
         if abs(df) < 1e-15:
             break
         nv = vtop - f / df
         if abs(nv - vtop) < vdiff_pad:
             vtop = nv
+            # Re-evaluate the residual at the accepted point: the step test
+            # alone does not prove charge conservation.
+            f = -q
+            for vb, g in zip(bots, gains):
+                f += g * cap.charge(vtop, vb)
+            converged = abs(f) <= q_tol
             break
         vtop = nv
+    if not converged:
+        raise RuntimeError(
+            f"side_top: charge solve did not converge (code={code}, "
+            f"vtop={vtop:.9f}, residual={f:.3e} fC)")
+    # Conversion-time incremental capacitance is dQ/dVtop, i.e. the 2-D
+    # Cgg(Vtop,Vbot) summed over the units - not the 1-D C(Vtop-Vbot) curve.
     den = 0.0
     for vb, g in zip(bots, gains):
-        den += g * cap.c(vtop - vb)
+        den += g * cap.dcharge(vtop, vb)
+    if den <= 0.0:
+        raise RuntimeError(f"side_top: non-positive conversion capacitance "
+                           f"({den:.6e} fF)")
     return vtop, den
 
 
-def differential(cfg: dict, cap: CapModel, code: int, factors,
+def differential(cfg: dict, cap: CapModel, code: int, factors_p, factors_n,
                  nbits: int) -> tuple[float, float, float]:
     vh = float(cfg["vrefh"])
     vl = float(cfg["vrefl"])
@@ -284,10 +361,10 @@ def differential(cfg: dict, cap: CapModel, code: int, factors,
     vin = float(cfg.get("vin_dc", vcm))
     dm = str(cfg.get("dummy_mode", "vcm"))
     vdummy = float(cfg.get("vrefl", 0.0))
-    p, den_p = side_top(cfg, cap, code, False, factors, nbits, vh, vl, vcm,
-                        vin, dm, vdummy)
-    n, den_n = side_top(cfg, cap, code, True, factors, nbits, vh, vl, vcm,
-                        vin, dm, vdummy)
+    p, den_p = side_top(cfg, cap, code, False, factors_p, nbits, vh, vl,
+                        vcm, vin, dm, vdummy)
+    n, den_n = side_top(cfg, cap, code, True, factors_n, nbits, vh, vl,
+                        vcm, vin, dm, vdummy)
     return p - n, den_p, den_n
 
 
@@ -456,8 +533,9 @@ def bench_model(cfg: dict, a) -> int:
     all_dnl, all_inl = [], []
     first = None
     for seed in range(1, seeds + 1):
-        factors = unit_factors(cfg, cap, sigma, seed, nu)
-        vals = [differential(cfg, cap, c, factors, nbits)[0] for c in codes]
+        factors_p, factors_n = unit_factors_pair(cfg, sigma, seed, nu)
+        vals = [differential(cfg, cap, c, factors_p, factors_n,
+                             nbits)[0] for c in codes]
         res = summarise(f"seed{seed}" if seeds > 1 else a.cap, vals,
                         brief=a.brief and seeds == 1)
         if first is None:
