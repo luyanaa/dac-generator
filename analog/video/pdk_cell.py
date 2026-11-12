@@ -269,6 +269,11 @@ def main(argv=None) -> int:
                     help="solve the operating point and stop (sizing loop)")
     ap.add_argument("--all", action="store_true",
                     help="run every PDK that is not blocked")
+    ap.add_argument("--vdd", type=float, default=None,
+                    help="override the supply (supply/corner sweep)")
+    ap.add_argument("--corner", default=None,
+                    help="model corner (ics55: tt/ff/ss; default: the entry's "
+                         "section)")
     a = ap.parse_args(argv)
     if a.all:
         # One process per PDK: the models are loaded per deck and the two
@@ -296,14 +301,19 @@ def main(argv=None) -> int:
     if a.pdk not in PDKS:
         die(f"unknown PDK {a.pdk} (have: {', '.join(PDKS)})")
     cfg = dict(PDKS[a.pdk], name=a.pdk)
+    if a.vdd is not None:
+        cfg["vdd"] = a.vdd
+    if a.corner is not None:
+        cfg["section"] = (f"{a.corner}_mos" if a.pdk == "ics55"
+                          else a.corner)
     if cfg.get("blocked"):
         print(f"{a.pdk}: blocked - {cfg['blocked']}", file=sys.stderr)
         return 2
     root = root_of(cfg)
     BUILD.mkdir(exist_ok=True)
     if not a.brief:
-        print(f"{a.pdk}: vdd {cfg['vdd']:g} V, mirror {cfg['mir']}, "
-              f"cascode {cfg['cas']}, pair {cfg['pair']}")
+        print(f"{a.pdk}: vdd {cfg['vdd']:g} V, section {cfg['section']}, "
+              f"mirror {cfg['mir']}, cascode {cfg['cas']}, pair {cfg['pair']}")
     if a.op_only:
         r = run(cfg, root, 128, 128, "op", op_only=True)
         o = r["op"]
@@ -332,11 +342,27 @@ def main(argv=None) -> int:
               f"vcp {opr.get('v(vcp)'):.4f} V, "
               f"mirror drain {opr.get('v(md_b0_0)'):.4f} V, "
               f"tail {opr.get('v(cd_b0_0)'):.4f} V")
-    ok = worst <= SETTLE_LSB and bias_mv <= BIAS_MV
+    # A missing settle time means the step never entered the 0.5 LSB window;
+    # a negative vcp means the replica wants a bias below ground, which the
+    # current sink cannot produce (the model would be unphysical).
+    settle_ok = all(r["settle_ns"] is not None and r["settle_ns"] <= 40.0
+                    for r in rows)
+    vcp_ok = all(r["vcp_dc"] is not None and 0.0 <= r["vcp_dc"] <= cfg["vdd"]
+                 for r in rows)
+    ok = (worst <= SETTLE_LSB and bias_mv <= BIAS_MV
+          and settle_ok and vcp_ok)
+    if not a.brief and not ok:
+        if not settle_ok:
+            print("  fail: at least one step did not settle within 40 ns")
+        if not vcp_ok:
+            print(f"  fail: vcp outside 0..{cfg['vdd']:g} V "
+                  f"({rows[0]['vcp_dc']:.4f} V at the operating point)")
     rep = {"pdk": a.pdk, "vdd": cfg["vdd"], "ok": ok,
            "mirror": cfg["mir"], "cascode": cfg["cas"], "pair": cfg["pair"],
            "runs": rows}
-    (BUILD / f"pdk_{a.pdk}.json").write_text(json.dumps(rep, indent=1) + "\n")
+    tag = a.pdk if (a.vdd is None and a.corner is None) else \
+        f"{a.pdk}_{cfg['section']}_{cfg['vdd']:g}"
+    (BUILD / f"pdk_{tag}.json").write_text(json.dumps(rep, indent=1) + "\n")
     print(f"{a.pdk}: {'PASS' if ok else 'FAIL'}  "
           f"(worst {worst:.3f} LSB, bias {bias_mv:.2f} mV)")
     return 0 if ok else 1
