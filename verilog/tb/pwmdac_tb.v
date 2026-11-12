@@ -25,6 +25,7 @@ module pwmdac_tb;
     reg         dith = 1'b0;
     reg         center = 1'b0;
     wire        ds, dsn;
+    wire        ds_c, dsn_c;
 
     integer checks = 0, errors = 0;
     wire ack_c;
@@ -41,7 +42,7 @@ module pwmdac_tb;
         .fifo_full_o(), .fifo_empty_o(),
         .data_i(data_i), .data_ld_i(data_ld), .data_ack_o(ack_c),
         .rst_n_i(rst_n), .clk_i(clk), .dith_i(1'b0), .center_i(center),
-        .ds_o(), .ds_n_o(), .tst_fifo_loop_i(1'b0));
+        .ds_o(ds_c), .ds_n_o(dsn_c), .tst_fifo_loop_i(1'b0));
 
     always #(CLK_PS / 2.0) clk = ~clk;
 
@@ -132,6 +133,39 @@ module pwmdac_tb;
         end
         chk(n == (1 << (BW + 1)) - 1,
             "centre-aligned frame is 2^(BW+1) cycles");
+
+        // centre-aligned pulse symmetry: measure the actual high and low
+        // edge spacing.  The high time is 2*duty cycles and the low time
+        // 2*(2^BW-duty), so the two edges are symmetric about the frame
+        // centre instead of both sitting at the frame start.
+        data_i = 4'd4;
+        @(posedge ack_c);
+        @(posedge ds_c);
+        n = $time;
+        @(negedge ds_c);
+        i = $time;
+        chk((i - n) == 2 * 4 * CLK_PS,
+            "centre-aligned high time is 2*duty (symmetric edges)");
+        @(posedge ds_c);
+        chk(($time - i) == 2 * ((1 << BW) - 4) * CLK_PS,
+            "centre-aligned low time is 2*(full-duty)");
+
+        // dither is latched at the frame boundary, not every clock
+        dith = 1'b0;
+        data_i = 4'd5;
+        data_ld = 1'b1;
+        @(posedge data_ack);
+        @(posedge clk); #1;
+        force dut.lfsr = 16'h0001;
+        dith = 1'b1;
+        repeat (2) @(posedge clk); #1;
+        chk(dut.dith_q === 1'b0, "dither not latched mid-frame");
+        chk(dut.duty_dith === 4'd5, "duty_dith stable mid-frame");
+        @(posedge data_ack);
+        @(posedge clk); #1;
+        chk(dut.dith_q === 1'b1, "dither latched at frame boundary");
+        chk(dut.duty_dith === 4'd6, "dither adds one LSB in the next frame");
+        release dut.lfsr;
 
         // dither saturates at full scale
         data_i = {BW{1'b1}};

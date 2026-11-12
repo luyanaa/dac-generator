@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Covers: reset state, disabled gate drives, one-cycle break window, make
+ * Covers: reset state (code 0 valid, en=1), disabled gate drives, one-cycle break window, make
  * cycle, hold behaviour, and the two properties the analog tree depends on:
  *   - d and dn are never both high (a switch would be on in both polarities),
  *   - en is never high while the applied code differs from the requested one.
@@ -71,7 +71,7 @@ module dac_string_dig_tb;
 		rst_n = 0;
 		repeat (2) @(posedge clk);
 		#0.1;
-		check(en, 0, "en after reset");
+		check(en, 1, "en after reset (code 0 is valid)");
 		check(bsy, 0, "bsy after reset");
 		check(d, {N{1'b0}}, "d after reset");
 		check(dn, {N{1'b1}}, "dn after reset (all switches off)");

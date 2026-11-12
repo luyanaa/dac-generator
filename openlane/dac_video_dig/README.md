@@ -69,7 +69,7 @@ klayout -b -r openlane/dac_video_dig/assemble.py -z
 Result:
 
 ```
-assembled dac_video_top: 255 cells, 510 pads, bbox -1.650,-19.400 .. 1917.100,8.200 um
+assembled dac_video_top: 255 cells, 510 pads, bbox -1.650,-98.000 .. 1917.100,8.200 um
 met2 merged regions: 4386; 510 pad islands: 510;
 pad centres not on a merged met2 region or shorted: 0
 ```

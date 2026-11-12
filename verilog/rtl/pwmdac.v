@@ -80,6 +80,7 @@ module pwmdac #(
 	reg			[BW:0]		shadow_cnt;		// tracks the PWM frame boundary
 	wire		[BW:0]		frame_max;
 	reg			[BW-1:0]	duty_reg;		// period-aligned duty latch
+	reg						dith_q;			// period-aligned dither bit
 	wire		[BW-1:0]	duty_sel;
 
 	// ------------------------------------------------------------------
@@ -130,13 +131,19 @@ module pwmdac #(
 		if (!rst_n_i) begin
 			shadow_cnt <= {(BW+1){1'b0}};
 			duty_reg   <= DATA_MID;
+			dith_q     <= 1'b0;
 		end else begin
 			if (shadow_cnt == frame_max)
 				shadow_cnt <= {(BW+1){1'b0}};
 			else
 				shadow_cnt <= shadow_cnt + 1'b1;
-			if (period_end)
+			if (period_end) begin
 				duty_reg <= duty_sel;
+				// Latch the dither decision with the duty word.  The LFSR
+				// itself keeps running, but duty_dith must not move inside
+				// a frame or the comparator edge moves with it.
+				dith_q <= dith_i & lfsr[0];
+			end
 		end
 	end
 	assign period_end = (shadow_cnt == frame_max);
@@ -151,7 +158,7 @@ module pwmdac #(
 		else
 			lfsr <= {lfsr[14:0], lfsr[15] ^ lfsr[13] ^ lfsr[12] ^ lfsr[10]};
 	end
-	wire dith_bit = dith_i & lfsr[0];
+	wire dith_bit = dith_q;
 	wire [BW-1:0] duty_dith = (dith_bit && (duty_reg != {BW{1'b1}}))
 		? duty_reg + 1'b1 : duty_reg;
 

@@ -15,7 +15,11 @@
 // forced to (0, 1); forcing both low would turn the p-FET on, which is the
 // classic bug this module exists to avoid.
 //
-//   en  : 1 while the tree is connected and the output is valid
+//   en  : 1 while the tree is connected and the output is valid.  Reset
+//         drives code 0 with en=1: zero is a valid tap, not a "no output"
+//         state.  (An earlier version reset en=0 and then waited for a code
+//         change, so a system that held code 0 after reset left the tree
+//         disconnected forever.)
 //   bsy : 1 during the one-cycle break window
 //
 // N is the number of tree levels (= bit count); the module is level-agnostic.
@@ -45,7 +49,7 @@ module dac_string_dig #(
             code_q    <= {N{1'b0}};
             code_pend <= {N{1'b0}};
             pend      <= 1'b0;
-            en        <= 1'b0;
+            en        <= 1'b1;   // code 0 is valid immediately after reset
             bsy       <= 1'b0;
         end else if (change && !pend) begin
             // Break: disconnect the tree and latch the request.  The code
