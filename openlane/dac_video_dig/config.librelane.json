@@ -34,6 +34,7 @@
             "ENCODING=0",
             "SETTLE_CYCLES=3"
         ],
+        "FP_DEF_TEMPLATE": "dir::pin_template_gf180.def",
         "//gf180": "GF180 video leaf: 8-bit binary (carry 128.000, +0.000 LSB)."
     },
     "pdk::ihp-sg13g2": {
@@ -43,6 +44,7 @@
             "ENCODING=0",
             "SETTLE_CYCLES=3"
         ],
+        "FP_DEF_TEMPLATE": "dir::pin_template_ihp130.def",
         "//ihp": "IHP video leaf: 8-bit binary (DNL 0.196 / INL 0.122)."
     },
     "FP_DEF_TEMPLATE": "dir::pin_template_sky130.def",
