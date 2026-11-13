@@ -172,22 +172,24 @@ then sees no MOS at all.
 
    i.e. the layout's devices reproduce the schematic study.
 
-   **PEX scale test (2026-11-13):** an 8-cell block (`N_CELLS=8`) extracts
-   with Magic in seconds (34 devices, 217 capacitors, 13 kB netlist), so the
-   runtime problem is only the full 255-cell flat extraction.  The block also
-   exposes a *toolchain* blocker before runtime: the Magic extraction loses
-   the pad-to-device contacts.  With `PEX_LABELS=1` the label is put on the
-   M1 gate fanout; the netlist then names that M1 net (`C76 d_b0_0`), but the
-   MOS gate is still an internal poly net (`M1000 ... a_452_n1900# ...`),
-   i.e. the **CT poly-to-M1 contact** is not merged.  The same is true of the
-   earlier single-cell PEX (it was used only for device W/L, not for driving
-   the pads).  The tech aliases `ct` to `active` and `v1` to `metal1`, so the
-   `contact`/`connect` entries do not form the pad stack in `ext2spice`;
-   KLayout LVS still passes because that deck has its own connectivity.
-   Fixing this needs a Magic tech pass (make CT/V1 true cut types and add a
-   contact/via extraction regression), or a KLayout RCX ruleset.  Until then
-   the device-level carry stands and the parasitic carry is open.  The
-   `PEX_LABELS` switch is kept for that work.
+   **PEX scale test (2026-11-14):** an 8-cell block (`N_CELLS=8`) extracts
+   with Magic in seconds (34 devices, 37 capacitors, 13 kB netlist), so the
+   runtime problem is only the full 255-cell flat extraction.  The
+   experimental tech copy `libs.tech/magic/experimental/ics55_pex.tech`
+   now connects the **V1 stack** and the **poly CT** (the `connect` section
+   needs the contact-area entries `ct/a`, `ct/m1`, `v1/a`, `v1/m1`,
+   `v1/m2` and the poly/FET plane join).  The 8-cell PEX names the MOS gates
+   (`M1000 ... db_b0_0`, `M1025 iout d_b0_0 ...`) and extracts 34 devices /
+   37 caps.
+
+   **Still open:** the diffusion CT to the M1 local interconnect.  The
+   mirror/cascode `md` nodes remain diffusion-only (`a_3100_n800#`,
+   `a_7600_n800#` with `pd` but no `m1`), so `block8_pex.py` settles at
+   0 LSB while the CDL gives 1/3/7 LSB for codes 1/3/7.  The next iteration
+   is the `ct ndiff/pdiff m1` path; `ct act m1` and dropping `,ct` from the
+   device model did not change it.  Until then the device-level carry stands
+   and the parasitic carry is open.  The experimental tech copy, the stack
+   regression and the 8-cell comparison are committed for that work.
 2. Density/fill: the structural DRC is 0, but the density tables flag the
    sparse analog row (78 ACT/PO items).  Dummy active/poly fill is the
    remaining tapeout step, not a device-rule failure.
