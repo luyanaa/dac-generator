@@ -121,6 +121,23 @@ def tag(j):
     return f"b{k}_{j - (2 ** k - 1)}"
 
 
+def well_tap(r, x0, x1):
+    """Merge the PMOS wells into one NW strip with a single NTAP to vdd.
+
+    The vendor NW1_R_1 rule requires every NW island to interact a tapped
+    NTAP (NP-covered active inside NW with a CT).  The per-cell PCell wells
+    are floating islands and two of them are only 0.1 um apart, which also
+    breaks NW1_S_1 (0.47).  One strip over the row merges them; the NTAP at
+    the left end is tied to the first cell's PMOS source (vdd) on M1.
+    """
+    r.box(L_NW, x0, -4.6, x1, 4.6)
+    r.box(L_ACT, -1.8, -0.15, -1.3, 0.15)
+    r.box(L_NP, -2.0, -0.35, -1.1, 0.35)
+    r.box(L_CT, -1.595, -0.045, -1.505, 0.045)
+    r.box(L_M1, -1.65, -0.16, -1.45, 0.16)
+    r.box(L_M1, -1.65, -0.07, -0.5, 0.07)
+
+
 def main():
     r = Row()
     x_end = (N - 1) * PITCH
@@ -182,6 +199,9 @@ def main():
     # iref pad on vcp, below the replica
     r.box(L_M2, xr + 2.2 - 0.065, -3.0, xr + 2.2 + 0.065, 5.26)
     r.box(L_M2, xr + 2.2 - 0.3, -3.2, xr + 2.2 + 0.3, -2.6)
+
+    # one merged NW strip + NTAP for the row and the replica
+    well_tap(r, -2.2, xr + 1.0)
 
     # rail labels at the left end
     for y, name in ((7.3, "vdd"), (6.3, "vbp"), (5.3, "vcp"),

@@ -1,17 +1,19 @@
 # ics55 PDK blockers — re-analysis and PDK-level repair
 
-Status: 2026-11-12. The earlier note said ics55 was blocked on three things
-(the PCell shorted source/drain, a partial DRC port, HSPICE-only models). This
-re-checks each against the *current* PDK (`/grid/icsprout55-pdk`,
-`v1.10.102-31-g3beae16`, PDK commit `b756fc8`), the vendor Calibre deck that ships in it
-(`pv/DRC/`), and the full foundry PDK of the same lineage
+Status: 2026-11-13. The earlier note said ics55 was blocked on three things
+(the PCell shorted source/drain, a partial DRC port, HSPICE-only models). The
+DRC deck was subsequently rewritten from the vendor deck (PDK commit
+`12f5125`) and the cell/row now close it. This re-checks each against the
+*current* PDK (`/grid/icsprout55-pdk`, PDK commit `12f5125` after `f16045b`),
+the vendor Calibre deck that ships in it (`pv/DRC/`), and the full foundry PDK
+of the same lineage
 (`/shared/SMIC/SMIC55LL_ULP_RF/SPDK55LL_ULP_RF_09121825_OA_CDS_V1.16_2`).
 
 | blocker | verdict | evidence |
 |---|---|---|
 | HSPICE-only models | **stale — no longer a blocker** | the PDK ships `libs.tech/spice/foundry/ngspice/`; ngspice 44 parses it and two runs give the same `id = 2.18971e-05 A` |
 | PCell shorts S/D | **confirmed, fixed and validated** | the drawn M1 covered the whole active; LVS returned `M$1 $1 $2 $1` (S=D). After the fix: one device `M$1 $2 $3 $1 ... W=3U`, `ICS55_LVS_COMPARE=PASS` |
-| partial DRC deck | **confirmed; the stored crosswalk is also stale** | the vendor deck has 679 rules (499 `RULECHECK` + 180 block-style); the stored crosswalk covers 466 and misses every block-style family (all 23 CT rules); the KLayout deck emits 49 categories |
+| DRC deck | **cleared** — rewritten from the vendor deck in `12f5125` | single cell and 255-cell row: 0 structural items (`no_density=true`); density tables flag 78 ACT/PO items, i.e. dummy active/poly fill is the remaining tapeout step.  The old 49-category port is superseded |
 
 ## 1. Models: use `foundry/ngspice`, not the HSPICE tree
 
@@ -155,8 +157,11 @@ So the direct comparison says three separate things:
    rule is missing from it, and CT is the family that gates the device
    geometry. This is why the old pcell passed the port with **0 items** while
    shorting G/S/D and violating CT space by 40 nm.
-3. **The KLayout deck is still a partial port**: 49 emitted categories for
-   679 vendor rules, with the FEOL/BEOL width/space/enclosure families
+3. **The KLayout deck was rewritten in `12f5125`**: it now assembles the
+   FEOL/BEOL/implant/contact/metal/via/pad/seal-ring/special families from
+   the vendor deck.  The old 49-category port is history; the current
+   verification is the fixture/alignment regression plus the cell/row runs,
+   not a rule-count comparison.  Remaining scope:
    omitted by design.
 
 The comparison is source-level only: no Calibre run/report exists on this

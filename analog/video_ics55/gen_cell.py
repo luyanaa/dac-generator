@@ -64,6 +64,14 @@ for k,d in devs.items():
     isl[k]=islands(d["W"],d["L"],d["c"][0],d["c"][1])
 top.flatten(-1, True)
 
+# merged NW strip + one NTAP tied to the first PMOS source (vdd)
+box(L_NW, -2.2, -4.6, 3.2, 4.6)
+box(L_ACT, -1.8, -0.15, -1.3, 0.15)
+box(L_NP, -2.0, -0.35, -1.1, 0.35)
+box(L_CT, -1.595, -0.045, -1.505, 0.045)
+box(L_M1, -1.65, -0.16, -1.45, 0.16)
+box(L_M1, -1.65, -0.07, -0.5, 0.07)
+
 # md: mirror right -> cascode left
 mr=isl["m"][1]; cl=isl["c"][0]
 box(L_M1, mr[0], -0.3, cl[2], 0.3)

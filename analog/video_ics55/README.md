@@ -1,14 +1,14 @@
 # ICsprout55 video DAC: cell study and next step
 
-Status 2026-11-12: **the device-level cell passes the P5 carry gate and the
-single-cell layout closes LVS and the partial DRC.**  The three recorded
-blockers are down to one:
+Status 2026-11-13: **the device-level cell passes the P5 carry gate; the
+single cell and the 255-cell row close the rewritten vendor-aligned DRC and
+LVS.**  The three recorded blockers are cleared:
 
 | blocker | state |
 |---|---|
 | models "HSPICE-only" | **cleared** — `libs.tech/spice/foundry/ngspice` parses in ngspice 44, `mismod=0`, deterministic |
 | PCell S/D short | **cleared** — fixed in `icsprout55-pdk` `b756fc8`; LVS extracts one device per finger group and passes |
-| DRC deck partial | **open** — 49 KLayout categories against 679 vendor rules; the device rules are checked by hand against the vendor ids (see `docs/ics55_pdk_repair.md`) |
+| DRC deck partial | **cleared** — rewritten from the vendor deck in `icsprout55-pdk` `12f5125`; cell and row report 0 structural items (`no_density=true`); density tables still need dummy fill |
 
 ## Cell study (device level, no parasitics)
 
@@ -96,8 +96,17 @@ M$4 cd    vcp md  vdd PM1P2_SVT_LP L=0.5U W=8U
 
 `ICS55_LVS_COMPARE=PASS` with `-rd strict_topology=true` (the default
 comparer trips over the well-tied bulk net; the strict path resolves it by
-pin name).  The partial KLayout DRC reports 0 items with `no_density=true`
-(the density windows are 100 um squares, meaningless for a 5 um cell).
+pin name).  The rewritten vendor-aligned KLayout DRC reports **0 items** with
+`no_density=true`; the density windows are 100 um squares and are a fill
+step, not a cell rule.
+
+The new deck caught two real layout issues that the old partial deck missed:
+NP/PP must enclose the field poly by 0.15 um (the PCell implant margin is now
+0.3, i.e. 0.15 beyond the 0.15 poly overhang), and every NW island needs a
+tapped NTAP (`NW1_R_1`).  The row now has one merged NW strip over the PMOS
+wells with a single NTAP tied to the first source (vdd), which also fixes the
+0.1 um NW-to-NW gap between the mirror and cascode that violated `NW1_S_1`
+(0.47).
 
 ## Row: 255 cells + replica + 510 pads
 
@@ -116,8 +125,9 @@ Results on `build/video_ics55.gds`:
 
 | check | result |
 |---|---|
-| partial DRC (`ics55_drc.drc`, `no_density=true`) | **0 items** |
-| hand rules (`check_rules.py`: CT size/space, CT-gate, AA/poly/M1 enclosure, AA/PO width) | **PASS** |
+| vendor-aligned DRC (`ics55_drc.drc`, `no_density=true`) | **0 items** |
+| DRC density tables (`tables=main`) | 78 ACT/PO density items — dummy fill is the remaining tapeout step |
+| hand rules (`check_rules.py`: CT size/space, CT-gate, AA/poly/M1 enclosure, AA/PO width) | **PASS** (secondary) |
 | LVS extraction | 1022 devices, 515 ports |
 | LVS compare (`strict_topology=true`) | **ICS55_LVS_COMPARE=PASS** |
 | netlist structure (`check_netlist.py`) | **PASS** (chains, drains, 510 distinct gate pads, replica diode) |
@@ -141,9 +151,11 @@ then sees no MOS at all.
    of the full row does not finish in a practical time (flat: >60 min;
    hierarchical with `drc off`: >40 min), so the *parasitic* carry is still
    open; `pex_carry.py` is the runner for it once the extraction is solved.
-2. PDK-side: the DRC deck still needs the FEOL/BEOL width/space families
-   (see `docs/ics55_pdk_repair.md`); the hand checks cover the device rules
-   in the meantime.
+2. Density/fill: the structural DRC is 0, but the density tables flag the
+   sparse analog row (78 ACT/PO items).  Dummy active/poly fill is the
+   remaining tapeout step, not a device-rule failure.
+3. Full-row PEX (Magic run time) and the bias-generator margin are the
+   remaining electrical items.
 3. Wrapper: the 510 pads, `iref`, `vdd`/`vbp`/`vcp`/`iout`/`idump` and the
    bias decoupling are the class-C work left.
 

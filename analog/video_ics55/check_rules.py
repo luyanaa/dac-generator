@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Hand-check the ics55 device rules the KLayout DRC deck does not emit.
+"""Secondary hand check of the ics55 device rules.
 
     klayout -b -r check_rules.py -z
 
-The partial deck (`libs.tech/drc`) only emits area/hole/coverage predicates;
-the vendor `pv/DRC` deck has the FEOL geometry rules.  This script measures
-the drawn row against those values directly:
+The rewritten vendor-aligned deck (`ics55_drc.drc`, PDK `12f5125`) is the
+primary signoff and reports 0 structural items on this row.  This script
+independently measures the same device geometry against the vendor values,
+so a deck regression or an omitted predicate still shows up:
 
     CT_W_1   0.09 square            CT_S_1   space 0.11
     CT_S_4   poly to CT on AA 0.055 CT_S_3   AA to CT on poly 0.065
