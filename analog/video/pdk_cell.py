@@ -70,6 +70,7 @@ PDKS: dict[str, dict] = {
         # "wide-swing": mirror copy + triode NMOS, vcp = I*Ron (positive at
         # low Vdd); the cell cascodes still use cfg["cas"].
         "bias": "series", "nbias": (0.5, 1.0),
+        "vref": 0.60, "sf": (1.0, 0.28),
     },
     "ics55": {
         # The PDK ships a foundry ngspice variant (foundry/ngspice); its
@@ -91,6 +92,7 @@ PDKS: dict[str, dict] = {
         # "wide-swing": mirror copy + triode NMOS, vcp = I*Ron (positive at
         # low Vdd); the cell cascodes still use cfg["cas"].
         "bias": "series", "nbias": (0.5, 1.0),
+        "vref": 0.60, "sf": (1.0, 0.28),
     },
 }
 
@@ -192,6 +194,18 @@ def deck(cfg: dict, root: Path, name: str, frm: int, to: int,
         lines.append(fmt.format(n="Xrc", d="vcp", g="vcp", s="vbp", b="vdd",
                                 m=cfg["pfet"], w=cfg["cas"][0],
                                 l=cfg["cas"][1]))
+        if bias == "clamp":
+            # Concept check: an ideal source holds vcp at a positive value.
+            # This is not an implementable bias yet; it isolates whether the
+            # 1.14 V failure is the vcp node or the cell headroom.
+            lines.append(f"Vclamp vcp 0 {float(cfg.get('vclamp', 0.1)):g}")
+        elif bias == "follower":
+            # Source-follower clamp: only sources current into vcp, finite
+            # output impedance, so it does not fight the replica cascode.
+            lines.append(f"Vref vref 0 {float(cfg.get('vref', 0.6)):g}")
+            lines.append(fmt.format(n="Xsf", d="vdd", g="vref", s="vcp",
+                                    b="vss", m=cfg["nfet"],
+                                    w=cfg["sf"][0], l=cfg["sf"][1]))
     for j in range(N):
         t = tag(j)
         k = 0
@@ -305,7 +319,7 @@ def main(argv=None) -> int:
     ap.add_argument("--corner", default=None,
                     help="model corner (ics55: tt/ff/ss; default: the entry's "
                          "section)")
-    ap.add_argument("--bias", choices=["series", "wide-swing"], default=None,
+    ap.add_argument("--bias", choices=["series", "follower", "wide-swing", "clamp"], default=None,
                     help="replica bias topology (default: the entry's bias)")
     ap.add_argument("--nbias", default=None,
                     help="wide-swing triode NMOS W,L in um (e.g. 0.5,1.0)")
@@ -313,6 +327,12 @@ def main(argv=None) -> int:
                     help="mirror W,L in um (sizing experiment)")
     ap.add_argument("--cas", default=None,
                     help="cascode W,L in um (sizing experiment)")
+    ap.add_argument("--vclamp", type=float, default=None,
+                    help="ideal vcp clamp voltage for --bias clamp")
+    ap.add_argument("--vref", type=float, default=None,
+                    help="reference voltage for --bias follower")
+    ap.add_argument("--sf", default=None,
+                    help="source-follower NMOS W,L in um (e.g. 1.0,0.28)")
     a = ap.parse_args(argv)
     if a.all:
         # One process per PDK: the models are loaded per deck and the two
@@ -354,6 +374,12 @@ def main(argv=None) -> int:
         cfg["mir"] = tuple(float(x) for x in a.mir.split(","))
     if a.cas is not None:
         cfg["cas"] = tuple(float(x) for x in a.cas.split(","))
+    if a.vclamp is not None:
+        cfg["vclamp"] = a.vclamp
+    if a.vref is not None:
+        cfg["vref"] = a.vref
+    if a.sf is not None:
+        cfg["sf"] = tuple(float(x) for x in a.sf.split(","))
     if cfg.get("blocked"):
         print(f"{a.pdk}: blocked - {cfg['blocked']}", file=sys.stderr)
         return 2
@@ -416,6 +442,10 @@ def main(argv=None) -> int:
         tag += f"_n{cfg['nbias'][0]:g}x{cfg['nbias'][1]:g}"
     if a.mir is not None or a.cas is not None:
         tag += f"_m{cfg['mir'][0]:g}x{cfg['mir'][1]:g}_c{cfg['cas'][0]:g}x{cfg['cas'][1]:g}"
+    if cfg.get("bias") == "clamp":
+        tag += f"_vc{float(cfg.get('vclamp', 0.1)):g}"
+    if cfg.get("bias") == "follower":
+        tag += f"_vr{float(cfg.get('vref', 0.6)):g}_s{cfg['sf'][0]:g}x{cfg['sf'][1]:g}"
     rep["bias"] = cfg.get("bias", "series")
     (BUILD / f"pdk_{tag}.json").write_text(json.dumps(rep, indent=1) + "\n")
     print(f"{a.pdk}: {'PASS' if ok else 'FAIL'}  "

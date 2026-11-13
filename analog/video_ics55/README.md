@@ -69,10 +69,18 @@ widening the cascode to 16/0.5 still gives -0.687 LSB; the wide-swing branch
 sets an initially positive `vcp` but cannot hold it against the 255 cascode
 gates (-7.2 mV, -1.6 LSB), and widening the mirror makes it worse.
 
-For a wider supply range the next experiment is a **controlled bias buffer /
-regulated cascode** (closed-loop or source-follower buffer with a reference),
-not another sizing sweep.  The `pdk_cell.py --bias wide-swing` topology and
-the `--mir/--cas` overrides are kept as the comparison bench.
+Simple clamps/followers were also rejected:
+
+| concept | result | why |
+|---|---|---|
+| ideal vcp clamp 0.10 V @1.14 | -143 LSB | forcing vcp changes the replica cascode current, so the mirror current no longer tracks |
+| ideal vcp clamp 0.02 V @1.14 | -70.7 LSB | same, even at the nominal vcp |
+| source follower vref 0.60 @1.2 | vcp 0.064, vbp 0.637, OP iout 60.7 mV vs 76.8 | it steals DC current from the 16 uA reference |
+
+A **class-B / regulated buffer** that only supplies transient charge (or a
+closed-loop regulated cascode) is the next experiment for a wider range, not
+another sizing sweep or a simple clamp.  The `--bias wide-swing|clamp|follower`
+topologies and the `--mir/--cas` overrides are kept as the comparison bench.
 
 ## What the PCell gives now
 
