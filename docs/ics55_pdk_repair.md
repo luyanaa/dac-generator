@@ -205,3 +205,45 @@ source; the Calibre rules plus the thumbnails are.
 4. `ics55_res_poly` / `ics55_mom` still need the same rule-based review.
 5. Only then re-attempt the video leaf: the cell needs a 4-terminal MOS with
    correct S/D straps, which is what this repair provides.
+
+## Magic PEX contact/via issue (2026-11-13)
+
+The KLayout LVS deck is the reference for the lower-layer connectivity.  Its
+`devices_connections.lvs` uses:
+
+```
+NSD/PSD/POLY_CON -> CT -> M1 -> V1 -> M2 -> V2 -> M3 ...
+```
+
+(the top T4/TM2 branch is separate and is not used here).  The Magic tech's
+`contact` section lists the same edges:
+
+```
+ct ndiff m1 / ct pdiff m1 / ct poly m1 / v1 m1 m2
+```
+
+so the topology is right; the problem is type registration.  In
+`ics55.tech`, `types` aliases `ct` to `active` and `v1` to `metal1`, and the
+extractor treats those aliases as non-cut.  A minimal M1/V1/M2 stack then
+extracts with `equiv "A" "B"` for the via but `ext2spice` does not merge the
+equivalence, and the CT poly-to-M1 contact is lost entirely.
+
+An 8-cell block (`N_CELLS=8`) extracts in seconds (34 devices, 217
+capacitors, 13 kB), so runtime is not the blocker.  With `PEX_LABELS=1` the
+M1 gate fanout is named (`C76 d_b0_0`), but the MOS gate remains an internal
+poly net (`M1000 ... a_452_n1900# ...`) because the CT is not merged.  The
+same was true of the earlier single-cell PEX; it was valid for device W/L,
+not for driving ports.
+
+One-line fixes were tried and rejected by Magic's tech parser:
+
+* size/overlap on the extract `contact v1` line — that syntax belongs to the
+  `wiring` section, not `extract`;
+* remove `v1` from the `metal1` alias, or add `cut v1` — the `types` section
+  has no `cut` plane, and `connect`/`extract` then report an unknown type.
+
+The fix is a contact-type refactor in `ics55.tech` (define CT/V1 as true cut
+types, mirroring the KLayout `CT -> M1 -> V1` chain) plus a minimal CT/V1
+stack regression in the PDK tests.  Until then `extracted_carry.py` remains
+the device-level signoff and the parasitic carry is open.  `PEX_LABELS` in
+`analog/video_ics55/gen_gds.py` is kept for that work.
