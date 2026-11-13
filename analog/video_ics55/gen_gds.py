@@ -37,7 +37,7 @@ L_M1 = (81, 1)
 L_M2 = (82, 1)
 L_V1 = (91, 1)
 
-N = 255
+N = int(os.environ.get("N_CELLS", "255"))
 PITCH = 7.5
 PAD_X0 = 2.25
 PAD_PITCH = 3.75

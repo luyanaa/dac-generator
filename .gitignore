@@ -23,6 +23,7 @@ mgmt_core_wrapper
 
 # analog leaf build products (generated SPICE, GDS, reports)
 /analog/*/build/
+/analog/video_ics55/*.ext
 /openlane/dac_video_dig/build/
 
 .slim/deepwork/

@@ -170,10 +170,19 @@ then sees no MOS at all.
      0 -> 255:   254.561 LSB (err   -0.439)
    ```
 
-   i.e. the layout's devices reproduce the schematic study.  The Magic PEX
-   of the full row does not finish in a practical time (flat: >60 min;
-   hierarchical with `drc off`: >40 min), so the *parasitic* carry is still
-   open; `pex_carry.py` is the runner for it once the extraction is solved.
+   i.e. the layout's devices reproduce the schematic study.
+
+   **PEX scale test (2026-11-13):** an 8-cell block (`N_CELLS=8`) extracts
+   with Magic in seconds (34 devices, 217 capacitors, 13 kB netlist), so the
+   runtime problem is only the full 255-cell flat extraction.  The 8-cell
+   netlist exposes a *toolchain* blocker before runtime: the Magic tech marks
+   the V1 via as `equiv "A" "B"` in the `.ext`, but `ext2spice` does not merge
+   the equivalent nets, so the M2 pad (`d_b0_0`) and the M1 gate fanout are
+   separate SPICE nodes.  KLayout LVS still passes (the geometry is
+   connected); the export step is what loses the via.  The next step is to
+   post-process `equiv` or use an RCX/export flow that preserves the via
+   resistor; after that, the 8-cell block can be simulated and the same
+   method can be applied hierarchically to the full row.
 2. Density/fill: the structural DRC is 0, but the density tables flag the
    sparse analog row (78 ACT/PO items).  Dummy active/poly fill is the
    remaining tapeout step, not a device-rule failure.

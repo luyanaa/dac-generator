@@ -10,7 +10,7 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-N = 255
+N = int(os.environ.get("N_CELLS", "255"))
 
 
 def tag(j):
