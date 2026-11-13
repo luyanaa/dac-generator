@@ -66,6 +66,10 @@ PDKS: dict[str, dict] = {
         "pdk_root_env": True,
         "mir": (8.0, 1.0), "cas": (8.0, 0.5), "pair": (4.0, 0.28),
         "vcp_cap_pf": 220.0,
+        # "series": replica mirror + diode cascode, vcp = Vdd - 2*Vsg.
+        # "wide-swing": mirror copy + triode NMOS, vcp = I*Ron (positive at
+        # low Vdd); the cell cascodes still use cfg["cas"].
+        "bias": "series", "nbias": (0.5, 1.0),
     },
     "ics55": {
         # The PDK ships a foundry ngspice variant (foundry/ngspice); its
@@ -83,6 +87,10 @@ PDKS: dict[str, dict] = {
         "env": {},
         "mir": (8.0, 1.0), "cas": (8.0, 0.5), "pair": (4.0, 0.28),
         "vcp_cap_pf": 220.0,
+        # "series": replica mirror + diode cascode, vcp = Vdd - 2*Vsg.
+        # "wide-swing": mirror copy + triode NMOS, vcp = I*Ron (positive at
+        # low Vdd); the cell cascodes still use cfg["cas"].
+        "bias": "series", "nbias": (0.5, 1.0),
     },
 }
 
@@ -124,12 +132,14 @@ def deck(cfg: dict, root: Path, name: str, frm: int, to: int,
     lib = cfg["lib"].format(root=root)
     dat = BUILD / f"pdk_{cfg['name']}_{name}.dat"
     op = BUILD / f"pdk_{cfg['name']}_{name}_op.dat"
+    bias = cfg.get("bias", "series")
+    iref_node = "vbp" if bias == "wide-swing" else "vcp"
     lines = [f"* {cfg['name']} dump-tail cell, {frm}->{to}",
              f'.lib "{lib}" {cfg["section"]}',
              f"Vdd vdd 0 {vdd:g}",
              "Vss vss 0 0",
              "Vdump idump 0 0",
-             f"Iref vcp 0 {I_UNIT_UA:g}u",
+             f"Iref {iref_node} 0 {I_UNIT_UA:g}u",
              f"Rl iout 0 {RL:g}",
              f"Cl iout 0 {CL_PF:g}p",
              f"Cvcp vcp 0 {cfg['vcp_cap_pf']:g}p"]
@@ -154,13 +164,34 @@ def deck(cfg: dict, root: Path, name: str, frm: int, to: int,
 
     for j in range(N):
         lines += cell(f"X{j}_", tag(j))
-    # Replica: mirror + cascode, diode-connected, no pair.
+    # Replica bias.
     lines.append(fmt.format(n="Xrm", d="vbp", g="vbp", s="vdd", b="vdd",
                             m=cfg["pfet"], w=cfg["mir"][0],
                             l=cfg["mir"][1]))
-    lines.append(fmt.format(n="Xrc", d="vcp", g="vcp", s="vbp", b="vdd",
-                            m=cfg["pfet"], w=cfg["cas"][0],
-                            l=cfg["cas"][1]))
+    if bias == "wide-swing":
+        # Bias branch: vcp = Vdd - Vsg(mirror copy) - I*Ron(triode); the
+        # triode gate is at Vdd, so vcp stays positive below 1.2 V.
+        lines.append(fmt.format(n="Xrc", d="vcp", g="vbp", s="vdd", b="vdd",
+                                m=cfg["pfet"], w=cfg["mir"][0],
+                                l=cfg["mir"][1]))
+        lines.append(fmt.format(n="Xrn", d="vcp", g="vdd", s="vss", b="vss",
+                                m=cfg["nfet"], w=cfg["nbias"][0],
+                                l=cfg["nbias"][1]))
+        # Replica mirror + cascode, loaded by a 16 uA sink.  Without this
+        # the replica no longer sets the cell's mirror drain: setting vcp
+        # independently left md at 0.649 V instead of vbp=0.613 V and the
+        # channel-length modulation produced 6 LSB of code-dependent error.
+        lines.append(fmt.format(n="Xrm2", d="md_rep", g="vbp", s="vdd",
+                                b="vdd", m=cfg["pfet"], w=cfg["mir"][0],
+                                l=cfg["mir"][1]))
+        lines.append(fmt.format(n="Xrca", d="cd_rep", g="vcp", s="md_rep",
+                                b="vdd", m=cfg["pfet"], w=cfg["cas"][0],
+                                l=cfg["cas"][1]))
+        lines.append(f"Isink cd_rep 0 {I_UNIT_UA:g}u")
+    else:
+        lines.append(fmt.format(n="Xrc", d="vcp", g="vcp", s="vbp", b="vdd",
+                                m=cfg["pfet"], w=cfg["cas"][0],
+                                l=cfg["cas"][1]))
     for j in range(N):
         t = tag(j)
         k = 0
@@ -274,6 +305,14 @@ def main(argv=None) -> int:
     ap.add_argument("--corner", default=None,
                     help="model corner (ics55: tt/ff/ss; default: the entry's "
                          "section)")
+    ap.add_argument("--bias", choices=["series", "wide-swing"], default=None,
+                    help="replica bias topology (default: the entry's bias)")
+    ap.add_argument("--nbias", default=None,
+                    help="wide-swing triode NMOS W,L in um (e.g. 0.5,1.0)")
+    ap.add_argument("--mir", default=None,
+                    help="mirror W,L in um (sizing experiment)")
+    ap.add_argument("--cas", default=None,
+                    help="cascode W,L in um (sizing experiment)")
     a = ap.parse_args(argv)
     if a.all:
         # One process per PDK: the models are loaded per deck and the two
@@ -306,6 +345,15 @@ def main(argv=None) -> int:
     if a.corner is not None:
         cfg["section"] = (f"{a.corner}_mos" if a.pdk == "ics55"
                           else a.corner)
+    if a.bias is not None:
+        cfg["bias"] = a.bias
+    if a.nbias is not None:
+        w, l = (float(x) for x in a.nbias.split(","))
+        cfg["nbias"] = (w, l)
+    if a.mir is not None:
+        cfg["mir"] = tuple(float(x) for x in a.mir.split(","))
+    if a.cas is not None:
+        cfg["cas"] = tuple(float(x) for x in a.cas.split(","))
     if cfg.get("blocked"):
         print(f"{a.pdk}: blocked - {cfg['blocked']}", file=sys.stderr)
         return 2
@@ -313,7 +361,8 @@ def main(argv=None) -> int:
     BUILD.mkdir(exist_ok=True)
     if not a.brief:
         print(f"{a.pdk}: vdd {cfg['vdd']:g} V, section {cfg['section']}, "
-              f"mirror {cfg['mir']}, cascode {cfg['cas']}, pair {cfg['pair']}")
+              f"bias {cfg.get('bias', 'series')}, mirror {cfg['mir']}, "
+              f"cascode {cfg['cas']}, pair {cfg['pair']}")
     if a.op_only:
         r = run(cfg, root, 128, 128, "op", op_only=True)
         o = r["op"]
@@ -360,8 +409,14 @@ def main(argv=None) -> int:
     rep = {"pdk": a.pdk, "vdd": cfg["vdd"], "ok": ok,
            "mirror": cfg["mir"], "cascode": cfg["cas"], "pair": cfg["pair"],
            "runs": rows}
-    tag = a.pdk if (a.vdd is None and a.corner is None) else \
-        f"{a.pdk}_{cfg['section']}_{cfg['vdd']:g}"
+    tag = a.pdk if (a.vdd is None and a.corner is None and a.bias is None
+                    and a.nbias is None and a.mir is None and a.cas is None) \
+        else f"{a.pdk}_{cfg['section']}_{cfg['vdd']:g}_{cfg.get('bias', 'series')}"
+    if cfg.get("bias") == "wide-swing":
+        tag += f"_n{cfg['nbias'][0]:g}x{cfg['nbias'][1]:g}"
+    if a.mir is not None or a.cas is not None:
+        tag += f"_m{cfg['mir'][0]:g}x{cfg['mir'][1]:g}_c{cfg['cas'][0]:g}x{cfg['cas'][1]:g}"
+    rep["bias"] = cfg.get("bias", "series")
     (BUILD / f"pdk_{tag}.json").write_text(json.dumps(rep, indent=1) + "\n")
     print(f"{a.pdk}: {'PASS' if ok else 'FAIL'}  "
           f"(worst {worst:.3f} LSB, bias {bias_mv:.2f} mV)")

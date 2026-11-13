@@ -47,17 +47,32 @@ slip through as a PASS.  At 1.2 V the full-scale margin to the 0.5 LSB limit
 is only 0.061 LSB, so the bias generator (not the mirror sizing) is the
 remaining ics55 design risk.
 
-Widening the cell to buy headroom was measured and rejected:
+### Bias decision (2026-11-13): keep the series replica
 
-| mirror | cascode | vcp | carry | full scale | verdict |
-|---|---|---|---|---|---|
-| 8/1 | 8/0.5 | 0.020 | +0.047 | **-0.439** | PASS |
-| 32/1 | 16/0.5 | 0.191 | +0.008 | -0.566 | FAIL (FS, settle inf) |
-| 64/1 | 32/0.5 | 0.274 | +0.050 | -0.849 | FAIL (FS, settle inf, bias 1.0 mV) |
+Candidates measured with the full P5 transient (1.2 V tt unless noted):
 
-The wider devices load `vbp`/`vcp` with 4-8x the gate capacitance and the
-full-scale step no longer settles inside 40 ns, so the row keeps the 8/1
-sizing and the replica is the bias generator.
+| candidate | vcp | carry | full scale | settle | dvcp | verdict |
+|---|---|---|---|---|---|---|
+| series 8/1 + 8/0.5 | 0.0196 | -0.047 | **-0.439** | 2.03/2.41 ns | 0.30 mV | **ADOPT** |
+| series 8/1 + 16/0.5 | 0.0674 | -0.032 | -0.687 | inf | 0.56 mV | reject |
+| wide-swing 0.5/0.28 + replica cascode | 0.0674 | -0.726 | -1.598 | inf | **-7.21 mV** | reject |
+| wide-swing 0.5/1.0 | 0.1891 | -2.985 | -6.095 | inf | 0.29 mV | reject |
+| mirror 32/1 + cas 16/0.5 | 0.191 | +0.008 | -0.566 | inf | 0.55 mV | reject |
+| mirror 64/1 + cas 32/0.5 | 0.274 | +0.050 | -0.849 | inf | 1.01 mV | reject |
+| series 8/1 + 8/0.5 @ 1.14 V | -0.040 | -0.069 | -0.489 | inf | 0.31 mV | out of range |
+
+**Decision:** keep the series replica and the 8/1 + 8/0.5 cell; the valid
+supply range is **1.20-1.26 V tt**, and 1.14 V is outside it.  The series
+replica's cascode diode gives the stiffest `vcp` (0.30 mV excursion) and the
+only full-scale result inside 0.5 LSB.  Every simple alternative fails:
+widening the cascode to 16/0.5 still gives -0.687 LSB; the wide-swing branch
+sets an initially positive `vcp` but cannot hold it against the 255 cascode
+gates (-7.2 mV, -1.6 LSB), and widening the mirror makes it worse.
+
+For a wider supply range the next experiment is a **controlled bias buffer /
+regulated cascode** (closed-loop or source-follower buffer with a reference),
+not another sizing sweep.  The `pdk_cell.py --bias wide-swing` topology and
+the `--mir/--cas` overrides are kept as the comparison bench.
 
 ## What the PCell gives now
 
