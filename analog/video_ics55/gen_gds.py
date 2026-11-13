@@ -155,9 +155,11 @@ def main():
         if os.environ.get("PEX_LABELS"):
             # The local md interconnect has no pad label; without this text
             # Magic drops the floating M1 net and splits the mirror drain
-            # from the cascode source.  The cd net is left unnamed for now:
-            # a label on its M2 route was picked up by the cascode gate net.
+            # from the cascode source.  The pair-source M1 island is the
+            # other local net that must be named before the M2 cd route can
+            # merge it with the cascode drain.
             r.text(L_M1, f"md_{j}", x + 1.2, 0.0)
+            r.text(L_M1, f"cd_{j}", x + 0.36, -7.5)
         # top stubs: M1 up from each island, V1 onto its bus
         for ax, ay, bus_y in ((a["vdd"][0], 3.93, 7.3),
                               (a["vbp"][0], 4.625, 6.3),

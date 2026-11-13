@@ -182,14 +182,18 @@ then sees no MOS at all.
    (`M1000 ... db_b0_0`, `M1025 iout d_b0_0 ...`) and extracts 34 devices /
    37 caps.
 
-   **Still open:** the diffusion CT to the M1 local interconnect.  The
-   mirror/cascode `md` nodes remain diffusion-only (`a_3100_n800#`,
-   `a_7600_n800#` with `pd` but no `m1`), so `block8_pex.py` settles at
-   0 LSB while the CDL gives 1/3/7 LSB for codes 1/3/7.  The next iteration
-   is the `ct ndiff/pdiff m1` path; `ct act m1` and dropping `,ct` from the
-   device model did not change it.  Until then the device-level carry stands
-   and the parasitic carry is open.  The experimental tech copy, the stack
-   regression and the 8-cell comparison are committed for that work.
+   **Still open:** the cascode drain S/D extraction.  Labelling the M1
+   `md` net keeps the mirror-drain/cascode-source path continuous, and
+   labelling the pair-source M1 island names the NMOS `cd_0` net.  But the
+   PMOS cascode drain is a **zero-area node** in the `.ext`
+   (`a_7990_n800#` has no `pd`/`m1` area), so the M2 cd route cannot merge
+   it with the source; `block8_pex.py` still settles at 0 LSB while the CDL
+   gives 1/3/7 for codes 1/3/7.  The GDS has the right-island ACT/PP, and
+   KLayout LVS extracts the drain; this points at the Magic `device mosfet`
+   S/D contact assignment for the cascode, not the cd route.  Next: fix the
+   Magic S/D contact model / `pdiff,ct` assignment, then rerun the 8-cell
+   comparison.  Until then the device-level carry stands and the parasitic
+   carry is open.
 2. Density/fill: the structural DRC is 0, but the density tables flag the
    sparse analog row (78 ACT/PO items).  Dummy active/poly fill is the
    remaining tapeout step, not a device-rule failure.
