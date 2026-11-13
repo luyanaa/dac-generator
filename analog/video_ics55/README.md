@@ -174,15 +174,20 @@ then sees no MOS at all.
 
    **PEX scale test (2026-11-13):** an 8-cell block (`N_CELLS=8`) extracts
    with Magic in seconds (34 devices, 217 capacitors, 13 kB netlist), so the
-   runtime problem is only the full 255-cell flat extraction.  The 8-cell
-   netlist exposes a *toolchain* blocker before runtime: the Magic tech marks
-   the V1 via as `equiv "A" "B"` in the `.ext`, but `ext2spice` does not merge
-   the equivalent nets, so the M2 pad (`d_b0_0`) and the M1 gate fanout are
-   separate SPICE nodes.  KLayout LVS still passes (the geometry is
-   connected); the export step is what loses the via.  The next step is to
-   post-process `equiv` or use an RCX/export flow that preserves the via
-   resistor; after that, the 8-cell block can be simulated and the same
-   method can be applied hierarchically to the full row.
+   runtime problem is only the full 255-cell flat extraction.  The block also
+   exposes a *toolchain* blocker before runtime: the Magic extraction loses
+   the pad-to-device contacts.  With `PEX_LABELS=1` the label is put on the
+   M1 gate fanout; the netlist then names that M1 net (`C76 d_b0_0`), but the
+   MOS gate is still an internal poly net (`M1000 ... a_452_n1900# ...`),
+   i.e. the **CT poly-to-M1 contact** is not merged.  The same is true of the
+   earlier single-cell PEX (it was used only for device W/L, not for driving
+   the pads).  The tech aliases `ct` to `active` and `v1` to `metal1`, so the
+   `contact`/`connect` entries do not form the pad stack in `ext2spice`;
+   KLayout LVS still passes because that deck has its own connectivity.
+   Fixing this needs a Magic tech pass (make CT/V1 true cut types and add a
+   contact/via extraction regression), or a KLayout RCX ruleset.  Until then
+   the device-level carry stands and the parasitic carry is open.  The
+   `PEX_LABELS` switch is kept for that work.
 2. Density/fill: the structural DRC is 0, but the density tables flag the
    sparse analog row (78 ACT/PO items).  Dummy active/poly fill is the
    remaining tapeout step, not a device-rule failure.

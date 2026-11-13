@@ -173,7 +173,16 @@ def main():
             lo, hi = sorted((vx, px))
             r.box(L_M1, lo - 0.07, -17.75, hi + 0.07, -17.6)
             r.box(L_V1, px - 0.045, -17.745, px + 0.045, -17.655)
-            r.text(L_M2, ("d_" if px < x + 4.0 else "db_") + tag(j), px, -17.9)
+            net = ("d_" if px < x + 4.0 else "db_") + tag(j)
+            # PEX_LABELS=1 puts the port label on the M1 gate fanout instead
+            # of the M2 pad.  Magic's ext2spice does not merge the V1 equiv,
+            # so the M1 net is the one the extractor can name; the M2 pad
+            # then stays a small floating cap (0.14 fF) and is omitted from
+            # the PEX run.  The signoff GDS keeps the M2 label for LVS.
+            if os.environ.get("PEX_LABELS"):
+                r.text(L_M1, net, vx, -5.0)
+            else:
+                r.text(L_M2, net, px, -17.9)
 
     # pads (M2), 3.75 um grid
     for j in range(N):
