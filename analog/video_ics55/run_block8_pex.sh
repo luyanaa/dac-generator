@@ -18,6 +18,8 @@ magic -dnull -noconsole \
     -rcfile /grid/icsprout55-pdk/libs.tech/magic/experimental/ics55_pex.magicrc \
     extract_block8.tcl
 
+python3 block8_pex.py
+
 klayout -b -r /grid/icsprout55-pdk/libs.tech/lvs/ics55.lvs \
     -rd input="$PWD/build/video_ics55_8.gds" -rd top=dac_video_ana \
     -rd schematic="$PWD/build/video_ics55.cdl" \

@@ -196,11 +196,26 @@ then sees no MOS at all.
    worst |PEX - CDL| = 0.0000 LSB
    ```
 
-   This is the adopted PEX path for the leaf: KLayout LVS for the
-   lower-layer connectivity (the layers the KLayout deck gets right), Magic
-   only for the per-net capacitance values.  The full-row version can use
-   `row_ext.cir` (1022 devices / 515 ports, LVS PASS) plus a cap stamp from
-   the full-row extraction or a geometry-based cap script.
+   **Magic-only PEX is fixed (2026-11-14):** the zero-area cascode drain
+   was a V1 stacked exactly on the CT.  The row now offsets the
+   cascode-drain V1 by 0.12 um in y and extends the M2 cd route to it; the
+   full `poly-CT-M1-V1-M2` stack extracts as one node, and `M1005` has
+   `cd_5` as its drain.  `block8_pex.py` (Magic-only, no KLayout devices):
+
+   ```
+   code  PEX(LSB)  CDL(LSB)   delta
+     0     0.0000     0.0000  -0.0000
+     1     1.0000     1.0000  -0.0000
+     3     3.0001     3.0001  -0.0000
+     7     7.0002     7.0002  -0.0000
+   worst |PEX - CDL| = 0.0000 LSB
+   ```
+
+   The KLayout LVS + named-net cap-stamp path (`block8_klayout_pex.py`) is
+   kept as an independent cross-check and also gives 0.0000 LSB.  The
+   full-row version can use `row_ext.cir` (1022 devices / 515 ports, LVS
+   PASS) plus a cap stamp from the full-row extraction or a geometry-based
+   cap script.
 
    Reproduce the 8-cell proof end-to-end:
 
