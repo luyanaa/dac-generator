@@ -52,13 +52,17 @@ on the north edge.  `FP_TEMPLATE_MATCH_MODE: strict` keeps the exact grid.
   `runs/dac_video_ics55/206-klayout-streamout/dac_video_dig.gds`.
 * LVS: **cell-level exact**, 95/95 used cell circuits match the merged CDL
   (`STRICT_HIERARCHY: circuits=95`), 524 ports, 20,368 devices, 10,968 nets,
-  ERC PASS.  The top-level KLayout comparer reports 141 symmetric net pairs
-  unresolved; a Netgen run reads identical device/net counts but fails top
-  pin matching because the 255 thermometer outputs are topologically
-  indistinguishable.  This is a comparer limitation on the 255-way
-  symmetric DAC, not a device/cell mismatch; a symmetry-aware comparator or
-  Calibre is required for the final top-level PASS.  Do not treat
-  `ICS55_LVS_COMPARE=FAIL` as a cell failure.
+  ERC PASS.  The top-level KLayout cross-reference still reports 180 net
+  pairs / 291 devices; with `add_net_labels.py` most pairs are now
+  same-name (`net645 | NET645`), i.e. the defect is the hierarchical
+  cell-pin/well mapping (the layout cell boundary exposes `VNW` plus
+  numeric pins while the CDL has VDD/VSS/Y), not the routed net names.  A
+  Netgen run reads identical device/net counts but fails top pin matching
+  because the 255 thermometer outputs are topologically indistinguishable.
+  This is a comparer limitation on the 255-way symmetric DAC, not a
+  device/cell mismatch; a symmetry-aware comparator or Calibre is required
+  for the final top-level PASS.  Do not treat `ICS55_LVS_COMPARE=FAIL` as a
+  cell failure.
 * DRC: the top-cell-only screening (`top_only_gds.py`, standard cells are
   library-qualified) reports zero via S_2/S_3 markers after the 0.13 spacing
   fix.  Remaining categories are the known deck approximations:

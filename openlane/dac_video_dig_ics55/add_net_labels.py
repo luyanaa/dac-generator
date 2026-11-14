@@ -69,14 +69,28 @@ def main():
     def flush():
         if cur is None or cur in labels:
             return
+        text = "\n".join(body)
+        # Prefer the midpoint of the longest routed segment: the first point
+        # of a net is often a cell pin, where the label would name the cell
+        # net rather than the top-level net.
+        best = None
         for layer in ("MET2", "MET3", "MET4", "MET5", "MET1"):
-            m = re.search(
-                layer + r"\s*\(\s*(-?\d+)\s+(-?\d+)",
-                "\n".join(body),
-            )
-            if m:
-                labels[cur] = (LAYERS[layer], int(m.group(1)), int(m.group(2)))
-                return
+            for m in re.finditer(
+                layer
+                + r"\s*\(\s*(-?\d+)\s+(-?\d+)(?:\s+-?\d+)?\s*\)"
+                + r"\s*\(\s*(\*|-?\d+)\s+(\*|-?\d+)(?:\s+-?\d+)?\s*\)",
+                text,
+            ):
+                x1, y1, x2, y2 = m.group(1), m.group(2), m.group(3), m.group(4)
+                x1 = int(x1); y1 = int(y1)
+                x2 = x1 if x2 == "*" else int(x2)
+                y2 = y1 if y2 == "*" else int(y2)
+                length = abs(x2 - x1) + abs(y2 - y1)
+                if best is None or length > best[0]:
+                    best = (length, layer, (x1 + x2) // 2, (y1 + y2) // 2)
+        if best is not None:
+            labels[cur] = (LAYERS[best[1]], best[2], best[3])
+            return
         skipped.append(cur)
 
     for line in lines[start:end]:
