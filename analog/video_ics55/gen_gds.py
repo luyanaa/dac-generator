@@ -103,8 +103,12 @@ class Row:
         def via(cx, cy):
             self.box(L_M1, cx - 0.085, cy - 0.085, cx + 0.085, cy + 0.085)
             self.box(L_V1, cx - 0.045, cy - 0.045, cx + 0.045, cy + 0.045)
-        via(c[1][0] + 0.07, y)
-        self.box(L_M2, c[1][0] + 0.005, y - 8.365, c[1][0] + 0.135, y + 0.085)
+        # Offset the V1 from the cascode-drain CT in y: a V1 stacked exactly
+        # on a CT makes Magic lose the lower contact (the drain extracts as a
+        # zero-area node).  The M1 island is tall enough for the 0.12 um
+        # offset, and the M2 cd route is extended to reach it.
+        via(c[1][0] + 0.07, y + 0.12)
+        self.box(L_M2, c[1][0] + 0.005, y - 8.365, c[1][0] + 0.135, y + 0.20)
         for p in (a, b):
             via(p[0][0] + 0.07, y - 8.3)
         self.box(L_M2, a[0][0] + 0.005, y - 8.365, c[1][0] + 0.135, y - 8.235)

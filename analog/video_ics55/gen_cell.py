@@ -82,8 +82,10 @@ def via_stack(cx, cy):
     box(L_M1, cx-0.085, cy-0.085, cx+0.085, cy+0.085)
     box(L_V1, cx-0.045, cy-0.045, cx+0.045, cy+0.045)
 cr=isl["c"][1]
-via_stack(cr[0]+0.07, 0.0)
-box(L_M2, cr[0]+0.005, -8.365, cr[0]+0.135, 0.085)
+# V1 offset from the CT in y: Magic loses the lower contact when a V1 is
+# stacked exactly on a CT.
+via_stack(cr[0]+0.07, 0.12)
+box(L_M2, cr[0]+0.005, -8.365, cr[0]+0.135, 0.20)
 for k in ("a","b"):
     li=isl[k][0]
     via_stack(li[0]+0.07, -8.3)

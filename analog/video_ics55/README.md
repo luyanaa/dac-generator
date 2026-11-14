@@ -148,8 +148,8 @@ Results on `build/video_ics55.gds`:
 
 | check | result |
 |---|---|
-| vendor-aligned DRC (`ics55_drc.drc`, `no_density=true`) | **0 items** |
-| DRC density tables (`tables=main`) | 78 ACT/PO density items — dummy fill is the remaining tapeout step |
+| vendor-aligned DRC (`ics55_drc.drc`, `no_density=true`, current deck) | cell 7 / row 2290 items: `poly.po.implant` + `latchup.s2_ptap/ntap`; these are the new deck rules, not the V1 offset |
+| DRC density tables (`tables=main`) | dummy fill is the remaining tapeout step |
 | hand rules (`check_rules.py`: CT size/space, CT-gate, AA/poly/M1 enclosure, AA/PO width) | **PASS** (secondary) |
 | LVS extraction | 1022 devices, 515 ports |
 | LVS compare (`strict_topology=true`) | **ICS55_LVS_COMPARE=PASS** |
