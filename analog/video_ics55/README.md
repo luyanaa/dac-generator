@@ -321,3 +321,8 @@ devices, ERC PASS) and its top-level DRC screening are documented in
 `openlane/dac_video_dig_ics55/README.md`.  The full-chip top-level LVS still
 needs a symmetry-aware comparator (255-way thermometer outputs); the
 physical pad grid is exact.
+
+RF/MOM LVS parity (gap 5): see `rf_mom_parity.md`.  RF MOS, two-terminal
+NW/DNW varactors and the 1TM+ALPA1 inductor pass the PDK fixtures; MOM is
+not extracted by the KLayout deck (Calibre extracts `MOM_PRO_2T`).  The video
+DAC uses no MOM, so this does not affect its LVS.
