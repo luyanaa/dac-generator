@@ -126,20 +126,41 @@ def tag(j):
 
 
 def well_tap(r, x0, x1):
-    """Merge the PMOS wells into one NW strip with a single NTAP to vdd.
+    """Merge the PMOS wells into one NW strip, then add latchup taps.
 
     The vendor NW1_R_1 rule requires every NW island to interact a tapped
-    NTAP (NP-covered active inside NW with a CT).  The per-cell PCell wells
-    are floating islands and two of them are only 0.1 um apart, which also
-    breaks NW1_S_1 (0.47).  One strip over the row merges them; the NTAP at
-    the left end is tied to the first cell's PMOS source (vdd) on M1.
+    NTAP, and LU_S_2_NTAP/PTAP require every MOS S/D to be within the tap
+    halo (35 um).  The per-cell PCell wells are floating islands and two of
+    them are only 0.1 um apart (NW1_S_1 = 0.47), so one strip merges them.
+    A row of NTAPs in the strip (tied to vdd) and PTAPs in the PWELL/PSUB
+    below the NMOS row are placed every 30 um.
     """
     r.box(L_NW, x0, -4.6, x1, 4.6)
-    r.box(L_ACT, -1.8, -0.15, -1.3, 0.15)
-    r.box(L_NP, -2.0, -0.35, -1.1, 0.35)
-    r.box(L_CT, -1.595, -0.045, -1.505, 0.045)
-    r.box(L_M1, -1.65, -0.16, -1.45, 0.16)
+
+    def ntap(cx, tie=True):
+        r.box(L_ACT, cx - 0.25, -0.5, cx + 0.25, 0.5)
+        r.box(L_NP, cx - 0.45, -0.7, cx + 0.45, 0.7)
+        r.box(L_CT, cx - 0.045, -0.045, cx + 0.045, 0.045)
+        r.box(L_M1, cx - 0.12, -0.5, cx + 0.12, 0.5)
+        if tie:
+            r.box(L_M1, cx - 0.07, 0.5, cx + 0.07, 7.345)
+            r.box(L_V1, cx - 0.045, 7.255, cx + 0.045, 7.345)
+
+    def ptap(cx):
+        r.box(L_ACT, cx - 0.25, -13.0, cx + 0.25, -12.0)
+        r.box(L_PP, cx - 0.45, -13.2, cx + 0.45, -11.8)
+        r.box(L_CT, cx - 0.045, -12.545, cx + 0.045, -12.455)
+        r.box(L_M1, cx - 0.12, -13.0, cx + 0.12, -12.0)
+
+    # reference NTAP at the left end, tied to the first PMOS source
+    ntap(-1.55)
     r.box(L_M1, -1.65, -0.07, -0.5, 0.07)
+    # distributed taps: every 30 um keeps every S/D inside the 35 um halo
+    cx = 3.75
+    while cx < x1 - 3.0:
+        ntap(cx)
+        ptap(cx)
+        cx += 30.0
 
 
 def main():
