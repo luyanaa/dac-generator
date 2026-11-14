@@ -327,6 +327,10 @@ def main(argv=None) -> int:
                     help="mirror W,L in um (sizing experiment)")
     ap.add_argument("--cas", default=None,
                     help="cascode W,L in um (sizing experiment)")
+    ap.add_argument("--pfet", default=None,
+                    help="PMOS model override (e.g. pm1p2_lvt_lp)")
+    ap.add_argument("--nfet", default=None,
+                    help="NMOS model override (e.g. nm1p2_lvt_lp)")
     ap.add_argument("--vclamp", type=float, default=None,
                     help="ideal vcp clamp voltage for --bias clamp")
     ap.add_argument("--vref", type=float, default=None,
@@ -374,6 +378,10 @@ def main(argv=None) -> int:
         cfg["mir"] = tuple(float(x) for x in a.mir.split(","))
     if a.cas is not None:
         cfg["cas"] = tuple(float(x) for x in a.cas.split(","))
+    if a.pfet is not None:
+        cfg["pfet"] = a.pfet
+    if a.nfet is not None:
+        cfg["nfet"] = a.nfet
     if a.vclamp is not None:
         cfg["vclamp"] = a.vclamp
     if a.vref is not None:
@@ -446,7 +454,11 @@ def main(argv=None) -> int:
         tag += f"_vc{float(cfg.get('vclamp', 0.1)):g}"
     if cfg.get("bias") == "follower":
         tag += f"_vr{float(cfg.get('vref', 0.6)):g}_s{cfg['sf'][0]:g}x{cfg['sf'][1]:g}"
+    if a.pfet is not None or a.nfet is not None:
+        tag += f"_{cfg['pfet']}_{cfg['nfet']}"
     rep["bias"] = cfg.get("bias", "series")
+    rep["pfet"] = cfg["pfet"]
+    rep["nfet"] = cfg["nfet"]
     (BUILD / f"pdk_{tag}.json").write_text(json.dumps(rep, indent=1) + "\n")
     print(f"{a.pdk}: {'PASS' if ok else 'FAIL'}  "
           f"(worst {worst:.3f} LSB, bias {bias_mv:.2f} mV)")

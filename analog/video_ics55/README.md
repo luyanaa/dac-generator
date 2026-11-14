@@ -49,12 +49,22 @@ slip through as a PASS.  At 1.2 V the full-scale margin to the 0.5 LSB limit
 is only 0.061 LSB, so the bias generator (not the mirror sizing) is the
 remaining ics55 design risk.
 
-**Corner finding (2026-11-14):** the 1.20-1.26 V range is **tt only**.  At
-1.20 V **ss** the OP gives `vcp = -0.079 V` (the replica needs a negative
-cascode gate); at **ff** it is +0.119 V.  So a 1.2 V ss part is outside the
-series-replica bias range, and a frozen 1.20 V minimum is not a corner-safe
-spec.  A controlled bias buffer / regulated cascode is therefore required,
-not optional, before a production supply spec can be claimed.
+**Corner finding (2026-11-14):** the series 1.20-1.26 V range is **tt
+only**.  At 1.20 V **ss** the OP gives `vcp = -0.079 V` (the replica needs a
+negative cascode gate); at **ff** it is +0.119 V.
+
+**LVT mirror/cascode fix (2026-11-14):** switching the mirror and cascode to
+the released `pm1p2_lvt_lp` (pair stays SVT) lowers the PMOS Vsg.  At 1.2 V:
+
+| corner | vcp | carry | full scale | settle | verdict |
+|---|---|---|---|---|---|
+| ss | 0.108 | +0.006 | -0.410 | 2.00 / 2.31 ns | **PASS** |
+| tt | 0.211 | +0.000 | -0.303 | 2.00 / 2.20 ns | **PASS** |
+
+Both corners are inside 0.5 LSB, so the LVT mirror/cascode is the adopted
+bias fix.  The layout still needs the LVTP implant over the two PMOS gates
+and the CDL/LVS model switch `pm1p2_svt_lp -> pm1p2_lvt_lp`; that is the
+next layout step.  A controlled buffer is no longer required for 1.2 V ss.
 
 ### Bias decision (2026-11-13): keep the series replica
 
