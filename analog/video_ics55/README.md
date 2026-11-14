@@ -292,8 +292,32 @@ then sees no MOS at all.
    remaining tapeout step, not a device-rule failure.
 3. Full-row PEX (Magic run time) and the bias-generator margin are the
    remaining electrical items.
-3. Wrapper: the 510 pads, `iref`, `vdd`/`vbp`/`vcp`/`iout`/`idump` and the
+4. Wrapper: the 510 pads, `iref`, `vdd`/`vbp`/`vcp`/`iout`/`idump` and the
    bias decoupling are the class-C work left.
 
 The pre-fix record (M1 over the whole active, "no layout can pass LVS") is in
 the git history of this file; that geometry no longer exists in the PDK.
+
+## Digital macro assembly (2026-11-15)
+
+`assemble_digital.py` merges the hardened ics55 digital macro
+(`openlane/dac_video_dig_ics55`) under this analog row: the digital cell is
+mirrored about X and translated to `y = -17.6`, so its 510 MET2 outputs
+(`x = 2.25 + 3.75*k`, `y = 0..0.6`) coincide with the analog M2 gate pads
+(`y = -18.2..-17.6`).  The script checks every pad overlap and writes the
+combined GDS:
+
+```sh
+cd analog/video_ics55
+DIGITAL_GDS=../../openlane/dac_video_dig_ics55/runs/dac_video_ics55/206-klayout-streamout/dac_video_dig.gds \
+ANALOG_GDS=build/video_ics55_lvt.gds \
+OUT_GDS=build/video_ics55_chip.gds \
+klayout -b -r assemble_digital.py -z
+# pads checked=510 min_overlap=360000.0 bad=0
+```
+
+The digital macro's cell-level LVS (95/95 used cells, 524 ports, 20,368
+devices, ERC PASS) and its top-level DRC screening are documented in
+`openlane/dac_video_dig_ics55/README.md`.  The full-chip top-level LVS still
+needs a symmetry-aware comparator (255-way thermometer outputs); the
+physical pad grid is exact.

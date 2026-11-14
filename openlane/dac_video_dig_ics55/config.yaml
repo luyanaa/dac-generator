@@ -17,12 +17,84 @@ GND_NETS: [VSS]
 FP_DEF_TEMPLATE: dir::../dac_video_dig/pin_template_ics55.def
 FP_TEMPLATE_MATCH_MODE: strict
 
+# The PDK's KLAYOUT_DEF_LAYER_MAP points at the GDS display map, which the
+# KLayout DEF reader cannot use: MET3-MET5 routing, the power grid and every
+# top-level via are dropped.  Use a real LEF/DEF map so the streamed GDS
+# carries the routed macro and pin labels (Mx/6) for LVS.
+KLAYOUT_DEF_LAYER_MAP: dir::ics55_def.map
 KLAYOUT_DRC_OPTIONS:
   densityRules: 0
   run_mode: tiling
   threads: 8
 KLAYOUT_LVS_OPTIONS:
   run_mode: deep
+  # The final GDS is filled: remove FILL/DECAP cell instances from both the
+  # extracted and reference netlists before compare (ics55 deck flow mode).
+  flow_mode: true
+  # Compare cell-by-cell; a flat 20k-device netlist has too much symmetry for
+  # the flat matcher.  All used cells are LVS-clean (exact W/L).
+  strict_topology: true
+  strict_hierarchy: true
+  # The deck's strict hierarchy mapping needs the top cell name; the plugin
+  # does not pass it otherwise and reachable-circuit purge removes the root.
+  top: dac_video_dig
+
+# Vendor cell GDS/CDL inconsistencies (device counts/widths differ by 2x,
+# e.g. AND2X8H7R CDL 2x0.6 vs layout 4 fingers of 0.2..0.4): avoid them so a
+# clean cell library subset is used and LVS is exact.
+EXTRA_EXCLUDED_CELLS:
+  - ADDFX1P4H7R
+  - ADDHX1P4H7R
+  - AND2X0P7H7R
+  - AND2X12H7R
+  - AND2X16H7R
+  - AND2X1P4H7R
+  - AND2X4H7R
+  - AND2X6H7R
+  - AND2X8H7R
+  - AND3X0P7H7R
+  - AND3X1P4H7R
+  - AND3X4H7R
+  - AND3X6H7R
+  - AND3X8H7R
+  - AND4X0P7H7R
+  - AND4X1P4H7R
+  - AOI211X3H7R
+  - AOI211X4H7R
+  - AOI211X6H7R
+  - AOI221X3H7R
+  - AOI221X4H7R
+  - AOI222X3H7R
+  - AOI222X4H7R
+  - AOI22X2H7R
+  - AOI22X3H7R
+  - AOI22X4H7R
+  - AOI22X6H7R
+  - AOI2BB2X2H7R
+  - AOI2BB2X3H7R
+  - AOI2BB2X4H7R
+  - AOI2BB2X6H7R
+  - INVX16H7R
+  - INVX7H7R
+  - MUX4X4H7R
+  - NAND2BX2H7R
+  - NAND2BX3H7R
+  - NAND2BX4H7R
+  - NAND4BBX3H7R
+  - NAND4BBX4H7R
+  - OAI31X3H7R
+  - OAI31X4H7R
+  - OAI32X3H7R
+  - OAI33X0P5H7R
+  - TBUFX2H7R
+  - TBUFX8H7R
+
+# The PDK tech LEF sets LAYER VIA1..4 SPACING to 0.11 (the isolated-via S_1
+# value).  OpenROAD's PDN via generator uses that for array tiling and emits
+# 5-cut arrays at 0.11 spacing, which violate the vendor Vn_S_2 rule (0.13).
+# Use a copy with 0.13 cut spacing so generated arrays are DRC-clean.
+TECH_LEFS:
+  "nom_*": dir::N551P6M_ecos_viafix.lef
 
 meta:
   flow: Classic

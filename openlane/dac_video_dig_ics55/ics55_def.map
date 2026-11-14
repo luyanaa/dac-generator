@@ -1,0 +1,25 @@
+# ics55 LEF/DEF -> GDS layer map for KLayout 0.27+ (map_file format).
+#
+# The PDK's tech/ics55.map is a GDS display map (layer datatype name) and is
+# NOT a LEF/DEF map.  Feeding it to KLayout's DEF reader silently drops every
+# top-level route: MET1/MET2 pins survive only through the merged stdcell GDS.
+# The LEF/DEF map uses one line per layer/purpose group:
+#
+#     <LEF layer> <purpose[,purpose...]> <gds layer> <gds datatype>
+#     NAME <LEF layer>/<purpose> <gds layer> <gds datatype>
+#
+# Labels are the NAME form; the ics55 LVS/DRC decks read pin text on Mx/6.
+MET1 NET,SPNET,VIA,PIN,LEFPIN 81 1
+NAME MET1/PIN 81 6
+MET2 NET,SPNET,VIA,PIN,LEFPIN 82 1
+NAME MET2/PIN 82 6
+MET3 NET,SPNET,VIA,PIN,LEFPIN 83 1
+NAME MET3/PIN 83 6
+MET4 NET,SPNET,VIA,PIN,LEFPIN 84 1
+NAME MET4/PIN 84 6
+MET5 NET,SPNET,VIA,PIN,LEFPIN 85 1
+NAME MET5/PIN 85 6
+VIA1 VIA,PIN,NET,SPNET 91 1
+VIA2 VIA,PIN,NET,SPNET 92 1
+VIA3 VIA,PIN,NET,SPNET 93 1
+VIA4 VIA,PIN,NET,SPNET 94 1
