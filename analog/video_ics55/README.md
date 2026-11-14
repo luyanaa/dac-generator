@@ -202,6 +202,15 @@ then sees no MOS at all.
    `row_ext.cir` (1022 devices / 515 ports, LVS PASS) plus a cap stamp from
    the full-row extraction or a geometry-based cap script.
 
+   Reproduce the 8-cell proof end-to-end:
+
+   ```sh
+   cd analog/video_ics55
+   ./run_block8_pex.sh
+   # ICS55_LVS_COMPARE=PASS
+   # worst |PEX - CDL| = 0.0000 LSB
+   ```
+
    **Magic-only PEX still blocked:** the cascode drain S/D extraction.  Labelling the M1
    `md` net keeps the mirror-drain/cascode-source path continuous, and
    labelling the pair-source M1 island names the NMOS `cd_0` net.  But the
