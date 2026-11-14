@@ -62,9 +62,17 @@ the released `pm1p2_lvt_lp` (pair stays SVT) lowers the PMOS Vsg.  At 1.2 V:
 | tt | 0.211 | +0.000 | -0.303 | 2.00 / 2.20 ns | **PASS** |
 
 Both corners are inside 0.5 LSB, so the LVT mirror/cascode is the adopted
-bias fix.  The layout still needs the LVTP implant over the two PMOS gates
-and the CDL/LVS model switch `pm1p2_svt_lp -> pm1p2_lvt_lp`; that is the
-next layout step.  A controlled buffer is no longer required for 1.2 V ss.
+bias fix at the device level.  The PCell now has an optional `lvt=1` LVTP
+implant (0.3 um over the active, PVT1_EX_2 clean).  Single-cell LVT layout:
+LVS PASS (`PM1P2_LVT_LP`), DRC 2 items (the standalone-cell latchup halo,
+expected without taps).
+
+**Row-level LVT is still open:** the 8-cell block extracts `PM1P2_LVT_LP`
+correctly, but the 255-cell row extraction returns zero PMOS devices.  The
+LVTP row-level interaction (the merged NW strip / LVT gate selector) needs
+debugging; until then the released row remains the SVT 8/1+8/0.5 layout at
+1.20 V tt.  A controlled buffer is no longer required for 1.2 V ss once the
+row LVT extraction is fixed.
 
 ### Bias decision (2026-11-13): keep the series replica
 
