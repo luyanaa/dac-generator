@@ -326,3 +326,9 @@ RF/MOM LVS parity (gap 5): see `rf_mom_parity.md`.  RF MOS, two-terminal
 NW/DNW varactors and the 1TM+ALPA1 inductor pass the PDK fixtures; MOM is
 not extracted by the KLayout deck (Calibre extracts `MOM_PRO_2T`).  The video
 DAC uses no MOM, so this does not affect its LVS.
+
+PPA/SFDR (gap 6): see `ppa_sfdr.md`.  Static PEX SFDR **52.8 dB**, SNDR
+**42.5 dB**, ENOB **6.76** (7-bit quantization-limited); PPA 48,960 um^2
+analog row + 153,000 um^2 digital macro = 202,860 um^2 chip, 4.92 mW analog +
+1.60 mW digital (6.52 mW total) at 25 MS/s.  Digital ff hold is -14.9 ps
+(one endpoint) and needs a buffer; ss/tt are clean.
