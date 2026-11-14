@@ -29,3 +29,4 @@ mgmt_core_wrapper
 .slim/deepwork/
 .qoder/
 __pycache__/
+bsim4v5.out
