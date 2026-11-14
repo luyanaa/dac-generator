@@ -212,10 +212,23 @@ then sees no MOS at all.
    ```
 
    The KLayout LVS + named-net cap-stamp path (`block8_klayout_pex.py`) is
-   kept as an independent cross-check and also gives 0.0000 LSB.  The
-   full-row version can use `row_ext.cir` (1022 devices / 515 ports, LVS
-   PASS) plus a cap stamp from the full-row extraction or a geometry-based
-   cap script.
+   kept as an independent cross-check and also gives 0.0000 LSB.
+
+   **Full-row PEX (2026-11-14):** `pex_row.py` uses the KLayout LVS row
+   extraction (`row_ext.cir`, 1022 devices / 515 ports, strict PASS) and
+   stamps the 8-cell named-net capacitances: each `d_*` 1.10576 fF, each
+   `db_*` 1.16543 fF, and the buses scaled by 255/8 (`vdd` 494 fF, `vbp`
+   317 fF, `vcp` 300 fF, `iout` 313 fF, `idump` 323 fF).  Result:
+
+   ```
+   127 -> 128:   127.951 LSB (err   -0.049)
+     0 -> 255:   254.564 LSB (err   -0.436)
+   ```
+
+   i.e. the full-row PEX carry stays inside 0.5 LSB.  This closes the
+   parasitic-carry gap at the named-net level; the exact full-row Magic
+   `.ext` extraction (instead of scaling the 8-cell block) is still a
+   runtime/verification item.
 
    Reproduce the 8-cell proof end-to-end:
 
