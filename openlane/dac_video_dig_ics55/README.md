@@ -76,6 +76,17 @@ on the north edge.  `FP_TEMPLATE_MATCH_MODE: strict` keeps the exact grid.
   overlaps.  Result: 510/510 pads, 0.36 um^2 each, 0 bad.  Output:
   `analog/video_ics55/build/video_ics55_chip.gds`.
 
+## Magic extraction experiment
+
+`magic -T libs.tech/magic/ics55.tech` extracts a single H7CR cell correctly
+(NAND2X0P5H7R: 4 devices, `nm1p2_svt_lp`/`pm1p2_svt_lp`, W/L and AS/AD/PS/PD;
+GDS pin texts become node names).  On the full unfilled macro (2,896
+instances, 20,368 devices, 48k instances with vias) `extract all` did not
+finish in 37 minutes (24 min CPU, 1.75 GB RSS, 40 min timeout).  Magic is not
+practical for the full flat digital macro without splitting/hierarchical
+extraction; the KLayout cell-level extraction remains the signoff path and
+Magic is suitable for individual cells/blocks.
+
 ## Next
 
 1. Run the top-level LVS with Calibre or a symmetry-aware comparator
