@@ -9,6 +9,7 @@
 set -e
 cd "$(dirname "$0")"
 
+N_CELLS=8 OUT="$PWD/build/video_ics55_8.gds" klayout -b -r gen_gds.py -z
 PEX_LABELS=1 N_CELLS=8 OUT="$PWD/build/video_ics55_8_pex.gds" \
     klayout -b -r gen_gds.py -z
 N_CELLS=8 python3 gen_cdl.py
