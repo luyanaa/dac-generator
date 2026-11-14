@@ -67,12 +67,21 @@ implant (0.3 um over the active, PVT1_EX_2 clean).  Single-cell LVT layout:
 LVS PASS (`PM1P2_LVT_LP`), DRC 2 items (the standalone-cell latchup halo,
 expected without taps).
 
-**Row-level LVT is still open:** the 8-cell block extracts `PM1P2_LVT_LP`
-correctly, but the 255-cell row extraction returns zero PMOS devices.  The
-LVTP row-level interaction (the merged NW strip / LVT gate selector) needs
-debugging; until then the released row remains the SVT 8/1+8/0.5 layout at
-1.20 V tt.  A controlled buffer is no longer required for 1.2 V ss once the
-row LVT extraction is fixed.
+**Row-level LVT is now signed off (2026-11-14):** with the `LVT=1` default
+(gen_gds/gen_cdl), the 255-cell row gives:
+
+| check | result |
+|---|---|
+| DRC (`no_density=true`) | **0 items** |
+| LVS (strict) | **PASS** (1022 devices: 512 `PM1P2_LVT_LP` + 510 `NM1P2_SVT_LP`, 515 ports) |
+| full-row PEX carry | 127->128 **+0.066 LSB**, 0->255 **-0.301 LSB** |
+| single cell LVT | LVS PASS, DRC 2 (standalone latchup halo, expected) |
+
+The Magic-only LVT `.ext` path still loses the cascode drain (the V1/CT
+offset rule works for SVT but the LVT pcell extraction needs a separate
+fix); the adopted LVT row PEX therefore uses the KLayout LVS + cap-stamp
+path.  The 8-cell Magic-only PEX diagnostic is fixed to the SVT block
+(`run_block8_pex.sh`), which is the tech-validation case.
 
 ### Bias decision (2026-11-13): keep the series replica
 

@@ -24,7 +24,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 N = 255
 DEV = re.compile(r"^M\S+\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+"
-                 r"(NM1P2_SVT_LP|PM1P2_SVT_LP)\s+L=(\S+)\s+W=(\S+)")
+                 r"(NM1P2_SVT_LP|PM1P2_SVT_LP|NM1P2_LVT_LP|PM1P2_LVT_LP)\s+L=(\S+)\s+W=(\S+)")
 
 
 def tag(j):

@@ -3,8 +3,8 @@
 * the n-well to the power alias taken from this netlist's power pin, so the
 * PMOS bulk is written as the same `vdd` net as its source.
 .subckt CELL vdd vbp vcp md cd d db iout idump
-M1 md  vbp vdd vdd pm1p2_svt_lp w=8u  l=1u
-M2 cd  vcp md  vdd pm1p2_svt_lp w=8u  l=0.5u
+M1 md  vbp vdd vdd pm1p2_lvt_lp w=8u  l=1u
+M2 cd  vcp md  vdd pm1p2_lvt_lp w=8u  l=0.5u
 M3 iout d  cd  VSS nm1p2_svt_lp w=4u  l=0.28u
 M4 idump db cd VSS nm1p2_svt_lp w=4u  l=0.28u
 .ends

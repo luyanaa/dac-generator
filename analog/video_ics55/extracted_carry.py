@@ -49,7 +49,7 @@ def convert() -> Path:
     out = []
     for ln in text.splitlines():
         m = re.match(r"^M(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+"
-                     r"(NM1P2_SVT_LP|PM1P2_SVT_LP)\s+(.*)$", ln)
+                     r"(NM1P2_SVT_LP|PM1P2_SVT_LP|NM1P2_LVT_LP|PM1P2_LVT_LP)\s+(.*)$", ln)
         if m:
             name, d, g, s, b, cls, rest = m.groups()
             kv = dict(x.split("=") for x in rest.split() if "=" in x)

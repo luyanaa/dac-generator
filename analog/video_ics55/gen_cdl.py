@@ -11,6 +11,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 N = int(os.environ.get("N_CELLS", "255"))
+LVT = os.environ.get("LVT", "1") == "1"
+PM = "pm1p2_lvt_lp" if LVT else "pm1p2_svt_lp"
 
 
 def tag(j):
@@ -28,14 +30,14 @@ def main():
     for j in range(N):
         t = tag(j)
         lines += [
-            f"M{j}m md_{j} vbp vdd vdd pm1p2_svt_lp w=8u l=1u",
-            f"M{j}c cd_{j} vcp md_{j} vdd pm1p2_svt_lp w=8u l=0.5u",
+            f"M{j}m md_{j} vbp vdd vdd {PM} w=8u l=1u",
+            f"M{j}c cd_{j} vcp md_{j} vdd {PM} w=8u l=0.5u",
             f"M{j}a iout d_{t} cd_{j} VSS nm1p2_svt_lp w=4u l=0.28u",
             f"M{j}b idump db_{t} cd_{j} VSS nm1p2_svt_lp w=4u l=0.28u",
         ]
     lines += [
-        "Mrm vbp vbp vdd vdd pm1p2_svt_lp w=8u l=1u",
-        "Mrc vcp vcp vbp vdd pm1p2_svt_lp w=8u l=0.5u",
+        f"Mrm vbp vbp vdd vdd {PM} w=8u l=1u",
+        f"Mrc vcp vcp vbp vdd {PM} w=8u l=0.5u",
         ".ends",
     ]
     out = os.path.join(HERE, "build", "video_ics55.cdl")

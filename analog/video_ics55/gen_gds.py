@@ -38,6 +38,7 @@ L_M2 = (82, 1)
 L_V1 = (91, 1)
 
 N = int(os.environ.get("N_CELLS", "255"))
+LVT = os.environ.get("LVT", "1") == "1"
 PITCH = 7.5
 PAD_X0 = 2.25
 PAD_PITCH = 3.75
@@ -79,13 +80,13 @@ class Row:
         self.top.shapes(self.ly.layer(*layer)).insert(
             db.Text(s, db.Trans(db.Vector(self.u(x), self.u(y)))))
 
-    def dev(self, dev, W, L, cx, cy):
-        key = (dev, W, L)
+    def dev(self, dev, W, L, cx, cy, lvt=0):
+        key = (dev, W, L, lvt)
         if key not in self.pcells:
             self.pcells[key] = self.ly.create_cell(
                 "ics55_mos_analog", "ICsprout55",
                 {"dev_type": dev, "w": W, "l": L, "fingers": 1,
-                 "guard_ring": 0, "ring_metal": 0})
+                 "guard_ring": 0, "ring_metal": 0, "lvt": lvt})
         self.top.insert(db.CellInstArray(
             self.pcells[key].cell_index(),
             db.Trans(db.Vector(self.u(cx), self.u(cy)))))
@@ -93,8 +94,8 @@ class Row:
 
     def cell(self, x, y=0.0):
         """Place one P5 cell; returns the net anchor points."""
-        m = self.dev("p", 8.0, 1.0, x + 0.0, y)
-        c = self.dev("p", 8.0, 0.5, x + 2.2, y)
+        m = self.dev("p", 8.0, 1.0, x + 0.0, y, lvt=1 if LVT else 0)
+        c = self.dev("p", 8.0, 0.5, x + 2.2, y, lvt=1 if LVT else 0)
         a = self.dev("n", 4.0, 0.28, x + 0.6, y - 7.5)
         b = self.dev("n", 4.0, 0.28, x + 2.4, y - 7.5)
         # md: mirror right -> cascode left
@@ -224,8 +225,8 @@ def main():
 
     # replica: mirror + cascode, diode-connected, with the iref pad on vcp
     xr = x_end + 12.0
-    m = r.dev("p", 8.0, 1.0, xr, 0.0)
-    c = r.dev("p", 8.0, 0.5, xr + 2.2, 0.0)
+    m = r.dev("p", 8.0, 1.0, xr, 0.0, lvt=1 if LVT else 0)
+    c = r.dev("p", 8.0, 0.5, xr + 2.2, 0.0, lvt=1 if LVT else 0)
     r.box(L_M1, m[1][0], -0.3, c[0][2], 0.3)              # md
     r.box(L_M1, m[0][0] - 0.07, -4.16, m[0][0] + 0.07, 7.345)   # vdd stub
     r.box(L_V1, m[0][0] - 0.045, 7.255, m[0][0] + 0.045, 7.345)

@@ -48,8 +48,8 @@ def text(s,x,y):
     top.shapes(ly.layer(81,1)).insert(db.Text(s, db.Trans(db.Vector(u(x),u(y)))))
 
 devs = {
-  "m": dict(W=8.0, L=1.0,  c=(0.0, 0.0),  m="pm1p2_svt_lp"),
-  "c": dict(W=8.0, L=0.5,  c=(2.2, 0.0),  m="pm1p2_svt_lp"),
+  "m": dict(W=8.0, L=1.0,  c=(0.0, 0.0),  m="pm1p2_lvt_lp", lvt=1),
+  "c": dict(W=8.0, L=0.5,  c=(2.2, 0.0),  m="pm1p2_lvt_lp", lvt=1),
   "a": dict(W=4.0, L=0.28, c=(0.6, -7.5), m="nm1p2_svt_lp"),
   "b": dict(W=4.0, L=0.28, c=(2.4, -7.5), m="nm1p2_svt_lp"),
 }
@@ -58,7 +58,7 @@ for k,d in devs.items():
     dev="p" if d["m"].startswith("pm") else "n"
     c=ly.create_cell("ics55_mos_analog","ICsprout55",
         {"dev_type":dev,"w":d["W"],"l":d["L"],"fingers":1,
-         "guard_ring":0,"ring_metal":0})
+         "guard_ring":0,"ring_metal":0,"lvt":d.get("lvt",0)})
     top.insert(db.CellInstArray(c.cell_index(),
         db.Trans(db.Vector(u(d["c"][0]),u(d["c"][1])))))
     isl[k]=islands(d["W"],d["L"],d["c"][0],d["c"][1])

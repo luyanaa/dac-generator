@@ -9,10 +9,13 @@
 set -e
 cd "$(dirname "$0")"
 
-N_CELLS=8 OUT="$PWD/build/video_ics55_8.gds" klayout -b -r gen_gds.py -z
-PEX_LABELS=1 N_CELLS=8 OUT="$PWD/build/video_ics55_8_pex.gds" \
+# The 8-cell Magic-only PEX is the tech-validation diagnostic and uses the
+# SVT devices (the Magic LVT extraction still loses the cascode drain).  The
+# adopted LVT row is signed off with the KLayout LVS + cap-stamp path.
+LVT=0 N_CELLS=8 OUT="$PWD/build/video_ics55_8.gds" klayout -b -r gen_gds.py -z
+PEX_LABELS=1 LVT=0 N_CELLS=8 OUT="$PWD/build/video_ics55_8_pex.gds" \
     klayout -b -r gen_gds.py -z
-N_CELLS=8 python3 gen_cdl.py
+LVT=0 N_CELLS=8 python3 gen_cdl.py
 
 magic -dnull -noconsole \
     -rcfile /grid/icsprout55-pdk/libs.tech/magic/experimental/ics55_pex.magicrc \
