@@ -182,7 +182,27 @@ then sees no MOS at all.
    (`M1000 ... db_b0_0`, `M1025 iout d_b0_0 ...`) and extracts 34 devices /
    37 caps.
 
-   **Still open:** the cascode drain S/D extraction.  Labelling the M1
+   **Working bypass (2026-11-14):** `block8_klayout_pex.py` uses the
+   KLayout LVS extraction for the devices and connectivity (`block8_ext.cir`,
+   ICS55_LVS_COMPARE=PASS, 34 devices) and stamps the **named-net**
+   capacitances from the Magic `.ext` onto the same nets.  Result:
+
+   ```
+   code  PEX(LSB)  CDL(LSB)   delta
+     0     0.0000     0.0000  +0.0000
+     1     1.0000     1.0000  +0.0000
+     3     3.0001     3.0001  +0.0000
+     7     7.0002     7.0002  +0.0000
+   worst |PEX - CDL| = 0.0000 LSB
+   ```
+
+   This is the adopted PEX path for the leaf: KLayout LVS for the
+   lower-layer connectivity (the layers the KLayout deck gets right), Magic
+   only for the per-net capacitance values.  The full-row version can use
+   `row_ext.cir` (1022 devices / 515 ports, LVS PASS) plus a cap stamp from
+   the full-row extraction or a geometry-based cap script.
+
+   **Magic-only PEX still blocked:** the cascode drain S/D extraction.  Labelling the M1
    `md` net keeps the mirror-drain/cascode-source path continuous, and
    labelling the pair-source M1 island names the NMOS `cd_0` net.  But the
    PMOS cascode drain is a **zero-area node** in the `.ext`
