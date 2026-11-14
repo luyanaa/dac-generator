@@ -1,0 +1,63 @@
+# ICsprout55 video DAC digital macro (7-bit thermometer, 510 outputs).
+DESIGN_NAME: dac_video_dig
+VERILOG_FILES: dir::../../verilog/rtl/dac_video_dig.v
+CLOCK_PERIOD: 10
+CLOCK_PORT: clk
+FP_SIZING: absolute
+DIE_AREA: [0, 0, 1912.5, 80]
+PL_TARGET_DENSITY_PCT: 25
+SYNTH_PARAMETERS:
+  - RESOLUTION=7
+  - ENCODING=1
+  - SETTLE_CYCLES=3
+VDD_NETS: [VDD]
+GND_NETS: [VSS]
+
+# Exact analog pad grid: MET2, x=2.25/6.0+7.5*k, y=0..0.6.
+FP_DEF_TEMPLATE: dir::../dac_video_dig/pin_template_ics55.def
+FP_TEMPLATE_MATCH_MODE: strict
+
+KLAYOUT_DRC_OPTIONS:
+  densityRules: 0
+  run_mode: tiling
+  threads: 8
+KLAYOUT_LVS_OPTIONS:
+  run_mode: deep
+
+meta:
+  flow: Classic
+  substituting_steps:
+    Magic.DRC: null
+    Checker.MagicDRC: null
+    Magic.SpiceExtraction: null
+    Magic.StreamOut: null
+    Magic.WriteLEF: null
+    Odb.CheckDesignAntennaProperties: null
+    Checker.IllegalOverlap: null
+    KLayout.XOR: null
+    Checker.XOR: null
+    KLayout.DRC: null
+    Checker.KLayoutDRC: null
+    "-Netgen.LVS": OpenROAD.WriteCDL
+    Netgen.LVS: ICS55.KLayoutLVS
+
+# Released LEF RC values (see libs.tech/pex/config_gen.py).
+LAYERS_RC:
+  "nom_*":
+    MET1: {res: 0.1122, cap: 0.0007630}
+    MET2: {res: 0.0914, cap: 0.0011069}
+    MET3: {res: 0.0914, cap: 0.0011069}
+    MET4: {res: 0.0914, cap: 0.0011069}
+    MET5: {res: 0.0914, cap: 0.0006259}
+    T4M2: {res: 0.0239, cap: 0.0001299}
+VIAS_R:
+  "nom_*":
+    VIA1: {res: 2.5}
+    VIA2: {res: 2.5}
+    VIA3: {res: 2.5}
+    VIA4: {res: 2.5}
+    T4V2: {res: 2.5}
+
+pdk::ics55*:
+  STD_CELL_LIBRARY: ics55_LLSC_H7CR
+  PAD_CELL_LIBRARY: ICsprout_55LLULP1233_IO_251013

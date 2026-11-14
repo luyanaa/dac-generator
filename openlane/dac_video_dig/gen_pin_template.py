@@ -40,6 +40,7 @@ LAYER = {
     "sky130": "met2",
     "gf180": "Metal2",
     "ihp130": "Metal2",
+    "ics55": "MET2",
 }
 
 

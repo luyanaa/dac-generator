@@ -1,0 +1,2097 @@
+VERSION 5.8 ;
+DIVIDERCHAR "/" ;
+BUSBITCHARS "[]" ;
+DESIGN dac_video_dig ;
+UNITS DISTANCE MICRONS 1000 ;
+DIEAREA ( 0 0 ) ( 1912500 80000 ) ;
+PINS 522 ;
+    - dout[0] + NET dout[0] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 2250 0 ) N ;
+    - dout_n[0] + NET dout_n[0] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 6000 0 ) N ;
+    - dout[1] + NET dout[1] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 9750 0 ) N ;
+    - dout_n[1] + NET dout_n[1] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 13500 0 ) N ;
+    - dout[2] + NET dout[2] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 17250 0 ) N ;
+    - dout_n[2] + NET dout_n[2] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 21000 0 ) N ;
+    - dout[3] + NET dout[3] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 24750 0 ) N ;
+    - dout_n[3] + NET dout_n[3] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 28500 0 ) N ;
+    - dout[4] + NET dout[4] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 32250 0 ) N ;
+    - dout_n[4] + NET dout_n[4] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 36000 0 ) N ;
+    - dout[5] + NET dout[5] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 39750 0 ) N ;
+    - dout_n[5] + NET dout_n[5] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 43500 0 ) N ;
+    - dout[6] + NET dout[6] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 47250 0 ) N ;
+    - dout_n[6] + NET dout_n[6] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 51000 0 ) N ;
+    - dout[7] + NET dout[7] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 54750 0 ) N ;
+    - dout_n[7] + NET dout_n[7] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 58500 0 ) N ;
+    - dout[8] + NET dout[8] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 62250 0 ) N ;
+    - dout_n[8] + NET dout_n[8] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 66000 0 ) N ;
+    - dout[9] + NET dout[9] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 69750 0 ) N ;
+    - dout_n[9] + NET dout_n[9] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 73500 0 ) N ;
+    - dout[10] + NET dout[10] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 77250 0 ) N ;
+    - dout_n[10] + NET dout_n[10] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 81000 0 ) N ;
+    - dout[11] + NET dout[11] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 84750 0 ) N ;
+    - dout_n[11] + NET dout_n[11] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 88500 0 ) N ;
+    - dout[12] + NET dout[12] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 92250 0 ) N ;
+    - dout_n[12] + NET dout_n[12] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 96000 0 ) N ;
+    - dout[13] + NET dout[13] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 99750 0 ) N ;
+    - dout_n[13] + NET dout_n[13] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 103500 0 ) N ;
+    - dout[14] + NET dout[14] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 107250 0 ) N ;
+    - dout_n[14] + NET dout_n[14] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 111000 0 ) N ;
+    - dout[15] + NET dout[15] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 114750 0 ) N ;
+    - dout_n[15] + NET dout_n[15] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 118500 0 ) N ;
+    - dout[16] + NET dout[16] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 122250 0 ) N ;
+    - dout_n[16] + NET dout_n[16] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 126000 0 ) N ;
+    - dout[17] + NET dout[17] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 129750 0 ) N ;
+    - dout_n[17] + NET dout_n[17] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 133500 0 ) N ;
+    - dout[18] + NET dout[18] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 137250 0 ) N ;
+    - dout_n[18] + NET dout_n[18] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 141000 0 ) N ;
+    - dout[19] + NET dout[19] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 144750 0 ) N ;
+    - dout_n[19] + NET dout_n[19] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 148500 0 ) N ;
+    - dout[20] + NET dout[20] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 152250 0 ) N ;
+    - dout_n[20] + NET dout_n[20] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 156000 0 ) N ;
+    - dout[21] + NET dout[21] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 159750 0 ) N ;
+    - dout_n[21] + NET dout_n[21] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 163500 0 ) N ;
+    - dout[22] + NET dout[22] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 167250 0 ) N ;
+    - dout_n[22] + NET dout_n[22] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 171000 0 ) N ;
+    - dout[23] + NET dout[23] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 174750 0 ) N ;
+    - dout_n[23] + NET dout_n[23] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 178500 0 ) N ;
+    - dout[24] + NET dout[24] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 182250 0 ) N ;
+    - dout_n[24] + NET dout_n[24] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 186000 0 ) N ;
+    - dout[25] + NET dout[25] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 189750 0 ) N ;
+    - dout_n[25] + NET dout_n[25] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 193500 0 ) N ;
+    - dout[26] + NET dout[26] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 197250 0 ) N ;
+    - dout_n[26] + NET dout_n[26] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 201000 0 ) N ;
+    - dout[27] + NET dout[27] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 204750 0 ) N ;
+    - dout_n[27] + NET dout_n[27] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 208500 0 ) N ;
+    - dout[28] + NET dout[28] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 212250 0 ) N ;
+    - dout_n[28] + NET dout_n[28] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 216000 0 ) N ;
+    - dout[29] + NET dout[29] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 219750 0 ) N ;
+    - dout_n[29] + NET dout_n[29] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 223500 0 ) N ;
+    - dout[30] + NET dout[30] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 227250 0 ) N ;
+    - dout_n[30] + NET dout_n[30] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 231000 0 ) N ;
+    - dout[31] + NET dout[31] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 234750 0 ) N ;
+    - dout_n[31] + NET dout_n[31] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 238500 0 ) N ;
+    - dout[32] + NET dout[32] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 242250 0 ) N ;
+    - dout_n[32] + NET dout_n[32] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 246000 0 ) N ;
+    - dout[33] + NET dout[33] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 249750 0 ) N ;
+    - dout_n[33] + NET dout_n[33] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 253500 0 ) N ;
+    - dout[34] + NET dout[34] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 257250 0 ) N ;
+    - dout_n[34] + NET dout_n[34] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 261000 0 ) N ;
+    - dout[35] + NET dout[35] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 264750 0 ) N ;
+    - dout_n[35] + NET dout_n[35] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 268500 0 ) N ;
+    - dout[36] + NET dout[36] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 272250 0 ) N ;
+    - dout_n[36] + NET dout_n[36] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 276000 0 ) N ;
+    - dout[37] + NET dout[37] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 279750 0 ) N ;
+    - dout_n[37] + NET dout_n[37] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 283500 0 ) N ;
+    - dout[38] + NET dout[38] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 287250 0 ) N ;
+    - dout_n[38] + NET dout_n[38] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 291000 0 ) N ;
+    - dout[39] + NET dout[39] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 294750 0 ) N ;
+    - dout_n[39] + NET dout_n[39] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 298500 0 ) N ;
+    - dout[40] + NET dout[40] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 302250 0 ) N ;
+    - dout_n[40] + NET dout_n[40] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 306000 0 ) N ;
+    - dout[41] + NET dout[41] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 309750 0 ) N ;
+    - dout_n[41] + NET dout_n[41] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 313500 0 ) N ;
+    - dout[42] + NET dout[42] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 317250 0 ) N ;
+    - dout_n[42] + NET dout_n[42] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 321000 0 ) N ;
+    - dout[43] + NET dout[43] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 324750 0 ) N ;
+    - dout_n[43] + NET dout_n[43] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 328500 0 ) N ;
+    - dout[44] + NET dout[44] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 332250 0 ) N ;
+    - dout_n[44] + NET dout_n[44] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 336000 0 ) N ;
+    - dout[45] + NET dout[45] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 339750 0 ) N ;
+    - dout_n[45] + NET dout_n[45] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 343500 0 ) N ;
+    - dout[46] + NET dout[46] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 347250 0 ) N ;
+    - dout_n[46] + NET dout_n[46] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 351000 0 ) N ;
+    - dout[47] + NET dout[47] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 354750 0 ) N ;
+    - dout_n[47] + NET dout_n[47] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 358500 0 ) N ;
+    - dout[48] + NET dout[48] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 362250 0 ) N ;
+    - dout_n[48] + NET dout_n[48] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 366000 0 ) N ;
+    - dout[49] + NET dout[49] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 369750 0 ) N ;
+    - dout_n[49] + NET dout_n[49] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 373500 0 ) N ;
+    - dout[50] + NET dout[50] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 377250 0 ) N ;
+    - dout_n[50] + NET dout_n[50] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 381000 0 ) N ;
+    - dout[51] + NET dout[51] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 384750 0 ) N ;
+    - dout_n[51] + NET dout_n[51] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 388500 0 ) N ;
+    - dout[52] + NET dout[52] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 392250 0 ) N ;
+    - dout_n[52] + NET dout_n[52] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 396000 0 ) N ;
+    - dout[53] + NET dout[53] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 399750 0 ) N ;
+    - dout_n[53] + NET dout_n[53] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 403500 0 ) N ;
+    - dout[54] + NET dout[54] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 407250 0 ) N ;
+    - dout_n[54] + NET dout_n[54] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 411000 0 ) N ;
+    - dout[55] + NET dout[55] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 414750 0 ) N ;
+    - dout_n[55] + NET dout_n[55] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 418500 0 ) N ;
+    - dout[56] + NET dout[56] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 422250 0 ) N ;
+    - dout_n[56] + NET dout_n[56] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 426000 0 ) N ;
+    - dout[57] + NET dout[57] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 429750 0 ) N ;
+    - dout_n[57] + NET dout_n[57] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 433500 0 ) N ;
+    - dout[58] + NET dout[58] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 437250 0 ) N ;
+    - dout_n[58] + NET dout_n[58] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 441000 0 ) N ;
+    - dout[59] + NET dout[59] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 444750 0 ) N ;
+    - dout_n[59] + NET dout_n[59] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 448500 0 ) N ;
+    - dout[60] + NET dout[60] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 452250 0 ) N ;
+    - dout_n[60] + NET dout_n[60] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 456000 0 ) N ;
+    - dout[61] + NET dout[61] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 459750 0 ) N ;
+    - dout_n[61] + NET dout_n[61] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 463500 0 ) N ;
+    - dout[62] + NET dout[62] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 467250 0 ) N ;
+    - dout_n[62] + NET dout_n[62] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 471000 0 ) N ;
+    - dout[63] + NET dout[63] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 474750 0 ) N ;
+    - dout_n[63] + NET dout_n[63] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 478500 0 ) N ;
+    - dout[64] + NET dout[64] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 482250 0 ) N ;
+    - dout_n[64] + NET dout_n[64] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 486000 0 ) N ;
+    - dout[65] + NET dout[65] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 489750 0 ) N ;
+    - dout_n[65] + NET dout_n[65] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 493500 0 ) N ;
+    - dout[66] + NET dout[66] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 497250 0 ) N ;
+    - dout_n[66] + NET dout_n[66] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 501000 0 ) N ;
+    - dout[67] + NET dout[67] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 504750 0 ) N ;
+    - dout_n[67] + NET dout_n[67] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 508500 0 ) N ;
+    - dout[68] + NET dout[68] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 512250 0 ) N ;
+    - dout_n[68] + NET dout_n[68] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 516000 0 ) N ;
+    - dout[69] + NET dout[69] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 519750 0 ) N ;
+    - dout_n[69] + NET dout_n[69] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 523500 0 ) N ;
+    - dout[70] + NET dout[70] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 527250 0 ) N ;
+    - dout_n[70] + NET dout_n[70] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 531000 0 ) N ;
+    - dout[71] + NET dout[71] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 534750 0 ) N ;
+    - dout_n[71] + NET dout_n[71] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 538500 0 ) N ;
+    - dout[72] + NET dout[72] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 542250 0 ) N ;
+    - dout_n[72] + NET dout_n[72] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 546000 0 ) N ;
+    - dout[73] + NET dout[73] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 549750 0 ) N ;
+    - dout_n[73] + NET dout_n[73] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 553500 0 ) N ;
+    - dout[74] + NET dout[74] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 557250 0 ) N ;
+    - dout_n[74] + NET dout_n[74] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 561000 0 ) N ;
+    - dout[75] + NET dout[75] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 564750 0 ) N ;
+    - dout_n[75] + NET dout_n[75] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 568500 0 ) N ;
+    - dout[76] + NET dout[76] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 572250 0 ) N ;
+    - dout_n[76] + NET dout_n[76] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 576000 0 ) N ;
+    - dout[77] + NET dout[77] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 579750 0 ) N ;
+    - dout_n[77] + NET dout_n[77] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 583500 0 ) N ;
+    - dout[78] + NET dout[78] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 587250 0 ) N ;
+    - dout_n[78] + NET dout_n[78] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 591000 0 ) N ;
+    - dout[79] + NET dout[79] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 594750 0 ) N ;
+    - dout_n[79] + NET dout_n[79] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 598500 0 ) N ;
+    - dout[80] + NET dout[80] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 602250 0 ) N ;
+    - dout_n[80] + NET dout_n[80] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 606000 0 ) N ;
+    - dout[81] + NET dout[81] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 609750 0 ) N ;
+    - dout_n[81] + NET dout_n[81] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 613500 0 ) N ;
+    - dout[82] + NET dout[82] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 617250 0 ) N ;
+    - dout_n[82] + NET dout_n[82] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 621000 0 ) N ;
+    - dout[83] + NET dout[83] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 624750 0 ) N ;
+    - dout_n[83] + NET dout_n[83] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 628500 0 ) N ;
+    - dout[84] + NET dout[84] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 632250 0 ) N ;
+    - dout_n[84] + NET dout_n[84] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 636000 0 ) N ;
+    - dout[85] + NET dout[85] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 639750 0 ) N ;
+    - dout_n[85] + NET dout_n[85] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 643500 0 ) N ;
+    - dout[86] + NET dout[86] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 647250 0 ) N ;
+    - dout_n[86] + NET dout_n[86] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 651000 0 ) N ;
+    - dout[87] + NET dout[87] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 654750 0 ) N ;
+    - dout_n[87] + NET dout_n[87] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 658500 0 ) N ;
+    - dout[88] + NET dout[88] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 662250 0 ) N ;
+    - dout_n[88] + NET dout_n[88] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 666000 0 ) N ;
+    - dout[89] + NET dout[89] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 669750 0 ) N ;
+    - dout_n[89] + NET dout_n[89] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 673500 0 ) N ;
+    - dout[90] + NET dout[90] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 677250 0 ) N ;
+    - dout_n[90] + NET dout_n[90] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 681000 0 ) N ;
+    - dout[91] + NET dout[91] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 684750 0 ) N ;
+    - dout_n[91] + NET dout_n[91] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 688500 0 ) N ;
+    - dout[92] + NET dout[92] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 692250 0 ) N ;
+    - dout_n[92] + NET dout_n[92] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 696000 0 ) N ;
+    - dout[93] + NET dout[93] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 699750 0 ) N ;
+    - dout_n[93] + NET dout_n[93] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 703500 0 ) N ;
+    - dout[94] + NET dout[94] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 707250 0 ) N ;
+    - dout_n[94] + NET dout_n[94] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 711000 0 ) N ;
+    - dout[95] + NET dout[95] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 714750 0 ) N ;
+    - dout_n[95] + NET dout_n[95] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 718500 0 ) N ;
+    - dout[96] + NET dout[96] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 722250 0 ) N ;
+    - dout_n[96] + NET dout_n[96] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 726000 0 ) N ;
+    - dout[97] + NET dout[97] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 729750 0 ) N ;
+    - dout_n[97] + NET dout_n[97] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 733500 0 ) N ;
+    - dout[98] + NET dout[98] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 737250 0 ) N ;
+    - dout_n[98] + NET dout_n[98] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 741000 0 ) N ;
+    - dout[99] + NET dout[99] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 744750 0 ) N ;
+    - dout_n[99] + NET dout_n[99] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 748500 0 ) N ;
+    - dout[100] + NET dout[100] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 752250 0 ) N ;
+    - dout_n[100] + NET dout_n[100] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 756000 0 ) N ;
+    - dout[101] + NET dout[101] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 759750 0 ) N ;
+    - dout_n[101] + NET dout_n[101] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 763500 0 ) N ;
+    - dout[102] + NET dout[102] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 767250 0 ) N ;
+    - dout_n[102] + NET dout_n[102] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 771000 0 ) N ;
+    - dout[103] + NET dout[103] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 774750 0 ) N ;
+    - dout_n[103] + NET dout_n[103] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 778500 0 ) N ;
+    - dout[104] + NET dout[104] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 782250 0 ) N ;
+    - dout_n[104] + NET dout_n[104] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 786000 0 ) N ;
+    - dout[105] + NET dout[105] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 789750 0 ) N ;
+    - dout_n[105] + NET dout_n[105] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 793500 0 ) N ;
+    - dout[106] + NET dout[106] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 797250 0 ) N ;
+    - dout_n[106] + NET dout_n[106] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 801000 0 ) N ;
+    - dout[107] + NET dout[107] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 804750 0 ) N ;
+    - dout_n[107] + NET dout_n[107] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 808500 0 ) N ;
+    - dout[108] + NET dout[108] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 812250 0 ) N ;
+    - dout_n[108] + NET dout_n[108] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 816000 0 ) N ;
+    - dout[109] + NET dout[109] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 819750 0 ) N ;
+    - dout_n[109] + NET dout_n[109] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 823500 0 ) N ;
+    - dout[110] + NET dout[110] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 827250 0 ) N ;
+    - dout_n[110] + NET dout_n[110] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 831000 0 ) N ;
+    - dout[111] + NET dout[111] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 834750 0 ) N ;
+    - dout_n[111] + NET dout_n[111] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 838500 0 ) N ;
+    - dout[112] + NET dout[112] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 842250 0 ) N ;
+    - dout_n[112] + NET dout_n[112] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 846000 0 ) N ;
+    - dout[113] + NET dout[113] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 849750 0 ) N ;
+    - dout_n[113] + NET dout_n[113] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 853500 0 ) N ;
+    - dout[114] + NET dout[114] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 857250 0 ) N ;
+    - dout_n[114] + NET dout_n[114] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 861000 0 ) N ;
+    - dout[115] + NET dout[115] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 864750 0 ) N ;
+    - dout_n[115] + NET dout_n[115] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 868500 0 ) N ;
+    - dout[116] + NET dout[116] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 872250 0 ) N ;
+    - dout_n[116] + NET dout_n[116] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 876000 0 ) N ;
+    - dout[117] + NET dout[117] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 879750 0 ) N ;
+    - dout_n[117] + NET dout_n[117] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 883500 0 ) N ;
+    - dout[118] + NET dout[118] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 887250 0 ) N ;
+    - dout_n[118] + NET dout_n[118] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 891000 0 ) N ;
+    - dout[119] + NET dout[119] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 894750 0 ) N ;
+    - dout_n[119] + NET dout_n[119] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 898500 0 ) N ;
+    - dout[120] + NET dout[120] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 902250 0 ) N ;
+    - dout_n[120] + NET dout_n[120] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 906000 0 ) N ;
+    - dout[121] + NET dout[121] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 909750 0 ) N ;
+    - dout_n[121] + NET dout_n[121] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 913500 0 ) N ;
+    - dout[122] + NET dout[122] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 917250 0 ) N ;
+    - dout_n[122] + NET dout_n[122] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 921000 0 ) N ;
+    - dout[123] + NET dout[123] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 924750 0 ) N ;
+    - dout_n[123] + NET dout_n[123] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 928500 0 ) N ;
+    - dout[124] + NET dout[124] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 932250 0 ) N ;
+    - dout_n[124] + NET dout_n[124] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 936000 0 ) N ;
+    - dout[125] + NET dout[125] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 939750 0 ) N ;
+    - dout_n[125] + NET dout_n[125] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 943500 0 ) N ;
+    - dout[126] + NET dout[126] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 947250 0 ) N ;
+    - dout_n[126] + NET dout_n[126] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 951000 0 ) N ;
+    - dout[127] + NET dout[127] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 954750 0 ) N ;
+    - dout_n[127] + NET dout_n[127] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 958500 0 ) N ;
+    - dout[128] + NET dout[128] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 962250 0 ) N ;
+    - dout_n[128] + NET dout_n[128] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 966000 0 ) N ;
+    - dout[129] + NET dout[129] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 969750 0 ) N ;
+    - dout_n[129] + NET dout_n[129] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 973500 0 ) N ;
+    - dout[130] + NET dout[130] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 977250 0 ) N ;
+    - dout_n[130] + NET dout_n[130] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 981000 0 ) N ;
+    - dout[131] + NET dout[131] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 984750 0 ) N ;
+    - dout_n[131] + NET dout_n[131] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 988500 0 ) N ;
+    - dout[132] + NET dout[132] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 992250 0 ) N ;
+    - dout_n[132] + NET dout_n[132] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 996000 0 ) N ;
+    - dout[133] + NET dout[133] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 999750 0 ) N ;
+    - dout_n[133] + NET dout_n[133] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1003500 0 ) N ;
+    - dout[134] + NET dout[134] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1007250 0 ) N ;
+    - dout_n[134] + NET dout_n[134] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1011000 0 ) N ;
+    - dout[135] + NET dout[135] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1014750 0 ) N ;
+    - dout_n[135] + NET dout_n[135] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1018500 0 ) N ;
+    - dout[136] + NET dout[136] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1022250 0 ) N ;
+    - dout_n[136] + NET dout_n[136] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1026000 0 ) N ;
+    - dout[137] + NET dout[137] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1029750 0 ) N ;
+    - dout_n[137] + NET dout_n[137] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1033500 0 ) N ;
+    - dout[138] + NET dout[138] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1037250 0 ) N ;
+    - dout_n[138] + NET dout_n[138] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1041000 0 ) N ;
+    - dout[139] + NET dout[139] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1044750 0 ) N ;
+    - dout_n[139] + NET dout_n[139] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1048500 0 ) N ;
+    - dout[140] + NET dout[140] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1052250 0 ) N ;
+    - dout_n[140] + NET dout_n[140] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1056000 0 ) N ;
+    - dout[141] + NET dout[141] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1059750 0 ) N ;
+    - dout_n[141] + NET dout_n[141] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1063500 0 ) N ;
+    - dout[142] + NET dout[142] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1067250 0 ) N ;
+    - dout_n[142] + NET dout_n[142] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1071000 0 ) N ;
+    - dout[143] + NET dout[143] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1074750 0 ) N ;
+    - dout_n[143] + NET dout_n[143] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1078500 0 ) N ;
+    - dout[144] + NET dout[144] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1082250 0 ) N ;
+    - dout_n[144] + NET dout_n[144] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1086000 0 ) N ;
+    - dout[145] + NET dout[145] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1089750 0 ) N ;
+    - dout_n[145] + NET dout_n[145] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1093500 0 ) N ;
+    - dout[146] + NET dout[146] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1097250 0 ) N ;
+    - dout_n[146] + NET dout_n[146] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1101000 0 ) N ;
+    - dout[147] + NET dout[147] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1104750 0 ) N ;
+    - dout_n[147] + NET dout_n[147] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1108500 0 ) N ;
+    - dout[148] + NET dout[148] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1112250 0 ) N ;
+    - dout_n[148] + NET dout_n[148] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1116000 0 ) N ;
+    - dout[149] + NET dout[149] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1119750 0 ) N ;
+    - dout_n[149] + NET dout_n[149] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1123500 0 ) N ;
+    - dout[150] + NET dout[150] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1127250 0 ) N ;
+    - dout_n[150] + NET dout_n[150] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1131000 0 ) N ;
+    - dout[151] + NET dout[151] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1134750 0 ) N ;
+    - dout_n[151] + NET dout_n[151] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1138500 0 ) N ;
+    - dout[152] + NET dout[152] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1142250 0 ) N ;
+    - dout_n[152] + NET dout_n[152] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1146000 0 ) N ;
+    - dout[153] + NET dout[153] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1149750 0 ) N ;
+    - dout_n[153] + NET dout_n[153] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1153500 0 ) N ;
+    - dout[154] + NET dout[154] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1157250 0 ) N ;
+    - dout_n[154] + NET dout_n[154] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1161000 0 ) N ;
+    - dout[155] + NET dout[155] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1164750 0 ) N ;
+    - dout_n[155] + NET dout_n[155] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1168500 0 ) N ;
+    - dout[156] + NET dout[156] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1172250 0 ) N ;
+    - dout_n[156] + NET dout_n[156] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1176000 0 ) N ;
+    - dout[157] + NET dout[157] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1179750 0 ) N ;
+    - dout_n[157] + NET dout_n[157] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1183500 0 ) N ;
+    - dout[158] + NET dout[158] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1187250 0 ) N ;
+    - dout_n[158] + NET dout_n[158] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1191000 0 ) N ;
+    - dout[159] + NET dout[159] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1194750 0 ) N ;
+    - dout_n[159] + NET dout_n[159] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1198500 0 ) N ;
+    - dout[160] + NET dout[160] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1202250 0 ) N ;
+    - dout_n[160] + NET dout_n[160] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1206000 0 ) N ;
+    - dout[161] + NET dout[161] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1209750 0 ) N ;
+    - dout_n[161] + NET dout_n[161] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1213500 0 ) N ;
+    - dout[162] + NET dout[162] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1217250 0 ) N ;
+    - dout_n[162] + NET dout_n[162] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1221000 0 ) N ;
+    - dout[163] + NET dout[163] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1224750 0 ) N ;
+    - dout_n[163] + NET dout_n[163] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1228500 0 ) N ;
+    - dout[164] + NET dout[164] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1232250 0 ) N ;
+    - dout_n[164] + NET dout_n[164] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1236000 0 ) N ;
+    - dout[165] + NET dout[165] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1239750 0 ) N ;
+    - dout_n[165] + NET dout_n[165] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1243500 0 ) N ;
+    - dout[166] + NET dout[166] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1247250 0 ) N ;
+    - dout_n[166] + NET dout_n[166] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1251000 0 ) N ;
+    - dout[167] + NET dout[167] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1254750 0 ) N ;
+    - dout_n[167] + NET dout_n[167] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1258500 0 ) N ;
+    - dout[168] + NET dout[168] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1262250 0 ) N ;
+    - dout_n[168] + NET dout_n[168] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1266000 0 ) N ;
+    - dout[169] + NET dout[169] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1269750 0 ) N ;
+    - dout_n[169] + NET dout_n[169] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1273500 0 ) N ;
+    - dout[170] + NET dout[170] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1277250 0 ) N ;
+    - dout_n[170] + NET dout_n[170] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1281000 0 ) N ;
+    - dout[171] + NET dout[171] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1284750 0 ) N ;
+    - dout_n[171] + NET dout_n[171] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1288500 0 ) N ;
+    - dout[172] + NET dout[172] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1292250 0 ) N ;
+    - dout_n[172] + NET dout_n[172] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1296000 0 ) N ;
+    - dout[173] + NET dout[173] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1299750 0 ) N ;
+    - dout_n[173] + NET dout_n[173] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1303500 0 ) N ;
+    - dout[174] + NET dout[174] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1307250 0 ) N ;
+    - dout_n[174] + NET dout_n[174] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1311000 0 ) N ;
+    - dout[175] + NET dout[175] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1314750 0 ) N ;
+    - dout_n[175] + NET dout_n[175] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1318500 0 ) N ;
+    - dout[176] + NET dout[176] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1322250 0 ) N ;
+    - dout_n[176] + NET dout_n[176] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1326000 0 ) N ;
+    - dout[177] + NET dout[177] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1329750 0 ) N ;
+    - dout_n[177] + NET dout_n[177] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1333500 0 ) N ;
+    - dout[178] + NET dout[178] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1337250 0 ) N ;
+    - dout_n[178] + NET dout_n[178] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1341000 0 ) N ;
+    - dout[179] + NET dout[179] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1344750 0 ) N ;
+    - dout_n[179] + NET dout_n[179] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1348500 0 ) N ;
+    - dout[180] + NET dout[180] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1352250 0 ) N ;
+    - dout_n[180] + NET dout_n[180] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1356000 0 ) N ;
+    - dout[181] + NET dout[181] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1359750 0 ) N ;
+    - dout_n[181] + NET dout_n[181] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1363500 0 ) N ;
+    - dout[182] + NET dout[182] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1367250 0 ) N ;
+    - dout_n[182] + NET dout_n[182] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1371000 0 ) N ;
+    - dout[183] + NET dout[183] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1374750 0 ) N ;
+    - dout_n[183] + NET dout_n[183] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1378500 0 ) N ;
+    - dout[184] + NET dout[184] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1382250 0 ) N ;
+    - dout_n[184] + NET dout_n[184] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1386000 0 ) N ;
+    - dout[185] + NET dout[185] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1389750 0 ) N ;
+    - dout_n[185] + NET dout_n[185] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1393500 0 ) N ;
+    - dout[186] + NET dout[186] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1397250 0 ) N ;
+    - dout_n[186] + NET dout_n[186] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1401000 0 ) N ;
+    - dout[187] + NET dout[187] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1404750 0 ) N ;
+    - dout_n[187] + NET dout_n[187] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1408500 0 ) N ;
+    - dout[188] + NET dout[188] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1412250 0 ) N ;
+    - dout_n[188] + NET dout_n[188] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1416000 0 ) N ;
+    - dout[189] + NET dout[189] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1419750 0 ) N ;
+    - dout_n[189] + NET dout_n[189] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1423500 0 ) N ;
+    - dout[190] + NET dout[190] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1427250 0 ) N ;
+    - dout_n[190] + NET dout_n[190] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1431000 0 ) N ;
+    - dout[191] + NET dout[191] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1434750 0 ) N ;
+    - dout_n[191] + NET dout_n[191] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1438500 0 ) N ;
+    - dout[192] + NET dout[192] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1442250 0 ) N ;
+    - dout_n[192] + NET dout_n[192] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1446000 0 ) N ;
+    - dout[193] + NET dout[193] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1449750 0 ) N ;
+    - dout_n[193] + NET dout_n[193] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1453500 0 ) N ;
+    - dout[194] + NET dout[194] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1457250 0 ) N ;
+    - dout_n[194] + NET dout_n[194] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1461000 0 ) N ;
+    - dout[195] + NET dout[195] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1464750 0 ) N ;
+    - dout_n[195] + NET dout_n[195] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1468500 0 ) N ;
+    - dout[196] + NET dout[196] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1472250 0 ) N ;
+    - dout_n[196] + NET dout_n[196] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1476000 0 ) N ;
+    - dout[197] + NET dout[197] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1479750 0 ) N ;
+    - dout_n[197] + NET dout_n[197] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1483500 0 ) N ;
+    - dout[198] + NET dout[198] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1487250 0 ) N ;
+    - dout_n[198] + NET dout_n[198] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1491000 0 ) N ;
+    - dout[199] + NET dout[199] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1494750 0 ) N ;
+    - dout_n[199] + NET dout_n[199] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1498500 0 ) N ;
+    - dout[200] + NET dout[200] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1502250 0 ) N ;
+    - dout_n[200] + NET dout_n[200] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1506000 0 ) N ;
+    - dout[201] + NET dout[201] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1509750 0 ) N ;
+    - dout_n[201] + NET dout_n[201] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1513500 0 ) N ;
+    - dout[202] + NET dout[202] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1517250 0 ) N ;
+    - dout_n[202] + NET dout_n[202] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1521000 0 ) N ;
+    - dout[203] + NET dout[203] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1524750 0 ) N ;
+    - dout_n[203] + NET dout_n[203] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1528500 0 ) N ;
+    - dout[204] + NET dout[204] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1532250 0 ) N ;
+    - dout_n[204] + NET dout_n[204] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1536000 0 ) N ;
+    - dout[205] + NET dout[205] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1539750 0 ) N ;
+    - dout_n[205] + NET dout_n[205] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1543500 0 ) N ;
+    - dout[206] + NET dout[206] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1547250 0 ) N ;
+    - dout_n[206] + NET dout_n[206] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1551000 0 ) N ;
+    - dout[207] + NET dout[207] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1554750 0 ) N ;
+    - dout_n[207] + NET dout_n[207] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1558500 0 ) N ;
+    - dout[208] + NET dout[208] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1562250 0 ) N ;
+    - dout_n[208] + NET dout_n[208] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1566000 0 ) N ;
+    - dout[209] + NET dout[209] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1569750 0 ) N ;
+    - dout_n[209] + NET dout_n[209] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1573500 0 ) N ;
+    - dout[210] + NET dout[210] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1577250 0 ) N ;
+    - dout_n[210] + NET dout_n[210] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1581000 0 ) N ;
+    - dout[211] + NET dout[211] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1584750 0 ) N ;
+    - dout_n[211] + NET dout_n[211] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1588500 0 ) N ;
+    - dout[212] + NET dout[212] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1592250 0 ) N ;
+    - dout_n[212] + NET dout_n[212] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1596000 0 ) N ;
+    - dout[213] + NET dout[213] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1599750 0 ) N ;
+    - dout_n[213] + NET dout_n[213] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1603500 0 ) N ;
+    - dout[214] + NET dout[214] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1607250 0 ) N ;
+    - dout_n[214] + NET dout_n[214] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1611000 0 ) N ;
+    - dout[215] + NET dout[215] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1614750 0 ) N ;
+    - dout_n[215] + NET dout_n[215] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1618500 0 ) N ;
+    - dout[216] + NET dout[216] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1622250 0 ) N ;
+    - dout_n[216] + NET dout_n[216] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1626000 0 ) N ;
+    - dout[217] + NET dout[217] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1629750 0 ) N ;
+    - dout_n[217] + NET dout_n[217] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1633500 0 ) N ;
+    - dout[218] + NET dout[218] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1637250 0 ) N ;
+    - dout_n[218] + NET dout_n[218] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1641000 0 ) N ;
+    - dout[219] + NET dout[219] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1644750 0 ) N ;
+    - dout_n[219] + NET dout_n[219] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1648500 0 ) N ;
+    - dout[220] + NET dout[220] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1652250 0 ) N ;
+    - dout_n[220] + NET dout_n[220] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1656000 0 ) N ;
+    - dout[221] + NET dout[221] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1659750 0 ) N ;
+    - dout_n[221] + NET dout_n[221] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1663500 0 ) N ;
+    - dout[222] + NET dout[222] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1667250 0 ) N ;
+    - dout_n[222] + NET dout_n[222] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1671000 0 ) N ;
+    - dout[223] + NET dout[223] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1674750 0 ) N ;
+    - dout_n[223] + NET dout_n[223] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1678500 0 ) N ;
+    - dout[224] + NET dout[224] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1682250 0 ) N ;
+    - dout_n[224] + NET dout_n[224] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1686000 0 ) N ;
+    - dout[225] + NET dout[225] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1689750 0 ) N ;
+    - dout_n[225] + NET dout_n[225] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1693500 0 ) N ;
+    - dout[226] + NET dout[226] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1697250 0 ) N ;
+    - dout_n[226] + NET dout_n[226] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1701000 0 ) N ;
+    - dout[227] + NET dout[227] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1704750 0 ) N ;
+    - dout_n[227] + NET dout_n[227] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1708500 0 ) N ;
+    - dout[228] + NET dout[228] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1712250 0 ) N ;
+    - dout_n[228] + NET dout_n[228] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1716000 0 ) N ;
+    - dout[229] + NET dout[229] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1719750 0 ) N ;
+    - dout_n[229] + NET dout_n[229] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1723500 0 ) N ;
+    - dout[230] + NET dout[230] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1727250 0 ) N ;
+    - dout_n[230] + NET dout_n[230] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1731000 0 ) N ;
+    - dout[231] + NET dout[231] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1734750 0 ) N ;
+    - dout_n[231] + NET dout_n[231] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1738500 0 ) N ;
+    - dout[232] + NET dout[232] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1742250 0 ) N ;
+    - dout_n[232] + NET dout_n[232] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1746000 0 ) N ;
+    - dout[233] + NET dout[233] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1749750 0 ) N ;
+    - dout_n[233] + NET dout_n[233] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1753500 0 ) N ;
+    - dout[234] + NET dout[234] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1757250 0 ) N ;
+    - dout_n[234] + NET dout_n[234] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1761000 0 ) N ;
+    - dout[235] + NET dout[235] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1764750 0 ) N ;
+    - dout_n[235] + NET dout_n[235] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1768500 0 ) N ;
+    - dout[236] + NET dout[236] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1772250 0 ) N ;
+    - dout_n[236] + NET dout_n[236] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1776000 0 ) N ;
+    - dout[237] + NET dout[237] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1779750 0 ) N ;
+    - dout_n[237] + NET dout_n[237] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1783500 0 ) N ;
+    - dout[238] + NET dout[238] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1787250 0 ) N ;
+    - dout_n[238] + NET dout_n[238] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1791000 0 ) N ;
+    - dout[239] + NET dout[239] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1794750 0 ) N ;
+    - dout_n[239] + NET dout_n[239] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1798500 0 ) N ;
+    - dout[240] + NET dout[240] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1802250 0 ) N ;
+    - dout_n[240] + NET dout_n[240] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1806000 0 ) N ;
+    - dout[241] + NET dout[241] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1809750 0 ) N ;
+    - dout_n[241] + NET dout_n[241] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1813500 0 ) N ;
+    - dout[242] + NET dout[242] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1817250 0 ) N ;
+    - dout_n[242] + NET dout_n[242] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1821000 0 ) N ;
+    - dout[243] + NET dout[243] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1824750 0 ) N ;
+    - dout_n[243] + NET dout_n[243] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1828500 0 ) N ;
+    - dout[244] + NET dout[244] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1832250 0 ) N ;
+    - dout_n[244] + NET dout_n[244] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1836000 0 ) N ;
+    - dout[245] + NET dout[245] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1839750 0 ) N ;
+    - dout_n[245] + NET dout_n[245] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1843500 0 ) N ;
+    - dout[246] + NET dout[246] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1847250 0 ) N ;
+    - dout_n[246] + NET dout_n[246] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1851000 0 ) N ;
+    - dout[247] + NET dout[247] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1854750 0 ) N ;
+    - dout_n[247] + NET dout_n[247] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1858500 0 ) N ;
+    - dout[248] + NET dout[248] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1862250 0 ) N ;
+    - dout_n[248] + NET dout_n[248] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1866000 0 ) N ;
+    - dout[249] + NET dout[249] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1869750 0 ) N ;
+    - dout_n[249] + NET dout_n[249] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1873500 0 ) N ;
+    - dout[250] + NET dout[250] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1877250 0 ) N ;
+    - dout_n[250] + NET dout_n[250] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1881000 0 ) N ;
+    - dout[251] + NET dout[251] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1884750 0 ) N ;
+    - dout_n[251] + NET dout_n[251] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1888500 0 ) N ;
+    - dout[252] + NET dout[252] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1892250 0 ) N ;
+    - dout_n[252] + NET dout_n[252] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1896000 0 ) N ;
+    - dout[253] + NET dout[253] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1899750 0 ) N ;
+    - dout_n[253] + NET dout_n[253] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1903500 0 ) N ;
+    - dout[254] + NET dout[254] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1907250 0 ) N ;
+    - dout_n[254] + NET dout_n[254] + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 0 ) ( 300 600 )
+        + PLACED ( 1911000 0 ) N ;
+    - clk + NET clk + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 147115 80000 ) N ;
+    - rst_n + NET rst_n + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 294230 80000 ) N ;
+    - stb + NET stb + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 441345 80000 ) N ;
+    - valid + NET valid + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 588460 80000 ) N ;
+    - ready + NET ready + DIRECTION OUTPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 735575 80000 ) N ;
+    - code[0] + NET code[0] + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 882690 80000 ) N ;
+    - code[1] + NET code[1] + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 1029810 80000 ) N ;
+    - code[2] + NET code[2] + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 1176925 80000 ) N ;
+    - code[3] + NET code[3] + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 1324040 80000 ) N ;
+    - code[4] + NET code[4] + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 1471155 80000 ) N ;
+    - code[5] + NET code[5] + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 1618270 80000 ) N ;
+    - code[6] + NET code[6] + DIRECTION INPUT + USE SIGNAL
+      + PORT
+        + LAYER MET2 ( -300 -300 ) ( 300 300 )
+        + PLACED ( 1765385 80000 ) N ;
+END PINS
+END DESIGN
