@@ -36,9 +36,11 @@ supply sweep at tt (`pdk_cell.py ics55 --vdd ... --corner tt`) gives:
 
 | Vdd | vbp | vcp | carry | full scale | settle | verdict |
 |---|---|---|---|---|---|---|
-| 1.14 V | 0.553 | **-0.040** | -0.069 | -0.489 | inf | **FAIL** |
-| 1.20 V | 0.613 | 0.020 | -0.047 | -0.439 | 2.03 / 2.41 ns | PASS |
-| 1.26 V | 0.673 | 0.080 | -0.027 | -0.391 | 2.07 / 2.52 ns | PASS |
+| 1.14 V tt | 0.553 | **-0.040** | -0.069 | -0.489 | inf | **FAIL** |
+| 1.20 V tt | 0.613 | 0.020 | -0.047 | -0.439 | 2.03 / 2.41 ns | PASS |
+| 1.26 V tt | 0.673 | 0.080 | -0.027 | -0.391 | 2.07 / 2.52 ns | PASS |
+| 1.20 V **ss** | 0.567 | **-0.079** | — | — | — | **bias invalid** |
+| 1.20 V **ff** | 0.660 | 0.119 | — | — | — | positive |
 
 At 1.14 V the replica wants a negative cascode gate, which the current sink
 cannot produce; the full-scale step never enters the 0.5 LSB window.  The
@@ -46,6 +48,13 @@ gate now fails on a negative `vcp` or a missing settle time, so this cannot
 slip through as a PASS.  At 1.2 V the full-scale margin to the 0.5 LSB limit
 is only 0.061 LSB, so the bias generator (not the mirror sizing) is the
 remaining ics55 design risk.
+
+**Corner finding (2026-11-14):** the 1.20-1.26 V range is **tt only**.  At
+1.20 V **ss** the OP gives `vcp = -0.079 V` (the replica needs a negative
+cascode gate); at **ff** it is +0.119 V.  So a 1.2 V ss part is outside the
+series-replica bias range, and a frozen 1.20 V minimum is not a corner-safe
+spec.  A controlled bias buffer / regulated cascode is therefore required,
+not optional, before a production supply spec can be claimed.
 
 ### Bias decision (2026-11-13): keep the series replica
 
