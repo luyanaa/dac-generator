@@ -85,3 +85,27 @@ pdk:
     res_l_param: l
     res_rsh: 2000.0
     vmax: 3.3
+
+  ihp-sg13g2:
+    # 1.2 V sg13_lv MOS + rppd 260 ohm/sq.  1 kOhm unit at W=2u -> L=7.692u.
+    vdd: 1.2
+    vref: 1.2
+    vmax: 1.2
+    model_lib: models/cornerMOSlv.lib
+    model_lib_res: models/cornerRES.lib
+    design_file: null
+    res_subckt: rppd
+    res_ports: [p, n, b]
+    nfet: sg13_lv_nmos
+    pfet: sg13_lv_pmos
+    res_w_param: w
+    res_l_param: l
+    res_rsh: 260.0
+    # 4 kOhm unit (L=30.769 um at W=2) chosen for the IHP rppd PCell:
+    # the 1 kOhm short unit has 0.001-grid pSD/polyres slivers and fails
+    # the PDK offgrid rule; 4 kOhm is DRC clean and is the 4 kOhm string
+    # option already discussed in the README.
+    unit_l: 30.7692
+    tg_wn: 8.0
+    tg_wp: 10.0
+    tg_l: 0.13

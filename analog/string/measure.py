@@ -15,10 +15,21 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+
+
+def vdd_of(pdk: str) -> float:
+    try:
+        import yaml
+    except ImportError:
+        return 3.3
+    with open(ROOT / "string.yaml") as f:
+        cfg = yaml.safe_load(f)
+    return float(cfg["pdk"].get(pdk, {}).get("vdd", cfg["vdd"]))
 
 
 def read_cols(path: Path):
@@ -89,7 +100,8 @@ def measure_dc(path: Path, nbits: int, brief: bool = False) -> int:
     return 0
 
 
-def measure_tran(path: Path, nbits: int, step_us: float = 10.0) -> int:
+def measure_tran(path: Path, nbits: int, step_us: float = 10.0,
+                 vdd: float = 3.3) -> int:
     rows = read_cols(path)
     if not rows:
         print("error: empty tran data", file=sys.stderr)
@@ -98,7 +110,7 @@ def measure_tran(path: Path, nbits: int, step_us: float = 10.0) -> int:
     vtap = [r[1] for r in rows]
     vout = [r[2] for r in rows]
     code = [r[3] for r in rows]
-    lsb = 3.3 / (2 ** nbits - 1)
+    lsb = vdd / (2 ** nbits - 1)
     tol = 0.5 * lsb
     step = step_us * 1e-6
     t_end = t[-1]
@@ -137,13 +149,15 @@ def main() -> None:
     ap.add_argument("--bits", type=int, default=8)
     ap.add_argument("--brief", action="store_true",
                     help="machine-readable DNL/INL lines only")
+    ap.add_argument("--vdd", type=float, default=None)
     a = ap.parse_args()
     p = Path(a.path) if a.path else ROOT / "build" / f"{a.mode}.dat"
     if not p.is_file():
         sys.exit(f"missing {p}")
     if a.mode == "dc":
         sys.exit(measure_dc(p, a.bits, a.brief))
-    sys.exit(measure_tran(p, a.bits))
+    vdd = a.vdd if a.vdd is not None else vdd_of(os.environ.get("PDK", "gf180"))
+    sys.exit(measure_tran(p, a.bits, vdd=vdd))
 
 
 if __name__ == "__main__":

@@ -168,3 +168,28 @@ What the generator does **not** contain, and still not verified:
 
 The pre-layout numbers in the tables above are schematic-level and still
 stand; the string macro changes none of them.
+
+## IHP sg13g2 (1.2 V) implementation
+
+`string.yaml` has an `ihp-sg13g2` binding: `sg13_lv` 1.2 V MOS, `rppd`
+260 ohm/sq, **4 kOhm unit** (W=2 um, L=30.769 um) and 100 ohm-class
+transmission gates (`Wn=8/Wp=10 um`, L=0.13 um).  The 4 kOhm choice is the
+README's 4 kOhm string option; the 1 kOhm short rppd PCell has 0.001-grid
+pSD/polyres slivers that fail the PDK offgrid rule.
+
+```sh
+python3 analog/string/ihp_signoff.py
+```
+
+Result (`analog/string/build/ihp_signoff.json`):
+
+| gate | result |
+|---|---|
+| pre-layout DC (MOS TG tree) | DNL **-0.038..+0.008 LSB**, INL **-0.147..+0.129 LSB**, monotonic |
+| settling (ideal 100 ohm switches, 0/1/2/3/127/128/129/254/255/0) | worst **290 ns** to 0.5 LSB |
+| layout | 255 `rppd` PCells, 255 taps (`t1..t254`, vss, vref), DRC **0 items** |
+| KLayout LVS (reference 255-resistor string) | **PASS, Netlists match** |
+
+The layout is the matched 255-unit string, exactly the generated split of the
+gf180 leaf: the 255-TG binary tree and the output follower remain class-C
+hand layout.
