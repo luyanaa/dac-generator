@@ -225,9 +225,9 @@ def main() -> int:
         out_net = "cd_" + tag
         wc = W if tag.startswith("u") else w_bin
         top.insert(pya.CellInstArray(pfet_pcell(MIR_L, wc).cell_index(),
-                                     pya.Trans(int(x * 1000), 0)))
+                                     pya.Trans(int(round(x * 1000)), 0)))
         top.insert(pya.CellInstArray(pfet_pcell(CAS_L, wc).cell_index(),
-                                     pya.Trans(int((x + CAS_DX) * 1000), 0)))
+                                     pya.Trans(int(round((x + CAS_DX) * 1000)), 0)))
         # PCell terminal geometry, for the self-check only.
         lt = left_term()
         rt_m = right_term(MIR_L)
@@ -254,11 +254,11 @@ def main() -> int:
         # --- straps -------------------------------------------------------
         add(m1, x - 0.01, Y_VDD[0], x + 0.37, 0.0, "vdd")            # source
 
-        add(m1, x + rt_m[0], wc + 0.01, x + rt_m[1], 8.55, node)     # riser
-        add(m1, x + CAS_DX + lt[0], wc + 0.01,
+        add(m1, x + rt_m[0], wc, x + rt_m[1], 8.55, node)     # riser
+        add(m1, x + CAS_DX + lt[0], wc,
             x + CAS_DX + lt[1], 8.55, node)                           # cas riser
         add(m1, x + rt_m[0], 8.25, x + CAS_DX + 0.33, 8.55, node)    # bridge
-        add(m1, x + CAS_DX + rt_c[0], wc + 0.01,
+        add(m1, x + CAS_DX + rt_c[0], wc,
             x + CAS_DX + rt_c[1], Y_PAD[0], out_net)                 # out riser
         add(m1, x + CAS_DX + rt_c[0], Y_PAD[0],
             x + CAS_DX + rt_c[1], Y_PAD[1], out_net)                 # out pad
@@ -267,7 +267,7 @@ def main() -> int:
               out_net)
 
         g = gate_span(MIR_L)
-        add(poly, x + g[0], wc + 0.22, x + g[1], Y_RB_A[1], "vbp")
+        add(poly, x + g[0], wc + 0.10, x + g[1], Y_RB_A[1], "vbp")
         # vbp pickup, mirror gate -> poly contact -> M1 pad -> via1 -> M2 rail.
         # Both bias rails cannot live on poly: the cascode gate extension has
         # to cross the mirror-gate rail band, so vbp is carried on metal2 and
@@ -276,7 +276,7 @@ def main() -> int:
         top.shapes(cont).insert(box(x + 0.58, 8.52, x + 0.80, 8.74))
         top.shapes(via1).insert(box(x + 0.90, 8.50, x + 1.16, 8.76))
         g = gate_span(CAS_L)
-        add(poly, x + CAS_DX + g[0], wc + 0.22,
+        add(poly, x + CAS_DX + g[0], wc + 0.10,
             x + CAS_DX + g[1], Y_RB_B[1], "vcp")
         gate_ext_cas.append((x + CAS_DX + g[0], x + CAS_DX + g[1]))
 
@@ -315,34 +315,34 @@ def main() -> int:
     # so vbp is the mirror gate and vcp one cascode Vgs below it: exactly the
     # bias the 30 cells use.  No extra pad, the vcp pad is the iref node.
     top.insert(pya.CellInstArray(pcell_mir.cell_index(),
-                                 pya.Trans(int(x_b * 1000), 0)))
+                                 pya.Trans(int(round(x_b * 1000)), 0)))
     top.insert(pya.CellInstArray(pcell_cas.cell_index(),
-                                 pya.Trans(int((x_b + CAS_DX) * 1000), 0)))
+                                 pya.Trans(int(round((x_b + CAS_DX) * 1000)), 0)))
     # Mref: source and bulk to vdd, gate+drain to vbp.  Use the same pickup
     # as a mirror cell (poly riser -> contact -> M1 pad -> via1), kept above
     # the source terminal so the M1 pad cannot crowd it.
     g = gate_span(MIR_L)                      # 0.44..1.44 for the 8/1 device
     rt = right_term(MIR_L)                    # 1.51..1.89
     add(m1, x_b - 0.01, Y_VDD[0], x_b + 0.37, 0.0, "vdd")
-    add(poly, x_b + g[0], W + 0.22, x_b + g[1], Y_RB_A[1], "vbp")
+    add(poly, x_b + g[0], W + 0.10, x_b + g[1], Y_RB_A[1], "vbp")
     add(m1, x_b + 0.50, 8.44, x_b + rt[1], 8.80, "vbp")
     top.shapes(cont).insert(box(x_b + 0.58, 8.52, x_b + 0.80, 8.74))
-    add(m1, x_b + rt[0], 8.01, x_b + rt[1], 8.44, "vbp")
+    add(m1, x_b + rt[0], W, x_b + rt[1], 8.44, "vbp")
     top.shapes(via1).insert(box(x_b + 0.90, 8.50, x_b + 1.16, 8.76))
     # Mcas: source to vbp, bulk to vdd, gate+drain to vcp
     g = gate_span(CAS_L)                      # 0.44..0.94 for the 8/0.5 device
     rt = right_term(CAS_L)                    # 0.79..1.17
-    add(m1, x_b + CAS_DX - 0.01, 8.01, x_b + CAS_DX + 0.37, 8.80, "vbp")
+    add(m1, x_b + CAS_DX - 0.01, 7.99, x_b + CAS_DX + 0.37, 8.80, "vbp")
     top.shapes(via1).insert(box(x_b + CAS_DX + 0.05, 8.46,
                                 x_b + CAS_DX + 0.31, 8.72))
 
-    add(poly, x_b + CAS_DX + g[0], W + 0.22,
+    add(poly, x_b + CAS_DX + g[0], W + 0.10,
         x_b + CAS_DX + g[1], Y_RB_B[1], "vcp")
     add(m1, x_b + CAS_DX + 0.50, Y_RB_B[0],
         x_b + CAS_DX + rt[1] + 0.35, 10.05, "vcp")
     top.shapes(cont).insert(box(x_b + CAS_DX + 0.58, 9.53,
                                 x_b + CAS_DX + 0.80, 9.75))
-    add(m1, x_b + CAS_DX + rt[0], 8.01,
+    add(m1, x_b + CAS_DX + rt[0], W - 0.01,
         x_b + CAS_DX + rt[1], Y_RB_B[0], "vcp")
     label(x_b + CAS_DX + rt[1] + 0.1, 9.75, "vcp")
 
@@ -367,9 +367,12 @@ def main() -> int:
     sw_w = float(cfg.get("sw_w", 4.0))
     pcell_n = ly.create_cell("nmos", "SG13_dev",
                              {"l": f"{sw_l:g}u", "w": f"{sw_w:g}u", "ng": 1})
+    # IHP SG13_dev nmos rotated R90 (W=4, L=0.28): active Y..Y+0.96,
+    # source M1 Y+0.07..Y+0.23, drain M1 Y+0.73..Y+0.89, gate poly
+    # Y+0.34..Y+0.62 spanning X-4.22..X+0.22.
     y_a, y_b = 12.0, 16.0
-    y_iout = y_a + 1.17
-    y_idump = y_b + 1.17
+    y_iout = y_a + 1.15
+    y_idump = y_b + 1.15
 
     # Analog-facing pin row.  Two pins per cell on a uniform 2.75 um grid (half
     # the 5.5 um cell pitch), all on M2, all at the same y: that is the edge a
@@ -392,19 +395,22 @@ def main() -> int:
         regions.setdefault((m1, "cd_" + tag), pya.Region()).insert(
             box(X - 4.0, Y - 0.01, X, Y + 0.37))
         regions.setdefault((m1, row), pya.Region()).insert(
-            box(X - 4.0, Y + 0.79, X, Y + 1.17))
+            box(X - 4.0, Y + 0.73, X, Y + 0.89))
         regions.setdefault((poly, gate), pya.Region()).insert(
-            box(X - 4.22, Y + 0.44, X + 0.22, Y + 0.72))
-        regions.setdefault((m1, "vss"), pya.Region()).insert(
-            box(X - 4.0, Y - 0.76, X, Y - 0.32))
+            box(X - 4.22, Y + 0.34, X + 0.22, Y + 0.62))
+        # Drain sits at Y+0.73..Y+0.89; raise it to the row bus on the far
+        # left of the device, where the gate landing cannot collide.
+        rib = (Y + 0.85, (y_iout if row == "iout" else y_idump) + 0.02)
+        if rib[0] < rib[1]:
+            add(m1, X - 3.45, rib[0], X - 3.05, rib[1], row)
 
     # iout / idump buses: M1 bars that merge with every drain strip.  The 0.02
     # of overlap is enough because the extractor merges overlapping metal; the
     # LVS gate then proves every switch drain really landed on its bus.
-    add(m1, -0.76, y_iout - 0.02, x_b + 1.0, y_iout + 0.30, "iout")
-    label(0.5, y_iout + 0.14, "iout")
-    add(m1, -0.76, y_idump - 0.02, x_b + 1.0, y_idump + 0.30, "idump")
-    label(0.5, y_idump + 0.14, "idump")
+    add(m1, -3.8, y_iout, x_b + 1.0, y_iout + 0.22, "iout")
+    label(0.5, y_iout + 0.11, "iout")
+    add(m1, -3.8, y_idump, x_b + 1.0, y_idump + 0.22, "idump")
+    label(0.5, y_idump + 0.11, "idump")
     # Bulk-tie rails: one M1 bar per row, strapped together on M2 at the far
     # right (needs 0.06 of M2 around each via1).
     add(m1, -0.76, y_a - 0.78, x_b + 1.0, y_a - 0.30, "vss")
@@ -430,19 +436,20 @@ def main() -> int:
         top.shapes(via1).insert(box(x + 4.05, 9.80, x + 4.31, 10.06))
         add(m2, x + 3.99, 9.74, x + 4.37, 10.30, "cd_" + tag)
         add(m2, x + 0.06, 10.00, x + 4.37, 10.30, "cd_" + tag)
-        add(m2, x + 0.06, 10.00, x + 0.44, y_a + 0.05, "cd_" + tag)
-        top.shapes(via1).insert(box(x + 0.12, y_a + 0.05,
-                                    x + 0.38, y_a + 0.31))
-        add(m2, x + 0.06, y_a + 0.05, x + 0.44, y_b + 0.37, "cd_" + tag)
-        top.shapes(via1).insert(box(x + 0.12, y_b + 0.05,
-                                    x + 0.38, y_b + 0.31))
+        add(m2, x + 0.06, 10.00, x + 0.44, y_b + 0.30, "cd_" + tag)
+        for yy in (y_a, y_b):
+            # Source strip is only 0.16 tall; widen it on M1 before the
+            # 0.19 via1 so the enclosure rule is satisfied.
+            add(m1, x + 0.00, yy + 0.02, x + 0.44, yy + 0.30, "cd_" + tag)
+            top.shapes(via1).insert(box(x + 0.12, yy + 0.065,
+                                        x + 0.38, yy + 0.255))
 
         # Row A gate: poly paddle -> contact -> M1 landing -> via1 -> M2
         # riser to the control pad.  The riser is the pad's only layer, so
         # the digital macro connects on M2.
         add(poly, x + 0.62, y_a + 0.34, x + 1.26, y_a + 0.82, "swa_" + tag)
-        top.shapes(cont).insert(box(x + 0.86, y_a + 0.46,
-                                    x + 1.08, y_a + 0.68))
+        top.shapes(cont).insert(box(x + 0.86, y_a + 0.42,
+                                    x + 1.08, y_a + 0.64))
         add(m1, x + 0.80, y_a + 0.40, x + 1.20, y_a + 0.80, "swa_" + tag)
         top.shapes(via1).insert(box(x + 0.87, y_a + 0.48,
                                     x + 1.13, y_a + 0.74))
@@ -505,6 +512,52 @@ def main() -> int:
     if problems:
         sys.exit(1)
 
+    # One continuous n-well across the array: the per-cell bars leave sub-1.8um
+    # p-well gaps between the mirror/cascode/replica n-wells (NW.b1).  Match
+    # the PCell n-well's own y extent so the bar merges with it exactly.
+    add(nw, -1.0, -0.31, x_b + 7.0, 8.31, "nw")
+
+    # pSD-PWell ties for the two steering rows.  LU.b wants a p-tap within
+    # 20 um of every N+ active; one per cell keeps the worst distance below
+    # 4 um.  Each tap is 0.78 um square with its M1 pin at +0.14..+0.64, and
+    # is strapped straight up to the row's bulk rail.
+    tap = ly.create_cell("ptap1", "SG13_dev", {})
+    for k in range(len(cells)):
+        x = k * PITCH
+        for ytap, rail_y in ((10.55, y_a - 0.78), (13.8, y_b - 0.78)):
+            # x+0.86..x+1.64 is the only active-free band: the cell's switch
+            # ends at x+0.5 and the next cell's switch starts at x+2.0.
+            top.insert(pya.CellInstArray(
+                tap.cell_index(),
+                pya.Trans(int(round((x + 0.86) * 1000)),
+                          int(round(ytap * 1000)))))
+            add(m1, x + 1.00, ytap - 0.10, x + 1.50, ytap + 0.64, "vss")
+            add(m1, x + 1.15, ytap + 0.44, x + 1.35, rail_y + 0.10, "vss")
+    # n-well ties: one ntap per cell (and one for the replica), in the free
+    # band between the mirror and the cascode, strapped down to the vdd rail.
+    ntap = ly.create_cell("ntap1", "SG13_dev", {})
+    for xx in [k * PITCH for k in range(len(cells))] + [x_b]:
+        top.insert(pya.CellInstArray(
+            ntap.cell_index(),
+            pya.Trans(int(round((xx + 1.90) * 1000)), int(round(6.0 * 1000)))))
+        add(m1, xx + 2.04, 5.90, xx + 2.54, 6.64, "vdd")
+        add(m1, xx + 2.19, 6.44, xx + 2.39, -1.15, "vdd")
+    ly.flatten(top.cell_index(), -1, False)
+    # IHP Via1 is exactly 0.19 um and Cnt is 0.16 um; the csteer straps were
+    # drawn with the gf180 0.22/0.26 cut sizes.  Re-cut every top-level cut.
+    for layer, size in ((via1, 0.19), (cont, 0.16)):
+        reg = pya.Region()
+        it = top.begin_shapes_rec(layer)
+        while not it.at_end():
+            sh = it.shape()
+            reg.insert(pya.Polygon(sh.box) if sh.is_box() else sh.polygon)
+            it.next()
+        top.shapes(layer).clear()
+        for poly in reg.each():
+            b = poly.bbox()
+            cx, cy = b.center().x * ly.dbu, b.center().y * ly.dbu
+            top.shapes(layer).insert(box(cx - size / 2, cy - size / 2,
+                                         cx + size / 2, cy + size / 2))
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     ly.write(out_path)
     b = top.bbox()

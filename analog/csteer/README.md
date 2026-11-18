@@ -486,11 +486,30 @@ was a 3.3 V-only value).  The device bench and the ideal-cell/DEM benches pass:
 | DC/DEM with the 1.8 % Pelgrom model | bench DNL **-0.890..+0.275**, INL **-0.483..+1.373**; DEM-mean DNL **-0.515..+0.275**, INL **-0.483..+0.483**; dem noise 391 mLSB rms |
 | supply | 1.2 V (no 3.3 V devices needed) |
 
-**IHP GDS is not yet clean.**  `gen_gds_ihp.py` now instantiates the IHP
-`SG13_dev` `pmos`/`nmos` PCells and produces a one-unary-cell + replica +
-steering-pair test GDS with the 2.75 um M2 pin row; its first DRC pass has
-**50 items** (V1.a 20, M1.b 8, Gat.b 6, Cnt.a 6, CntB.a 6, NW.b1 3, LU.b 1),
-so no LVS is claimed.  The 30-cell/60-switch array is not generated yet.
-`ihp_gds_status.json` records the gate state.  The gf180 generator remains
-the reference for the full floorplan; the IHP port needs the via1 cut size,
-gate-riser and nwell-spacing fixes first.
+**IHP layout is closed for the array macro.**  `gen_gds_ihp.py` instantiates
+the IHP `SG13_dev` `pmos`/`nmos` PCells and builds the full array:
+
+* 15 unary (8/1 mirror + 8/0.5 cascode) + 15 binary (0.5/1 + 0.5/0.5) cells,
+* the two-device replica cascode bias generator,
+* 60 `sg13_lv_nmos` 4/0.28 steering switches, one differential pair per cell,
+* the 2.75 um M2 control-pin row (60 pins), vdd/vbp/vcp rails, iout/idump
+  buses and pSD/n-well ties.
+
+| gate | result |
+|---|---|
+| IHP KLayout DRC | **0 items** (`build/csteer_ihp_drc.lyrdb`) |
+| IHP KLayout LVS vs 122-device reference CDL | **PASS, netlists match, 0 errors** |
+| GDS | `build/csteer_ihp.gds`, bbox (-3.8,-1.4)..(173.0,19.8) um |
+
+`python3 analog/csteer/ihp_signoff.py` regenerates the GDS, DRC and LVS and
+writes `build/ihp_signoff.json` (`ok: true`).  `ihp_gds_status.json` mirrors
+the gate state.  The differential wrapper, the 1 kOhm output termination and
+the digital half (`dac_csteer_dig`) remain outside the macro, as in the
+gf180 leaf.
+
+IHP-specific layout notes: the nmos switch geometry is the rotated SG13_dev
+PCell (active Y..Y+0.96, source Y+0.07..0.23, drain Y+0.73..0.89), not the
+gf180 4/0.28 rectangle; via1 is 0.19 um and Cnt 0.16 um (gf180 drew 0.26 /
+0.22); the p-taps sit at y=10.55 and 13.8 so the vcp poly rail cannot land on
+a tap contact; one continuous n-well bar plus ntap per cell ties the PMOS
+bulk.

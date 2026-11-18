@@ -1,14 +1,27 @@
 {
   "pdk": "ihp-sg13g2",
-  "layout_ok": false,
-  "scope": "one unary cell + replica + one steering pair; 30-cell/60-switch array not yet",
+  "layout_ok": true,
+  "scope": "30 cells (15 unary 8/1 + 15 binary 0.5/1), replica bias, 60 NMOS steering switches, 2.75 um M2 pin row",
   "generator": "analog/csteer/gen_gds_ihp.py",
-  "cell_gds": "analog/csteer/build/csteer_ihp_cell.gds",
-  "self_check": {"terminals": "iout/idump, vss, 2 switch gates on 2.75 um M2 pin row, 3 bias rails, iref on vcp", "shorts": 0},
-  "drc": {
-    "items": 50,
-    "categories": {"V1.a": 20, "M1.b": 8, "Gat.b": 6, "Cnt.a": 6, "CntB.a": 6, "NW.b1": 3, "LU.b": 1},
-    "note": "first IHP PCell geometry pass; via1 cuts, gate riser and nwell spacing still need fixing"
+  "cell_gds": "analog/csteer/build/csteer_ihp.gds",
+  "bbox_um": [-3.8, -1.4, 173.0, 19.8],
+  "self_check": {
+    "pfets": 62,
+    "nfets": 60,
+    "switch_control_pins": 60,
+    "shorts": 0
   },
-  "lvs": "not run: DRC not clean and the 30-cell array is not generated"
+  "drc": {
+    "items": 0,
+    "report": "analog/csteer/build/csteer_ihp_drc.lyrdb"
+  },
+  "lvs": {
+    "ok": true,
+    "mode": "reference CDL, 122 devices (2 replica + 30 mirror/cascode pairs + 60 switches)",
+    "reference": "analog/csteer/build/csteer_ihp_ref.cdl",
+    "log": "analog/csteer/build/ihp_lvs.log",
+    "status": "PASS (netlists match), 0 errors"
+  },
+  "signoff": "analog/csteer/build/ihp_signoff.json",
+  "note": "The differential wrapper, the 1 kOhm output termination and the digital half (dac_csteer_dig) remain outside this macro, as in the gf180 leaf."
 }
