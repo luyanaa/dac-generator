@@ -1,0 +1,62 @@
+{
+  "dac_r2r_dig": {
+    "run": "openlane/dac_r2r_dig/runs/ihp",
+    "pdk": "ihp-sg13g2",
+    "gds": "openlane/dac_r2r_dig/runs/ihp/final/gds/dac_r2r_dig.gds",
+    "die_area_um2": 15000,
+    "klayout_drc_errors": 0,
+    "route_drc_errors": 0,
+    "lvs_errors": 0,
+    "lvs_unmatched_device": 0,
+    "lvs_unmatched_net": 0,
+    "antenna_violating_nets": 0,
+    "setup_wns_ns": 0,
+    "hold_wns_ns": 0,
+    "design_violations": 0
+  },
+  "dac_string_dig": {
+    "run": "openlane/dac_string_dig/runs/ihp",
+    "pdk": "ihp-sg13g2",
+    "gds": "openlane/dac_string_dig/runs/ihp/final/gds/dac_string_dig.gds",
+    "die_area_um2": 9600,
+    "klayout_drc_errors": 0,
+    "route_drc_errors": 0,
+    "lvs_errors": 0,
+    "lvs_unmatched_device": 0,
+    "lvs_unmatched_net": 0,
+    "antenna_violating_nets": 0,
+    "setup_wns_ns": 0,
+    "hold_wns_ns": 0,
+    "design_violations": 0
+  },
+  "dac_csteer_dig": {
+    "run": "openlane/dac_csteer_dig/runs/ihp",
+    "pdk": "ihp-sg13g2",
+    "gds": "openlane/dac_csteer_dig/runs/ihp/final/gds/dac_csteer_dig.gds",
+    "die_area_um2": 15000,
+    "klayout_drc_errors": 0,
+    "route_drc_errors": 0,
+    "lvs_errors": 0,
+    "lvs_unmatched_device": 0,
+    "lvs_unmatched_net": 0,
+    "antenna_violating_nets": 0,
+    "setup_wns_ns": 0,
+    "hold_wns_ns": 0,
+    "design_violations": 0
+  },
+  "dac_cdac_dig": {
+    "run": "openlane/dac_cdac_dig/runs/ihp",
+    "pdk": "ihp-sg13g2",
+    "gds": "openlane/dac_cdac_dig/runs/ihp/final/gds/dac_cdac_dig.gds",
+    "die_area_um2": 7200,
+    "klayout_drc_errors": 0,
+    "route_drc_errors": 0,
+    "lvs_errors": 0,
+    "lvs_unmatched_device": 0,
+    "lvs_unmatched_net": 0,
+    "antenna_violating_nets": 0,
+    "setup_wns_ns": 0,
+    "hold_wns_ns": 0,
+    "design_violations": 0
+  }
+}

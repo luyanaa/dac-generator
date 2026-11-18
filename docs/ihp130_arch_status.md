@@ -75,8 +75,18 @@ The differential second side, TGs and comparator stay wrapper / class-C work,
 exactly as in the sky130 leaf.
 
 ## Digital macros
-`openlane/dac_r2r_dig`, `dac_string_dig`, `dac_csteer_dig`, `dac_cdac_dig`
-still have only their original PDK configs (`gf180mcu*` / `sky130*`), no
-`pdk::ihp-sg13g2` and no `runs/`.  The IHP digital flow that already works is
-`openlane/dac_video_dig` (`ihp_ant`); the four macros above still need their
-IHP pin plan and hardening.
+
+All four standard-cell halves are now configured and hardened on
+`pdk::ihp-sg13g2` (1.2 V `sg13g2_stdcell`, 0.44 um PDN rail, IHP antenna
+diode), using the `dac_video_dig` IHP flow:
+
+| macro | die (um) | KLayout DRC | route DRC | LVS | antenna | setup/hold WNS |
+|---|---|---|---|---|---|---|
+| `dac_r2r_dig` | 150x100 | 0 | 0 | 0 errors, 0 unmatched | 0 | pass |
+| `dac_string_dig` | 120x80 | 0 | 0 | 0 errors, 0 unmatched | 0 | pass |
+| `dac_csteer_dig` | 150x100 | 0 | 0 | 0 errors, 0 unmatched | 0 | pass |
+| `dac_cdac_dig` | 90x80 | 0 | 0 | 0 errors, 0 unmatched | 0 | pass |
+
+Runs: `openlane/<macro>/runs/ihp/final`; summary metrics in
+`openlane/ihp_digital_status.json`.  The analog macros above are the
+device-level counterparts; the wrapper still owns their assembly.

@@ -18,5 +18,21 @@
     "//note6": "20 ns: 8 trials x (break + drive + compare) fits 1 MS/s with room",
     "pdk::sky130*": {
         "DIE_AREA": "0 0 90 80"
+    },
+    "pdk::ihp-sg13g2": {
+        "DIE_AREA": "0 0 90 80",
+        "VDD_NETS": [
+            "VDD"
+        ],
+        "GND_NETS": [
+            "VSS"
+        ],
+        "PL_TARGET_DENSITY_PCT": 30,
+        "RUN_CTS": false,
+        "PDN_RAIL_WIDTH": 0.44,
+        "//rail": "sg13g2_stdcell rail is 0.44 um; the 1.0 um default leaves an M1.b notch.",
+        "DIODE_CELL": "sg13g2_antennanp/A",
+        "//antenna": "IHP antenna diode cell, same as the dac_video_dig IHP flow.",
+        "pdk_note": "1.2 V sg13g2_stdcell macro; the analog half is the IHP device macro in analog/."
     }
 }
