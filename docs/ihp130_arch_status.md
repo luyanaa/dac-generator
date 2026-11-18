@@ -6,10 +6,10 @@ Status 2026-11-19.  Scope: the four `analog/` architecture generators
 
 | architecture | IHP pre-layout | IHP analog layout | DRC | reference LVS | digital macro |
 |---|---|---|---|---|---|
-| **R-2R** | **PASS** | 25 `rppd` units + M1, `gen_gds_ihp.py` | **0** | **PASS** | `dac_r2r_dig` still gf180 config |
-| **resistor string** | **PASS** (4 kOhm unit) | 255 `rppd` units + 256 taps | **0** | **PASS** | `dac_string_dig` still gf180 config |
-| **current-steering** | **PASS** at 1.2 V (cell + DEM) | 30 cells + 60 switches, `gen_gds_ihp.py` | **0** | **PASS** | `dac_csteer_dig` still gf180 config |
-| **binary CDAC** | **PASS** (flat `cmim`, measured moscap study) | 256 `cmim` units, `gen_gds_ihp.py` | **0** | **PASS** | `dac_cdac_dig` still sky130 config |
+| **R-2R** | **PASS** | 25 `rppd` units + M1, `gen_gds_ihp.py` | **0** | **PASS** | `dac_r2r_dig` IHP hardened |
+| **resistor string** | **PASS** (4 kOhm unit) | 255 `rppd` units + 256 taps | **0** | **PASS** | `dac_string_dig` IHP hardened |
+| **current-steering** | **PASS** at 1.2 V (cell + DEM) | 30 cells + 60 switches, `gen_gds_ihp.py` | **0** | **PASS** | `dac_csteer_dig` IHP hardened |
+| **binary CDAC** | **PASS** (flat `cmim`, measured moscap study) | 256 `cmim` units, `gen_gds_ihp.py` | **0** | **PASS** | `dac_cdac_dig` IHP hardened |
 
 ## R-2R (`analog/r2r`)
 
