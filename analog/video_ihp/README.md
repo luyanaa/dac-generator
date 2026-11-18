@@ -130,3 +130,22 @@ in Y at `y0 = -9.5` under the row.  The 510 pads overlap by 0.4 um on
 Metal2 (10/0); the assembled `build/dac_video_top.gds` has **510 distinct
 merged Metal2 islands** and the PDK KLayout DRC on the top cell is **0
 items**.
+
+## Closure update (2026-11-19)
+
+- **Reference-CDL LVS:** `gen_cdl.py` + `signoff.py --stage lvs_full`:
+  1022 devices, 516 ports, PDK `run_lvs.py` COMPARE **PASS**
+  ("Netlists match").
+- **Wrapper/bias:** `wrapper_bias.py` uses a 1660 ohm `rppd` resistor from
+  `vcp` to `vss` (iref is a sink): DC **4.1031 mA / 16.091 uA per cell**,
+  `vcp 26.62 mV`, `vbp 631.53 mV`; carry **0.030 LSB** at 40 ns.  The
+  21-port wrapper layout is `openlane/dac_video_dig/wrapper_connect.py`
+  (**510 islands, DRC 0**); see `wrapper.md`.
+- **PPA/SFDR:** `static_sfdr.py` / `ppa_sfdr.md`: 16-seed static
+  **SFDR 58.8 dB, SNDR 49.3 dB, ENOB 7.9 bit**; total power 5.335 mW
+  full-scale (2.861 mW sine average), 213.4 pJ/sample.
+- **Full-chip LVS/PEX/RCX:** `fullchip_lvs.py` (Netgen "Circuits match
+  uniquely"), `fullchip_rcx.py`, `top_pex.spice` (12,013 devices / 19,491
+  caps) and the digital OpenRCX SPEF (1,214 nets, 2.795 pF).  The only
+  remaining physical item is the ESD/probe pad ring; decoupling and the
+  1.66 kohm resistor are external by design.

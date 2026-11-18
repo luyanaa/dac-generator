@@ -126,3 +126,20 @@ DIG_GDS=runs/ihp_ant/final/gds/dac_video_dig.gds \
 Result: **510 distinct merged Metal2 islands**, 0 bad centres, bbox
 -1.0,-109.8 .. 1918.5,12.0 um.  The PDK KLayout DRC on the assembled
 `build/dac_video_top.gds` is **0 items**.
+
+## Wrapper (leaf-level)
+
+`wrapper_connect.py` builds `build/dac_video_wrapper.gds` from the
+hierarchical row/digital cells: row rails stubbed to x=-3..-1, digital
+control pins stubbed to y=-112, digital VDD/VSS TopMetal1 extensions to
+y=-20, and 21 top labels (`vdd vss vbp vcp iout idump dvdd dvss clk
+code[0..7] stb rst_n valid ready`).  The 510 Metal2 islands stay independent.
+
+- wrapper KLayout DRC: **0 items** (`build/wrapper_drc.lyrdb`);
+- wrapper Netgen LVS: **"Circuits match uniquely"** with the row CDL +
+  digital gate-level and the 21 ports (`analog/video_ihp/fullchip_lvs.py`);
+- external bias: 1660 ohm `rppd` from `vcp` to `vss`, 470 pF / 100 pF
+  decoupling, 37.5 ohm / 2 pF load (`analog/video_ihp/wrapper.md`).
+
+The wrapper is a probe/port wrapper, not an ESD pad ring; the user project
+wrapper or test board supplies the external components.

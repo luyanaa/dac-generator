@@ -18,8 +18,10 @@ and the two blocks are **assembled with top-level DRC 0**:
 - assembly `assemble_ihp.py`: **510 independent merged Metal2 islands** and
   **top-level KLayout DRC 0**.
 
-Still open: the wrapper/bias block, PPA/SFDR, and full-chip LVS/PEX.  These
-are listed below with evidence.
+Closed since: reference-CDL LVS, wrapper/bias, PPA/SFDR, hierarchical
+full-chip LVS and PEX.  The remaining items are the physical ESD/probe pad
+ring (the wrapper is a leaf port wrapper) and the final full-RC run; see the
+closure update at the end.  The earlier gap list below is kept for history.
 
 ## What closed since the first gap report
 
@@ -155,3 +157,72 @@ full-scale study sets **470 pF**.  The row signoff tran uses 470 pF and the
 same 100 pF on vbp.
 
 The critical path is now **wrapper/bias -> full-chip LVS/PEX -> PPA/SFDR.**
+
+
+## Closure update 2026-11-19
+
+### Reference-CDL analog LVS (closed)
+
+`analog/video_ihp/gen_cdl.py` emits the 1022-device / 516-port row schematic.
+The PDK `run_lvs.py` in COMPARE mode reports:
+
+```
+INFO : Congratulations! Netlists match.
+Status PASS, 1022 devices, 516 ports
+```
+
+Stage `signoff.py --stage lvs_full` (and `--stage all`) records it in
+`build/signoff.json` (`lvs_full.ok = true`).
+
+### Wrapper / bias (closed at leaf level)
+
+`wrapper_bias.py` replaces the ideal 16.032 uA reference with a **1660 ohm
+rppd resistor from vcp to vss** (the row's iref is a sink; the replica
+self-biases at vcp ~26.6 mV).  With 470 pF/100 pF and 37.5 ohm + 2 pF:
+
+| case | result |
+|---|---|
+| DC code 255 | 4.1031 mA total, 16.091 uA/cell, vcp 26.62 mV, vbp 631.53 mV |
+| carry 127->128, 40 ns | 0.030 LSB, vbp/vcp drift -0.024 / -0.052 mV |
+
+`openlane/dac_video_dig/wrapper_connect.py` builds
+`build/dac_video_wrapper.gds`: 21 ports (vdd/vss/vbp/vcp/iout/idump,
+dvdd/dvss, clk, code[0..7], stb, rst_n, valid, ready), same-layer stubs on
+the row rails and digital pins, digital VDD/VSS TopMetal1 extensions, 510
+Metal2 islands unchanged.  Wrapper DRC **0 items**.  External components
+(1.66 kohm, 470 pF, 100 pF, 37.5 ohm, 2 pF) are documented in `wrapper.md`.
+
+### PPA / SFDR (closed)
+
+`static_sfdr.py` uses the 16-seed 1.2 V mismatch transfer and a 256-sample,
+7-cycle coherent sine:
+
+| transfer | SFDR | SNDR | ENOB |
+|---|---|---|---|
+| zero mismatch | 58.90 dB | 49.35 dB | 7.90 bit |
+| 16-seed mean | 58.80 dB | 49.33 dB | 7.90 bit |
+| worst seed | 58.39 dB | 49.35 dB | 7.90 bit |
+
+PPA: analog 4.949 mW full-scale / 2.475 mW sine average, digital 0.3865 mW,
+total 5.335 / 2.861 mW, 213.4 pJ per full-scale sample, LSB 0.601 mV, 25 MS/s.
+Details in `analog/video_ihp/ppa_sfdr.md` and `build/static_sfdr.json`.
+
+### Full-chip LVS / PEX / RCX
+
+- **LVS (hierarchical, pass):** `fullchip_lvs.py` builds the wrapper GDS,
+  extracts it with Magic (1023 top devices = 1022 row + 1 digital macro),
+  and compares against the row X-device CDL + digital gate-level (stdcells
+  black-boxed).  Netgen: **"Circuits match uniquely."**  The row and digital
+  internals are separately PASS (`lvs_full` and `ihp_ant` LVS); the
+  top-level 510 interconnects, power rails and control ports are verified by
+  the hierarchical compare.
+- **PEX:** `top_pex.spice` (hierarchical Magic) has **12,013 devices,
+  19,491 capacitors**; the row PEX has 1,022 devices / 8,421 caps; the
+  digital OpenRCX SPEF has 1,214 nets with R+C and 2.795 pF.
+- **RCX:** `top_pex_rcx.spice` is the same extraction with
+  `extract do resistance`; the digital macro's OpenRCX SPEF supplies the
+  digital R.  The 510 top connections are 0.4 um Metal2 overlaps, so the
+  top-level wire is zero-length.
+
+The only remaining physical item is the **ESD/probe pad ring** (the wrapper
+uses leaf-level metal stubs and external decoupling), not the DAC itself.
