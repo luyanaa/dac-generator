@@ -168,11 +168,11 @@ def main() -> int:
     (BUILD / "fullchip_netgen.log").write_text(p.stdout + p.stderr)
     text = p.stdout + p.stderr
     ok = "Circuits match uniquely" in text
-    m_d = re.search(r"Circuit 1 contains (\d+) devices", text)
-    m_n = re.search(r"Circuit 1 contains (\d+) nets", text)
+    ds = re.findall(r"Circuit 1 contains (\d+) devices", text)
+    ns = re.findall(r"Circuit 1 contains (\d+) nets", text)
     res = {"ok": ok,
-           "devices": int(m_d.group(1)) if m_d else None,
-           "nets": int(m_n.group(1)) if m_n else None,
+           "devices": int(ds[-1]) if ds else None,
+           "nets": int(ns[-1]) if ns else None,
            "topcell": "dac_video_wrapper",
            "gds": str(GDS),
            "extracted": str(MAGIC_SPICE),

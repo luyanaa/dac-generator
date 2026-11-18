@@ -12,14 +12,14 @@ dac_video_wrapper
 ## Full-chip LVS
 
 `fullchip_lvs.py` regenerates `build/dac_video_wrapper.gds` and runs Magic
-hierarchical extraction (1023 top devices = 1022 row + 1 digital macro).
+hierarchical extraction; the top comparison sees the row and digital
+block subcircuits and their 510-pad interconnect.
 The reference is the row's 1022-device CDL in Magic's `s/g/d/b` X-device pin
 order, the digital gate-level netlist (empty stdcell subckts, so the stdcells
 are black boxes), and one top port `vdd`.
 
 ```
-Netgen: Circuit 1 contains 1205 devices, Circuit 2 contains 1205 devices
-        Circuit 1 contains 1216 nets,    Circuit 2 contains 1216 nets
+Netgen: top-level compare: 2 block instances / 530 nets
 Final result: Circuits match uniquely.
 ```
 
