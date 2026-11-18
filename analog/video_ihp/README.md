@@ -111,17 +111,18 @@ wrapper requirements, not part of this macro.
 
 The IHP digital macro is hardened in `openlane/dac_video_dig` with
 `config.librelane.json` (`RESOLUTION=8`, `ENCODING=0`, die 1912.5 x 100 um,
-`pin_template_ihp130.def`).  Run `ihp_pdn44` is clean:
+`pin_template_ihp130.def`).  Run `ihp_ant` is clean:
 
 * **KLayout DRC 0**; Netgen LVS **0 device/net/pin differences**;
 * **523 Metal2 pins**, the 510 `dout/dout_n` on the exact `x = 2.25 + 7.5k /
   6.0 + 7.5k`, y = 0..0.6 analog grid; the 13 control pins on the top edge;
 * 8-bit binary order matches the row: `dout[2^k-1+i] = code[k]`, the same
   `b{k}_{i}` tag as `gen_gds.py`;
-* setup **+5.039 ns** at `nom_slow_1p08V_125C`, hold **+0.1226 ns** at
-  `nom_fast_1p32V_m40C`, power **0.387 mW**, core 129,330 um^2;
-* one remaining antenna item: `clk` -> `clkbuf_0_clk/A` on Metal3, ratio
-  228.29 vs 200 (1.14x) - see the gap doc.
+* setup **+5.053 ns** at `nom_slow_1p08V_125C`, hold **+0.1171 ns** at
+  `nom_fast_1p32V_m40C`, power **0.3865 mW**, core 129,330 um^2;
+* antenna **0 violating nets/pins**; the earlier `clk` Metal3 item (228.29
+  vs 200) is fixed by the `OpenROAD.RepairAntennas` jumper when `DIODE_CELL`
+  is set.
 
 `openlane/dac_video_dig/assemble_ihp.py` places the digital macro mirrored
 in Y at `y0 = -9.5` under the row.  The 510 pads overlap by 0.4 um on

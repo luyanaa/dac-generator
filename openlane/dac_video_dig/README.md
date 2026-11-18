@@ -83,7 +83,7 @@ blocks are signed off separately (digital macro LVS 0, analog row LVS 0) and
 the 510 pad islands are checked individually, so the abutment itself is
 verified but not the combined extracted netlist.
 
-## IHP sg13g2 (`runs/ihp_pdn44`, 1.2 V)
+## IHP sg13g2 (`runs/ihp_ant`, 1.2 V)
 
 The same RTL is hardened on `sg13g2_stdcell` with `RESOLUTION=8`,
 `ENCODING=0`, die 1912.5 x 100 um, and `pin_template_ihp130.def` (523 pins,
@@ -100,12 +100,12 @@ Status of the final run:
 |---|---|
 | KLayout DRC | **0** |
 | Netgen LVS | **0** device/net/pin/property differences |
-| setup / hold | **+5.039 ns** (slow 1.08 V 125 C) / **+0.1226 ns** (fast 1.32 V -40 C) |
-| power | **0.387 mW** |
+| setup / hold | **+5.053 ns** (slow 1.08 V 125 C) / **+0.1171 ns** (fast 1.32 V -40 C) |
+| power | **0.3865 mW** |
 | area | die 1912.5 x 100 um, core 129,330 um^2, 1,203 stdcells + 10,167 fill |
 | 510 output pins | all on `x = 2.25/6.0 + 7.5*k`, y = 0..0.6, Metal2 |
 | binary order | `dout[2^k-1+i] = code[k]`, matching the row's `b{k}_{i}` tag |
-| antenna | 1 net: `clk` -> `clkbuf_0_clk/A`, Metal3, 228.29 vs 200 (1.14x) |
+| antenna | **0** violating nets/pins (`DIODE_CELL` enables `OpenROAD.RepairAntennas`) |
 
 The 255 outputs are driven by **8 code registers** (one per bit) plus output
 buffers: all cells in a binary group carry the same bit, so Yosys legally
@@ -119,7 +119,7 @@ pads -10.0..-9.6 by 0.4 um on Metal2 (10/0):
 
 ```sh
 cd openlane/dac_video_dig
-DIG_GDS=runs/ihp_pdn44/final/gds/dac_video_dig.gds \
+DIG_GDS=runs/ihp_ant/final/gds/dac_video_dig.gds \
   /usr/bin/klayout -b -r assemble_ihp.py -z
 ```
 

@@ -59,7 +59,9 @@
         "RUN_MAGIC_DRC": false,
         "//magicdrc": "Magic DRC OOM-killed the flow on this 1912x100 macro; the PDK KLayout DRC deck is the golden check.",
         "PDN_RAIL_WIDTH": 0.44,
-        "//rail": "The sg13g2 cell power rail is 0.44 um tall (3.56..4.00 in a 3.78 um row); the 1.0 um default rail leaves a 0.10 um M1.b notch to the cell internal M1."
+        "//rail": "The sg13g2 cell power rail is 0.44 um tall (3.56..4.00 in a 3.78 um row); the 1.0 um default rail leaves a 0.10 um M1.b notch to the cell internal M1.",
+        "DIODE_CELL": "sg13g2_antennanp/A",
+        "//antenna": "Set DIODE_CELL so OpenROAD.RepairAntennas runs; it inserts one jumper and removes the clk Metal3 antenna (0 violations after)."
     },
     "FP_TEMPLATE_MATCH_MODE": "strict",
     "IO_PIN_V_THICKNESS_MULT": 4,
