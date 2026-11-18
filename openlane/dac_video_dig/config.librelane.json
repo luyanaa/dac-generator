@@ -45,7 +45,18 @@
             "SETTLE_CYCLES=3"
         ],
         "FP_DEF_TEMPLATE": "dir::pin_template_ihp130.def",
-        "//ihp": "IHP video leaf: 8-bit binary (DNL 0.196 / INL 0.122)."
+        "//ihp": "IHP video leaf: 8-bit binary (DNL 0.196 / INL 0.122).",
+        "VDD_NETS": [
+            "VDD"
+        ],
+        "GND_NETS": [
+            "VSS"
+        ],
+        "RUN_CTS": true,
+        "IO_PIN_ORDER_CFG": null,
+        "//volt": "IHP sg13g2_stdcell is 1.2 V; the analog row is now 1.2 V (series bias), so the 510 outputs match directly.",
+        "//cts": "28k flops at 100 MHz; enable CTS instead of the sky130 ideal-clock shortcut.",
+        "//io": "The strict FP_DEF_TEMPLATE (pin_template_ihp130.def) is authoritative; do not use the sky130 pin_order fallback."
     },
     "FP_DEF_TEMPLATE": "dir::pin_template_sky130.def",
     "FP_TEMPLATE_MATCH_MODE": "strict",
