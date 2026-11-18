@@ -13,9 +13,12 @@ the external 470 pF / 100 pF decoupling and the 37.5 ohm output load.
 | digital macro | `dvdd`, `dvss`, `clk`, `code[0..7]`, `stb`, `rst_n`, `valid`, `ready` |
 | internal | the 510 `dout`/`dout_n` are already abutted to the row's `d_`/`db_` Metal2 pads |
 
-`vdd/vss` and `dvdd/dvss` are kept as separate 1.2 V domains; tie them at the
-board if a single rail is used.  `vbp`/`vcp` are brought out for the external
-decoupling and for bias observation.
+`vdd` is the analog 1.2 V rail and `dvdd` is a separate 1.2 V digital rail.
+`dvss` is the digital ground stub; the IHP Magic global substrate net ties it
+to the analog `vss` (common ground), which is also how the extracted
+`dac_video_wrapper` netlist sees it.  Tie `dvdd` to the same 1.2 V rail at the
+board if a single supply is used.  `vbp`/`vcp` are brought out for the
+external decoupling and for bias observation.
 
 ## Bias: 1.66 kohm from vcp to vss
 
