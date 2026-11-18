@@ -82,3 +82,47 @@ A full-chip LVS/PEX still needs a top-level netlist and an RCX run; the two
 blocks are signed off separately (digital macro LVS 0, analog row LVS 0) and
 the 510 pad islands are checked individually, so the abutment itself is
 verified but not the combined extracted netlist.
+
+## IHP sg13g2 (`runs/ihp_pdn44`, 1.2 V)
+
+The same RTL is hardened on `sg13g2_stdcell` with `RESOLUTION=8`,
+`ENCODING=0`, die 1912.5 x 100 um, and `pin_template_ihp130.def` (523 pins,
+510 `dout/dout_n` on the exact row grid, 13 control pins on the top edge).
+The IHP section of `config.librelane.json` sets `VDD_NETS=[VDD]`,
+`GND_NETS=[VSS]`, `RUN_CTS=true`, `PDN_RAIL_WIDTH=0.44`, and
+`RUN_MAGIC_DRC=false` (Magic DRC OOM-kills this 28k-instance 1912x100 macro;
+the PDK KLayout deck is the golden check).  The sky130 `IO_PIN_ORDER_CFG`
+and `FP_DEF_TEMPLATE` live in `pdk::sky130*` so they cannot override IHP.
+
+Status of the final run:
+
+| check | result |
+|---|---|
+| KLayout DRC | **0** |
+| Netgen LVS | **0** device/net/pin/property differences |
+| setup / hold | **+5.039 ns** (slow 1.08 V 125 C) / **+0.1226 ns** (fast 1.32 V -40 C) |
+| power | **0.387 mW** |
+| area | die 1912.5 x 100 um, core 129,330 um^2, 1,203 stdcells + 10,167 fill |
+| 510 output pins | all on `x = 2.25/6.0 + 7.5*k`, y = 0..0.6, Metal2 |
+| binary order | `dout[2^k-1+i] = code[k]`, matching the row's `b{k}_{i}` tag |
+| antenna | 1 net: `clk` -> `clkbuf_0_clk/A`, Metal3, 228.29 vs 200 (1.14x) |
+
+The 255 outputs are driven by **8 code registers** (one per bit) plus output
+buffers: all cells in a binary group carry the same bit, so Yosys legally
+shares the register.  The outputs still launch on one clock edge.
+
+### IHP assembly
+
+`assemble_ihp.py` places the digital macro mirrored in Y at `y0=-9.5` below
+the analog row.  The digital pins span -10.1..-9.5 and overlap the analog
+pads -10.0..-9.6 by 0.4 um on Metal2 (10/0):
+
+```sh
+cd openlane/dac_video_dig
+DIG_GDS=runs/ihp_pdn44/final/gds/dac_video_dig.gds \
+  /usr/bin/klayout -b -r assemble_ihp.py -z
+```
+
+Result: **510 distinct merged Metal2 islands**, 0 bad centres, bbox
+-1.0,-109.8 .. 1918.5,12.0 um.  The PDK KLayout DRC on the assembled
+`build/dac_video_top.gds` is **0 items**.

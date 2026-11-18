@@ -1,204 +1,165 @@
-# IHP SG13G2 video DAC: what is still missing for closure
+# IHP SG13G2 video DAC: closure status
 
-Status 2026-11-18.  This is a gap analysis of the IHP130 (`ihp-sg13g2`) video
-DAC leaf, not a new signoff result.  Evidence is from the current workspace:
-`analog/video_ihp/`, `openlane/dac_video_dig/`, and the IHP PDK under
-`pdks/ihp-sg13g2/`.
+Status 2026-11-18 (evening).  This is the gap analysis of the IHP130
+(`ihp-sg13g2`) video DAC leaf after the 1.2 V re-spin and the digital macro
+hardening.  Evidence is in `analog/video_ihp/`, `openlane/dac_video_dig/`,
+and the IHP PDK under `pdks/ihp-sg13g2/`.
 
 ## Short answer
 
-The **analog row is the mature block** (DRC 0, structural LVS walk, PEX, DC,
-16-seed mismatch, carry transient).  The following are not closed:
+The **analog row and the IHP digital macro are both signed off separately**,
+and the two blocks are **assembled with top-level DRC 0**:
 
-1. **Voltage domain (P0, being closed).** The old row ran at **1.8 V**, but
-   the PDK `cornerMOSlv.lib` states **maximum drain-source voltage 1.5 V**
-   for `sg13_lv`.  The row is moving to **1.2 V** with the existing series
-   replica, `iref` 16.032 uA and `Cvcp` 330 pF.  Row DC and carry pass at
-   1.2 V (see below); the full signoff is running.
-2. **IHP digital macro (P0).** `openlane/dac_video_dig` has an
-   `pdk::ihp-sg13g2` config (1912.5 x 100 um, `RESOLUTION=8`, `ENCODING=0`,
-   `pin_template_ihp130.def`), but `runs/` contains only `sky130` and
-   `sky130_pins`; there is no IHP synthesis/place/route/GDS, no DRC/LVS, no
-   timing/power/PEX, no 510-pin grid check.
-3. **Digital-analog interface (P0/P1).** The IHP stdcell library is **1.2 V**;
-   the analog row's gate drive is **1.8 V**.  If the row stays at 1.8 V, the
-   510 digital outputs need a 1.8 V driver/level shifter (the `sg13g2_io`
-   library is 3.3 V).  If the row moves to 1.2 V (the `sg13_lv` nominal), the
-   digital and analog supplies match and no shifter is needed.
-4. **Assembly (P1).** `openlane/dac_video_dig/assemble.py` is sky130-only
-   (hard-coded `analog/video_sky130`, met2 69/20, `DIG_Y=-17.7`).  The IHP row
-   pads are `PAD_Y=(-10.00,-9.60)` on met2 (10/0); the digital template pins
-   are at y=0..0.6.  A mirror + `y0=-9.5` gives the same 0.4 um overlap, but
-   the script, 510-island check and top-level DRC are missing.
-5. **True analog-row LVS (P1).** `analog/video_ihp/signoff.py` runs the PDK
-   `run_lvs.py --net_only --disable_tap_extraction` and a **structural pad-pair
-   walk** (1022 devices, 512 pmos/510 nmos, bulks, 255 mirrors).  It does not
-   compare against a reference CDL.  The IHP row has no `gen_cdl.py` (unlike
-   `video_ics55`); a full schematic-vs-layout LVS is still missing.
-6. **Signoff bookkeeping (P1).** `analog/video_ihp/build/signoff.json` contains
-   only the `pins` stage (it was overwritten by a later `--stage pins` run at
-   22:42; the DRC/LVS/PEX/DC/MM/tran logs are from 00:13-00:14).
-   `./signoff.py --stage all` should be re-run to restore the fail-closed
-   aggregate.  The `signoff.py` docstring still says "Not claimed: PEX and the
-   benches", which the README contradicts.
-7. **Bias / wrapper (P1).** The row's replica plus an external **16 uA** on
-   `vcp`; the README requires **220 pF on vcp and 100 pF on vbp** as wrapper
-   components.  There is no on-chip reference/startup or decap; the wrapper
-   must also supply the 510 gate nets, `iref`, `vdd`, `vbp`, `vcp`, `iout`,
-   `idump`, and the digital control pins.
-8. **PPA / SFDR (P2).** No IHP PPA/SFDR table.  The analog row DC is
-   4.0815 mA (7.35 mW at 1.8 V; ~4.9 mW at 1.2 V), area 1918.5 x 26.6 =
-   51,032 um^2; mismatch DNL 0.196 / INL 0.122 LSB; carry 0.062 LSB.  The
-   digital macro power/timing and the full-chip SFDR are unknown.
-9. **Full-chip LVS/PEX (P2).** Same gap as sky130: the two blocks are signed
-   off separately and the pad islands are checked, but there is no top-level
-   netlist, combined LVS, or full-chip RCX/SFDR.
-10. **Digital flow details (P2).** `config.librelane.json` inherits
-    `VDD_NETS=[vccd1]`, `GND_NETS=[vssd1]` from `openlane/common.json`; the IHP
-    stdcell pins are `VDD/VSS`.  `RUN_CTS` is `false`; 28k flops at 100 MHz
-    should either enable CTS or justify the clock tree.  The sky130
-    `IO_PIN_ORDER_CFG`/`pin_order_sky130.cfg` fallback is not IHP-specific
-    (the strict DEF template is authoritative, but it should be made explicit).
-11. **RF/MOM:** not a gap.  The IHP PDK is mature and this DAC uses no RF/MOM
-    devices.
+- analog row at **1.2 V series / iref 16.032 uA / Cvcp 470 pF**: all eight
+  `signoff.py --stage all` gates pass;
+- digital macro (run `ihp_pdn44`): **KLayout DRC 0**, Netgen LVS **0
+  device/net/pin differences**, setup **+5.039 ns**, hold **+0.1226 ns**,
+  **0.387 mW**, 523 Metal2 pins with the 510 outputs on the exact analog grid;
+- assembly `assemble_ihp.py`: **510 independent merged Metal2 islands** and
+  **top-level KLayout DRC 0**.
 
-## Evidence
+Still open: a reference-CDL analog LVS, the wrapper/bias block, PPA/SFDR,
+full-chip LVS/PEX, and one clock-net antenna item (1.14x).  These are listed
+below with evidence.
 
-| item | evidence |
+## What closed since the first gap report
+
+| old gap | now | evidence |
+|---|---|---|
+| P0 voltage domain: 1.8 V row outside `sg13_lv` 1.5 V max Vds | **closed at 1.2 V**, series bias, no layout re-spin | `analog/video/pdk_cell.py` IHP defaults 1.2 V / 16.032 uA / 470 pF; `analog/video_ihp/signoff.py` |
+| P0 IHP digital macro had no IHP run | **closed**: `runs/ihp_pdn44` final GDS/DEF/metrics | `runs/ihp_pdn44/final/metrics.json` |
+| P0/P1 1.2 V stdcell vs 1.8 V analog gate interface | **closed**: both 1.2 V, no level shifters | `VDD_NETS=[VDD]`, `GND_NETS=[VSS]`, 1.2 V analog row |
+| P1 no IHP assembly | **closed**: `assemble_ihp.py`, `y0=-9.5`, Metal2 10/0 | 510 islands, top DRC 0 |
+| P1 `signoff.json` only had `pins` | **closed**: `--stage all` restored all 8 stages, all `ok: true` | `analog/video_ihp/build/signoff.json` (git-ignored; values in the README) |
+| P2 digital flow details (`VDD_NETS`, CTS, pin-order) | **closed**: VDD/VSS, CTS on, sky130 pin-order moved to `pdk::sky130*` | `openlane/dac_video_dig/config.librelane.json` |
+
+## Verified numbers
+
+### Analog row (1.2 V)
+
+| stage | result |
 |---|---|
-| analog row signoff | `analog/video_ihp/README.md`: DRC 0, LVS walk 1022 devices, PEX 2.57 pF; at 1.2 V series DC 4.0865 mA, vbp/vcp 0.6316/0.0267 V, carry 0.039 LSB |
-| analog 1.8 V history | `analog/video/pdk_cell.py` now defaults IHP to 1.2 V; the 1.8 V values were DNL/INL 0.196/0.122, carry 0.062 LSB |
-| `sg13_lv` max | `pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib` line 63: "Maximum drain-source voltage: 1.5" |
-| structural LVS | `analog/video_ihp/signoff.py` `run_lvs.py ... --net_only`, then `check()`; no reference CDL |
-| signoff JSON | `analog/video_ihp/build/signoff.json` has only `pins`; logs `drc.log`, `lvs.log`, `dc_transfer.log`, `pex.spice` exist |
-| digital config | `openlane/dac_video_dig/config.librelane.json` `pdk::ihp-sg13g2` (8-bit binary, 100 um die, pin template) |
-| no IHP run | `openlane/dac_video_dig/runs/` = `sky130`, `sky130_pins` only |
-| pin template | `pin_template_ihp130.def`: 523 pins, 510 `dout/dout_n` on `x=2.25+3.75k`, y=0..0.6; 13 control pins at y=100 |
-| assembly | `openlane/dac_video_dig/assemble.py` hard-codes sky130 met2 69/20 and `analog/video_sky130` |
-| IHP row pads | `analog/video_ihp/gen_gds.py` `PAD_Y=(-10.00,-9.60)`, `PITCH=7.5`, met2 (10/0), met2 label (10/25) |
-| IHP LibreLane | `pdks/ihp-sg13g2/libs.tech/librelane/config.tcl` (sg13g2_stdcell, KLayout DRC/LVS, Magic, OpenRCX) |
+| build | 255 cells + replica, **1022 devices** (512 pmos / 510 nmos) |
+| DRC | PDK `ihp-sg13g2.drc`: **0 items** |
+| LVS | `run_lvs.py --net_only` + structural pad-pair walk: **1022 devices, 516 ports**, 255 cell mirrors + replica |
+| PEX | Magic hierarchical: **1022 instances, 2.57 pF** |
+| DC | extracted, **16.032 uA**: **4.0866 mA (-0.037 %)**, vbp/vcp **0.6316/0.0267 V** |
+| MM | PSP103 mismatch, **16 seeds at 1.2 V**: cell sigma **0.704 %**, **DNL 0.1467 / INL 0.0906 LSB**, monotonic |
+| tran | carry 127->128, **470 pF on vcp + 100 pF on vbp**: **0.029 LSB** at 40 ns, drift **-0.023/-0.068 mV** |
+| pins | **510 Metal2 pads** on the 3.75 um grid, 516 labels (10/25) |
 
-## Recommended closure path
+The cell-level full-scale study (0 -> 255) is the reason for **470 pF**, not
+330 pF: at 330 pF it lands at 0.549 LSB (over the 0.5 gate); at 470 pF it
+settles in **2.81 ns at 0.457 LSB** (`build/pdk_ihp-sg13g2_mos_tt_1.2_series_i16.032_c470.json`).
+The 1.2 V **wide-swing** replica is not used: carry -0.783 LSB, full -1.772
+LSB, dvcp +82.7 mV.  The existing series replica/layout is unchanged.
 
-### 1. Decide the analog voltage domain first (P0)
+### Digital macro (run `ihp_pdn44`, IHP 1.2 V stdcells)
 
-**Decision (2026-11-18): 1.2 V.**  The 1.2 V P5 cell study was run with both
-bias topologies.  The **series** bias is the better path; it uses the existing
-row replica (no layout re-spin):
+| item | result |
+|---|---|
+| DRC | **0** (KLayout `ihp-sg13g2.drc`, deep mode, 8 threads) |
+| LVS | Netgen: **0** device / net / pin / property differences |
+| timing | setup WS **+5.039 ns** at `nom_slow_1p08V_125C`; hold WS **+0.1226 ns** at `nom_fast_1p32V_m40C`; 0 setup/hold violations |
+| power | **0.387 mW** |
+| area | die **1912.5 x 100 um**, core 129,330 um^2, 1,203 stdcells + 10,167 fill |
+| pins | **523**: 510 `dout/dout_n` at `x = 2.25 + 7.5k / 6.0 + 7.5k`, `y = 0..0.6`; 13 control pins at `y = 100` |
+| encoding | **8-bit binary**; `dout[2^k-1+i] = code[k]`, matching the row's `b{k}_{i}` tag and the 7.5 um cell pitch |
+| antenna | **1 violation**: `clk` -> `clkbuf_0_clk/A`, Metal3, ratio 228.29 vs 200 (1.14x) |
 
-| 1.2 V bias | 127->128 | 0->255 | dvcp | verdict |
-|---|---|---|---|---|
-| series | **-0.062 LSB, 2.26 ns** | -0.698 LSB | +0.72 mV | FAIL only by the 0.5 LSB / 0.7 mV thresholds |
-| wide-swing (nbias 0.5/1.0) | -0.783 LSB, settle inf | -1.772 LSB | +82.7 mV | FAIL |
+The digital macro's 255 outputs are driven by **8 code registers** (one per
+bit) plus output buffers: all cells in a binary group carry the same bit, so
+Yosys legally shares the register.  This is still a single-clock-edge launch
+and is what the RTL comment intends.
 
-The wide-swing `vcp` is only 0.027 V and the 220 pF `vcp` node is kicked by
-82 mV at the carry; the triode bias cannot hold it.  The **series** carry is
-already good.  The 0->255 `settle inf` is not a topology failure: the final
-value is 0.698 LSB off, so it can never enter the 0.5 LSB window.  A ~0.2 %
-`iref` trim (16.032 uA instead of 16 uA) balances carry/full at about
-+/-0.19 LSB, and `Cvcp` 220 -> 330 pF reduces the full-scale kick to about
-0.48 mV.  Re-run `pdk_cell.py ihp-sg13g2 --vdd 1.2 --bias series` with those
-two values; if it passes, keep the existing row GDS and only change the
-benches/wrapper.
+### Assembly
 
-**Row-level validation (2026-11-18, 1.2 V series, iref 16.032 uA, Cvcp
-330 pF):**
-- extracted DC: **4.0865 mA (-0.037 %)**, **vbp 0.6316 V / vcp 0.0267 V**;
-- carry 127->128: **0.039 LSB at 40 ns**, vbp/vcp drift **-0.032 / -0.094 mV**;
-- the existing row GDS is unchanged; the full `signoff.py --stage all`
-  (build/DRC/LVS/PEX/DC/MM/tran/pins) is running and the 16-seed 1.2 V
-  mismatch MC is being re-run.  The 1.8 V mismatch values (DNL 0.196 /
-  INL 0.122 LSB) are the last full-MC numbers.
+`openlane/dac_video_dig/assemble_ihp.py` places the digital macro mirrored
+in Y at `y0 = -9.5` below the analog row:
 
-Option A (selected): **1.2 V row, series replica, trimmed iref + Cvcp.**
-- No row layout change; `gen_gds.py` replica stays as-is.
-- `signoff.py`/`dc_bench.py`/`_tran_decks` at 1.2 V and gates at 1.2 V.
-- The digital 1.2 V stdcell outputs then match directly; no level shifters,
-  and the `sg13_lv` 1.5 V maximum is respected.
-- The iout full-scale/gain trim lives in the wrapper's `iref` reference
-  (16.032 uA) and the `Cvcp` is 330 pF (240 pF at the vcp node plus margin).
+- digital pins become -10.1..-9.5; analog pads are -10.0..-9.6 -> **0.4 um
+  overlap** on Metal2 (10/0), no jog and no via;
+- **510 distinct merged Metal2 islands**, no shared island, all 510 centres
+  covered;
+- top-cell bbox -1.0,-109.8 .. 1918.5,12.0 um;
+- **PDK KLayout DRC on `dac_video_top`: 0 items**.
 
-Option B (fallback): **1.8 V with `sg13_hv` 3.3 V devices.**
+```sh
+cd openlane/dac_video_dig
+DIG_GDS=runs/ihp_pdn44/final/gds/dac_video_dig.gds \
+  /usr/bin/klayout -b -r assemble_ihp.py -z
+/usr/bin/klayout -b -zz -r \
+  /grid/dac-generator/pdks/ihp-sg13g2/libs.tech/klayout/tech/drc/ihp-sg13g2.drc \
+  -rd input=build/dac_video_top.gds -rd topcell=dac_video_top \
+  -rd report=build/top_drc.lyrdb -rd no_recommended=true \
+  -rd run_mode=deep -rd thr=8
+```
 
-Option C: keep 1.8 V `sg13_lv` with a written PDK/process waiver.
-- The model states 1.5 V max; a waiver is required before tapeout.  The
-  current `dc`/`tran` benches at 1.8 V are outside the stated model range.
+## Remaining gaps
 
-### 2. Harden the IHP digital macro (P0)
+1. **Reference-CDL analog LVS (P1).**  The row signoff is still the PDK
+   `run_lvs.py --net_only` extraction plus a structural pad-pair walk.  There
+   is no `gen_cdl.py` for the IHP row yet (unlike `video_ics55`), so a full
+   schematic-vs-layout compare with the extracted 1022-device netlist is still
+   missing.
+2. **Wrapper and bias (P1).**  The wrapper must provide:
+   - **iref 16.032 uA** (resistor/current mirror with startup);
+   - **470 pF on vcp**, **100 pF on vbp** (both are external components);
+   - 1.2 V analog and 1.2 V digital rails (can be the same domain, but keep
+     the 510 gate nets and the row's `vdd`/`vbp`/`vcp`/`iout`/`idump` rails
+     separate from the digital PDN);
+   - control/status pads: `clk`, `code[0..7]`, `stb`, `rst_n`, `valid`,
+     `ready`; the digital `dout/dout_n` are already on the row's pad row;
+   - no on-chip reference, startup or decap exists in either block.
+3. **PPA/SFDR (P2).**  Analog: 51,032 um^2, ~4.9 mW at 1.2 V, 25 MS/s, LSB
+   0.601 mV into 37.5 ohm.  Digital: 0.387 mW, 129,330 um^2 core, setup/hold
+   above.  Static SFDR can be computed from the 16-seed 1.2 V transfer (DNL
+   0.1467 / INL 0.0906 LSB) with `video_ics55/static_sfdr.py`; dynamic carry
+   0.029 LSB.  No full-chip SFDR yet.
+4. **Full-chip LVS/PEX (P2).**  The blocks are signed off separately and the
+   assembly is DRC-clean with isolated pad islands, but there is no top-level
+   netlist, combined LVS, or full-chip RCX/SFDR.  The digital macro has SPEF
+   and post-PnR STA; the analog row has Magic PEX; a top-level extraction is
+   still missing.
+5. **Antenna (P2).**  One clock net is 1.14x over the cumulative Metal3
+   antenna limit (`clk` -> `clkbuf_0_clk/A`).  Fixes: shorten the M3 clock
+   route, move the clock to Metal2 (`RT_CLOCK_MAX_LAYER`), widen the first
+   buffer's input gate, or insert an antenna diode.  It is the only remaining
+   digital DRC/LVS-adjacent item.
+6. **RF/MOM:** not a gap.  The DAC uses neither.
+
+## Digital flow notes (reproducible)
 
 ```sh
 cd openlane/dac_video_dig
 PYTHONPATH=$PWD/librelane_patch \
 librelane config.librelane.json \
-  --pdk ihp-sg13g2 --pdk-root /grid/dac-generator/pdks/ihp-sg13g2 \
-  --run-tag ihp_pins
+  --pdk ihp-sg13g2 --pdk-root /grid/dac-generator/pdks \
+  --manual-pdk --run-tag <tag>
 ```
 
-Before the run:
-- set `VDD_NETS: [VDD]`, `GND_NETS: [VSS]` (or confirm the `vccd1/vssd1`
-  mapping) in the `pdk::ihp-sg13g2` section;
-- decide `RUN_CTS` (enable CTS for the 28k-flop 100 MHz clock, or document
-  why the ideal clock is acceptable);
-- make the IHP pin order explicit (disable/override the sky130
-  `IO_PIN_ORDER_CFG` fallback; the strict `pin_template_ihp130.def` is the
-  contract).
+The IHP section sets `VDD_NETS=[VDD]`, `GND_NETS=[VSS]`, `RUN_CTS=true`,
+`FP_DEF_TEMPLATE=pin_template_ihp130.def`, `PDN_RAIL_WIDTH=0.44`, and
+`RUN_MAGIC_DRC=false` (Magic DRC OOM-killed the 28k-instance 1912x100 macro;
+the PDK KLayout deck is the golden check).  Three details matter:
 
-After the run check: 510 outputs on `x=2.25+3.75k`, y=0..0.6; 523 LEF pins;
-DRC 0; LVS 0 against the standard-cell CDL; setup/hold at ss/tt/ff; power;
-antenna; PEX; the 8-bit binary cell order against the row's `b*` tags.
+- **PDN rail width 0.44 um.**  The `sg13g2` cell power pin is 0.44 um tall
+  (3.56..4.00 in a 3.78 um row).  The default 1.0 um rail leaves a 0.10 um
+  notch to the cell internal M1: 3,924 `M1.b` + 33 `M1.e` violations.  0.44
+  matches the pin and clears both; 0.6 leaves 74 `M1.b`/`M1.e` items.
+- **`FP_DEF_TEMPLATE` and `IO_PIN_ORDER_CFG` live in `pdk::sky130*`.**  A
+  top-level key after the `pdk::` sections overrides them, so the IHP run
+  was reading the sky130 template and failing at ApplyDEFTemplate with
+  `met2`/`code[7]` errors.  The IHP section's `FP_DEF_TEMPLATE` is
+  authoritative.
+- **`--last-run` only selects a run directory; it does not resume.**  Add
+  `--from <Step.Id>` to continue (for example `--from Odb.RemovePDNObstructions`).
+  Regenerating PDN on top of an existing PDN with a different rail width can
+  report "grid does not contain any shapes"; start the PDN from a fresh run.
 
-### 3. Assemble the IHP blocks (P1)
+The previous 1.8 V row also needed `Cvcp=220 pF`; at 1.2 V the cell
+full-scale study sets **470 pF**.  The row signoff tran uses 470 pF and the
+same 100 pF on vbp.
 
-Write an IHP `assemble.py` (met2 10/0):
-- analog row at the origin (`PAD_Y=(-10.00,-9.60)`);
-- digital macro mirrored in Y, `y0=-9.5` (digital pads become -10.1..-9.5,
-  overlapping the analog -10.0..-9.6 by 0.4 um);
-- check 510 merged-met2 pad islands, no shared island, top-cell bbox;
-- run the IHP KLayout DRC on the assembled `dac_video_top` (the sky130
-  assembly reached 0 items with the same 0.4 um overlap).
-
-### 4. Close the analog LVS and signoff bookkeeping (P1)
-
-- Generate an IHP row reference CDL (port `video_ics55/gen_cdl.py` to the
-  `sg13_lv` devices; or emit it from `pdk_cell.py`/`gen_gds.py`).
-- Run the PDK `run_lvs.py` with the reference (not `--net_only`) plus the
-  pad-pair walk; resolve the tap/well handling (currently
-  `--disable_tap_extraction`).
-- Re-run `./signoff.py --stage all`, or merge the existing stage logs into
-  `signoff.json`; update the stale "Not claimed: PEX" docstring.
-
-### 5. Wrapper and bias (P1)
-
-- 16 uA `iref` reference (resistor/current mirror) with startup;
-- 220 pF on `vcp` and 100 pF on `vbp` (both are wrapper requirements);
-- 1.2 V digital and 1.2 V (or 1.8 V) analog rails, separated;
-- control/status pads for `clk`, `code[0..7]`, `stb`, `rst_n`, `valid`,
-  `ready`; digital `dout[0..254]`/`dout_n[0..254]` to the 510 row pads;
-- if the row stays 1.8 V, 510 level shifters / 1.8 V drivers between the
-  digital and analog pads.
-
-### 6. PPA/SFDR (P2)
-
-- Analog PPA: 51,032 um^2; 7.35 mW at 1.8 V (or ~4.9 mW at 1.2 V);
-  25 MS/s; LSB 0.6 mV into 37.5 ohm (16 uA/cell).
-- Digital PPA from the IHP LibreLane metrics (area, power, setup/hold).
-- Static SFDR from the 16-seed mismatch transfer (same method as
-  `video_ics55/static_sfdr.py`; the 8-bit binary DNL/INL 0.196/0.122 LSB is
-  the input); dynamic carry 0.062 LSB.
-- Full-chip SFDR/PEX after assembly and the wrapper.
-
-## What is already closed
-
-- Analog row generator and layout: 255 cells + replica, 1022 devices,
-  510 met2 pads on the 3.75 um grid, DRC 0, PEX 1022 instances / 2.57 pF.
-  At **1.2 V series / iref 16.032 uA / Cvcp 330 pF**: DC 4.0865 mA
-  (-0.037 %), vbp/vcp 0.6316/0.0267 V, carry 0.039 LSB, drift
-  -0.032/-0.094 mV.  The 1.8 V 16-seed MC was DNL/INL 0.196/0.122; the
-  1.2 V MC is re-running.
-- Digital pin contract: `pin_template_ihp130.def`, 523 pins, 510 outputs on
-  the exact analog grid, 8-bit binary, 100 um die.
-- IHP PDK LibreLane support: `sg13g2_stdcell`, KLayout DRC/LVS, Magic,
-  OpenRCX; the `librelane_patch` for the DEF template step.
-
-The critical path is **voltage-domain decision -> IHP row re-spin (if 1.2 V)
--> digital macro hardening -> assembly -> wrapper -> full-chip LVS/PEX/SFDR.**
+The critical path is now **wrapper/bias -> reference-CDL LVS -> full-chip
+LVS/PEX -> PPA/SFDR -> antenna fix.**

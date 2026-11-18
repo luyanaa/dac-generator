@@ -53,14 +53,15 @@
             "VSS"
         ],
         "RUN_CTS": true,
-        "IO_PIN_ORDER_CFG": null,
         "//volt": "IHP sg13g2_stdcell is 1.2 V; the analog row is now 1.2 V (series bias), so the 510 outputs match directly.",
-        "//cts": "28k flops at 100 MHz; enable CTS instead of the sky130 ideal-clock shortcut.",
-        "//io": "The strict FP_DEF_TEMPLATE (pin_template_ihp130.def) is authoritative; do not use the sky130 pin_order fallback."
+        "//cts": "CTS is enabled for the 100 MHz clock; the 255 outputs are 8 code registers plus buffers, not 28k flops.",
+        "//io": "The strict FP_DEF_TEMPLATE (pin_template_ihp130.def) is authoritative; do not use the sky130 pin_order fallback.",
+        "RUN_MAGIC_DRC": false,
+        "//magicdrc": "Magic DRC OOM-killed the flow on this 1912x100 macro; the PDK KLayout DRC deck is the golden check.",
+        "PDN_RAIL_WIDTH": 0.44,
+        "//rail": "The sg13g2 cell power rail is 0.44 um tall (3.56..4.00 in a 3.78 um row); the 1.0 um default rail leaves a 0.10 um M1.b notch to the cell internal M1."
     },
-    "FP_DEF_TEMPLATE": "dir::pin_template_sky130.def",
     "FP_TEMPLATE_MATCH_MODE": "strict",
-    "IO_PIN_ORDER_CFG": "dir::pin_order_sky130.cfg",
     "IO_PIN_V_THICKNESS_MULT": 4,
     "ERRORS_ON_UNMATCHED_IO": "both",
     "//tmpl": "The exact abutment grid is pin_template_*.def (x = 2.25 + j*3.75,",
@@ -82,5 +83,9 @@
     "//sdc2": "fallback SDC gives inputs a 0 ns min delay and the ss-corner I/O",
     "//sdc3": "hold check then fails (register-to-register hold is positive).",
     "GRT_ANTENNA_REPAIR_ITERS": 8,
-    "DRT_ANTENNA_REPAIR_ITERS": 8
+    "DRT_ANTENNA_REPAIR_ITERS": 8,
+    "pdk::sky130*": {
+        "IO_PIN_ORDER_CFG": "dir::pin_order_sky130.cfg",
+        "FP_DEF_TEMPLATE": "dir::pin_template_sky130.def"
+    }
 }

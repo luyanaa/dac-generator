@@ -65,9 +65,10 @@ PDKS: dict[str, dict] = {
         "env": {"PDK": "ihp-sg13g2"},
         "pdk_root_env": True,
         "mir": (8.0, 1.0), "cas": (8.0, 0.5), "pair": (4.0, 0.28),
-        # 1.2 V series: trim iref +0.2 % balances the carry/full-scale;
-        # Cvcp 330 pF keeps the 0->255 bias kick under 0.7 mV.
-        "vcp_cap_pf": 330.0,
+        # 1.2 V series: iref 16.032 uA is the row signoff value; Cvcp 470 pF
+        # makes the 0->255 full-scale settle in 2.8 ns at 0.457 LSB
+        # (330 pF gives 0.549 LSB, over the 0.5 gate).
+        "vcp_cap_pf": 470.0,
         "iref_ua": 16.032,
         # "series": replica mirror + diode cascode, vcp = Vdd - 2*Vsg.
         # "wide-swing": mirror copy + triode NMOS, vcp = I*Ron (positive at

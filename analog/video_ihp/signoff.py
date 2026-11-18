@@ -23,9 +23,11 @@ Gates:
   pins   the 510 met2 pads measured on the drawn GDS on the 3.75 um grid,
          with their d_/db_ labels (10/25).
 
-Not claimed: PEX and the benches.  The PDK has no KLayout PEX deck; a magic
-tech exists but its device extractor has not been validated for these PCell
-devices, so the leaf stops at DRC/LVS/pins.
+PEX and the benches are part of the aggregate: magic hierarchical extraction
+gives 1022 instances / 2.57 pF, and the DC, 16-seed mismatch and carry
+transient run on that extracted netlist at 1.2 V.  The LVS gate is still the
+PDK `run_lvs.py --net_only` extraction plus a structural pad-pair walk; a
+reference-CDL compare is the next LVS step.
 """
 from __future__ import annotations
 
@@ -56,11 +58,12 @@ N_CELLS = 255
 RAILS = {"vdd", "vss", "vbp", "vcp", "iout", "idump"}
 
 # 1.2 V series-bias signoff (2026-11-18).  The PDK sg13_lv maximum Vds is
-# 1.5 V, so the old 1.8 V supply was out of range.  iref +0.2 % balances the
-# carry/full-scale; Cvcp 330 pF keeps the 0->255 bias kick under 0.7 mV.
+# 1.5 V, so the old 1.8 V supply was out of range.  iref 16.032 uA is the row
+# value; the cell-level full 0->255 study needs Cvcp 470 pF (330 pF lands at
+# 0.549 LSB, 470 pF at 0.457 LSB).
 VDD = 1.2
 IREF_UA = 16.032
-VCP_CAP_PF = 330.0
+VCP_CAP_PF = 470.0
 
 
 def die(msg: str) -> None:

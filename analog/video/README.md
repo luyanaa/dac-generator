@@ -275,13 +275,15 @@ on - but the sizes do, because 16 uA needs a very different Vov per process:
 | PDK | supply | devices | mirror | cascode | pair | vbp / vcp | carry | full scale |
 |---|---|---|---|---|---|---|---|---|
 | sky130 | 3.3 V | g5v0d10v5 | 8/0.5 | 8/0.5 | 8/0.5 | 2.192 / 0.843 V | +0.562 (fail) | +0.242 |
-| ihp-sg13g2 | 1.8 V | lv (PSP103) | 8/1 | 8/0.5 | 4/0.28 | 1.232 / 0.627 V | +0.024 LSB | -0.412 LSB |
+| ihp-sg13g2 | 1.2 V | lv (PSP103) | 8/1 | 8/0.5 | 4/0.28 | 0.6316 / 0.0267 V | -0.061 LSB | -0.457 LSB |
 | icsprout55 | 1.2 V | nm1p2/pm1p2 | - | - | - | - | - | **blocked** |
 
 * **ihp-sg13g2** (130 nm, PSP103 OSDI): the gf180 sizes fit unchanged - an 8/1
-  PMOS needs only Vsg 0.57 V at 16 uA.  Carry **+0.024 LSB** at 2.57 ns with
-  the bias flat; full-scale **-0.412 LSB** at 3.35 ns with 220 pF on `vcp`
-  (100 pF gives -0.86, so this PDK wants more decoupling than gf180's 100 pF).
+  PMOS needs only Vsg 0.57 V at **1.2 V / 16.032 uA**.  The series replica
+  gives vbp/vcp **0.6316/0.0267 V**; the cell-level carry is **-0.061 LSB**
+  at 2.26 ns, and the full scale **-0.457 LSB** at 2.81 ns with **470 pF** on
+  `vcp` (330 pF gives -0.549, over the 0.5 LSB gate; 100 pF is not enough at
+  1.2 V).  The PDK `sg13_lv` maximum Vds is 1.5 V, so 1.8 V is not used.
 * **sky130**: the 1.8 V logic PMOS cannot stack two diodes at 16 uA inside
   1.8 V - measured, the replica's `vcp` is driven *negative* because the sink
   pulls harder than the stack can supply - so the cell moves to the 5 V

@@ -2,17 +2,18 @@
 
 The P5 cell on IHP SG13G2, built from the PDK's own `SG13_dev` PCells:
 255 cells + the diode-connected replica, **1022 devices** (512 pmos, 510
-nmos), 510 met2 pads on the 3.75 um grid.  Signoff: **DRC 0**, **LVS walk
-passes on all 255 cells**, **510 pins**, **PEX 1022 instances / 2.57 pF**,
-**extracted DC 4.0865 mA (-0.037 %) at vbp/vcp 0.6316/0.0267 V**, **carry
-settle 0.039 LSB** at **1.2 V**.  The 16-seed mismatch MC is being re-run at
-1.2 V (the 1.8 V values were DNL 0.196 / INL 0.122 LSB).
+nmos), 510 met2 pads on the 3.75 um grid.  **All eight signoff stages pass at
+1.2 V**: DRC 0, structural LVS walk on all 255 cells, 510 pins, PEX 1022
+instances / 2.57 pF, extracted DC **4.0866 mA (-0.037 %)** at vbp/vcp
+**0.6316/0.0267 V**, 16-seed mismatch **DNL 0.1467 / INL 0.0906 LSB**
+(monotonic), carry **0.029 LSB**.  The assembled leaf (row + IHP digital
+macro) has **top-level DRC 0** and 510 independent Metal2 pad islands.
 
 **Status 2026-11-18:** the row is moving from 1.8 V to **1.2 V** because the
 PDK `sg13_lv` model states **maximum Vds 1.5 V**; the old 1.8 V supply and
 1.8 V pair-gate drive were outside that limit.  The 1.2 V **series** replica
-with `iref` **16.032 uA** and `Cvcp` **330 pF** passes the extracted DC and
-the 127->128 carry (0.039 LSB, vbp/vcp drift -0.032/-0.094 mV).  The 1.2 V
+with `iref` **16.032 uA** and `Cvcp` **470 pF** passes the extracted DC and
+the 127->128 carry (0.029 LSB, vbp/vcp drift -0.023/-0.068 mV).  The 1.2 V
 **wide-swing** bias fails (carry -0.783 LSB, full -1.772 LSB, dvcp +82.7 mV)
 and is not used.  The digital `sg13g2_stdcell` is 1.2 V, so the 510 outputs
 match directly with no level shifters.
@@ -72,8 +73,8 @@ The first DRC rounds were via rules: **Via1/Via2 are 0.19 um (min=max)**, not
 | lvs | PDK `tech/lvs/run_lvs.py --net_only --disable_tap_extraction`, then the pad-pair walk: **1022 devices (512 pmos / 510 nmos), 516 ports, all pmos bulks vdd, all nmos bulks vss, 255 cell mirrors + 1 replica mirror/cascode** |
 | pex | magic hierarchical extraction, cthresh/rthresh 0: **1022 instances, 8421 caps, 2.57 pF, no floating node** |
 | dc | extracted array, **16.032 uA** at vcp, all 255 cells to iout, **1.2 V**: **4.0865 mA** (-0.037 %), **vbp 0.6316 V / vcp 0.0267 V** |
-| mm | PDK PSP103 mismatch (`mos_tt_mismatch` + per-instance `mm_ok=1`), one-hot 255-point `.dc` per seed; **1.8 V** 16 seeds: cell sigma 0.657 %, DNL 0.196 / INL 0.122 LSB; **1.2 V re-run in progress** |
-| tran | carry 127->128, **330 pF on vcp + 100 pF on vbp**, 37.5 ohm + 2 pF, **1.2 V**: **0.039 LSB** at 40 ns, vbp/vcp drift **-0.032/-0.094 mV** |
+| mm | PDK PSP103 mismatch (`mos_tt_mismatch` + per-instance `mm_ok=1`), one-hot 255-point `.dc` per seed; **1.2 V**, 16 seeds: cell sigma **0.704 %**, **DNL 0.1467 / INL 0.0906 LSB**, monotonic (the 1.8 V values were 0.196/0.122) |
+| tran | carry 127->128, **470 pF on vcp + 100 pF on vbp**, 37.5 ohm + 2 pF, **1.2 V**: **0.029 LSB** at 40 ns, vbp/vcp drift **-0.023/-0.068 mV** |
 | pins | 510 met2 pads on the 3.75 um grid, 516 labels (10/25) |
 
 The LVS runner needs KLayout >= 0.30.7 for its version gate and the
@@ -97,10 +98,33 @@ The mismatch MC uses the PDK's own law: the `mos_tt_mismatch` section and
 `mm_ok=1` on every device, so each extracted instance draws its own
 `delvto`/`factuo`; one 255-point one-hot `.dc` per seed recovers every cell's
 current and the 256-code transfer is exact superposition.  16 seeds give
-sigma 0.657 %, DNL 0.196, INL 0.122 LSB at 1.8 V; the 1.2 V MC is re-running.
+sigma 0.704 %, DNL 0.1467, INL 0.0906 LSB at 1.2 V (16 seeds, no
+non-monotonic seed).
 
-The 1.2 V carry transient (127 -> 128, 5 ps step, 40 ns) uses **330 pF on
-vcp + 100 pF on vbp**: 0.039 LSB, vbp/vcp drift -0.032/-0.094 mV.  The 1.8 V
-row needed 220 pF on vcp; at 1.2 V the larger `Cvcp` keeps the 0->255 bias
-kick under 0.7 mV.  Both caps are wrapper requirements, not part of this
-macro.
+The 1.2 V carry transient (127 -> 128, 5 ps step, 40 ns) uses **470 pF on
+vcp + 100 pF on vbp**: 0.029 LSB, vbp/vcp drift -0.023/-0.068 mV.  The P5
+cell full-scale study (0 -> 255) needs 470 pF: at 330 pF it lands at
+0.549 LSB, at 470 pF it settles in 2.8 ns at **0.457 LSB**.  Both caps are
+wrapper requirements, not part of this macro.
+
+## Digital macro and assembly (IHP)
+
+The IHP digital macro is hardened in `openlane/dac_video_dig` with
+`config.librelane.json` (`RESOLUTION=8`, `ENCODING=0`, die 1912.5 x 100 um,
+`pin_template_ihp130.def`).  Run `ihp_pdn44` finishes clean:
+
+* **KLayout DRC 0**; Netgen LVS **0 device/net/pin differences**;
+* **523 Metal2 pins**, the 510 `dout/dout_n` on the exact `x = 2.25 + 7.5k /
+  6.0 + 7.5k`, y = 0..0.6 analog grid; the 13 control pins on the top edge;
+* 8-bit binary order matches the row: `dout[2^k-1+i] = code[k]`, the same
+  `b{k}_{i}` tag as `gen_gds.py`;
+* setup **+5.039 ns** at `nom_slow_1p08V_125C`, hold **+0.1226 ns** at
+  `nom_fast_1p32V_m40C`, power **0.387 mW**, core 129,330 um^2;
+* one remaining antenna item: `clk` -> `clkbuf_0_clk/A` on Metal3, ratio
+  228.29 vs 200 (1.14x) - see the gap doc.
+
+`openlane/dac_video_dig/assemble_ihp.py` places the digital macro mirrored
+in Y at `y0 = -9.5` under the row.  The 510 pads overlap by 0.4 um on
+Metal2 (10/0); the assembled `build/dac_video_top.gds` has **510 distinct
+merged Metal2 islands** and the PDK KLayout DRC on the top cell is **0
+items**.
