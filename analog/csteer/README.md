@@ -486,9 +486,11 @@ was a 3.3 V-only value).  The device bench and the ideal-cell/DEM benches pass:
 | DC/DEM with the 1.8 % Pelgrom model | bench DNL **-0.890..+0.275**, INL **-0.483..+1.373**; DEM-mean DNL **-0.515..+0.275**, INL **-0.483..+0.483**; dem noise 391 mLSB rms |
 | supply | 1.2 V (no 3.3 V devices needed) |
 
-Not yet ported: the 30-cell + 60-switch **IHP GDS**.  `gen_gds.py` is still the
-gf180 `pfet` PCell generator (M1/poly geometry and 5.5 um cell pitch are
-gf180-specific), and the 60 switch drivers / differential wrapper / 1 kOhm
-termination were already class-C hand layout in the gf180 leaf.  The IHP
-pre-layout uses the same ideal-cell model and the measured IHP cell current;
-the layout is the next step.
+**IHP GDS is not yet clean.**  `gen_gds_ihp.py` now instantiates the IHP
+`SG13_dev` `pmos`/`nmos` PCells and produces a one-unary-cell + replica +
+steering-pair test GDS with the 2.75 um M2 pin row; its first DRC pass has
+**50 items** (V1.a 20, M1.b 8, Gat.b 6, Cnt.a 6, CntB.a 6, NW.b1 3, LU.b 1),
+so no LVS is claimed.  The 30-cell/60-switch array is not generated yet.
+`ihp_gds_status.json` records the gate state.  The gf180 generator remains
+the reference for the full floorplan; the IHP port needs the via1 cut size,
+gate-riser and nwell-spacing fixes first.

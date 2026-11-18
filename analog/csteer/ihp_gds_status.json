@@ -1,0 +1,14 @@
+{
+  "pdk": "ihp-sg13g2",
+  "layout_ok": false,
+  "scope": "one unary cell + replica + one steering pair; 30-cell/60-switch array not yet",
+  "generator": "analog/csteer/gen_gds_ihp.py",
+  "cell_gds": "analog/csteer/build/csteer_ihp_cell.gds",
+  "self_check": {"terminals": "iout/idump, vss, 2 switch gates on 2.75 um M2 pin row, 3 bias rails, iref on vcp", "shorts": 0},
+  "drc": {
+    "items": 50,
+    "categories": {"V1.a": 20, "M1.b": 8, "Gat.b": 6, "Cnt.a": 6, "CntB.a": 6, "NW.b1": 3, "LU.b": 1},
+    "note": "first IHP PCell geometry pass; via1 cuts, gate riser and nwell spacing still need fixing"
+  },
+  "lvs": "not run: DRC not clean and the 30-cell array is not generated"
+}
