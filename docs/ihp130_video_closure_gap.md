@@ -15,7 +15,7 @@ The **analog row is the mature block** (DRC 0, structural LVS walk, PEX, DC,
    **maximum drain-source voltage 1.5 V** for `sg13_lv`.  The pair gate is
    driven at 1.8 V with its drain near 0 V in the DC bench, i.e. Vgd ~1.8 V.
    This is outside the model's stated maximum; DRC/LVS do not check it.  A
-   1.8 V row needs a reliability waiver, a 1.2 V re-spin (wide-swing bias), or
+   1.8 V row needs a reliability waiver, a 1.2 V re-spin (series replica, trimmed iref), or
    `sg13_hv` 3.3 V devices.
 2. **IHP digital macro (P0).** `openlane/dac_video_dig` has an
    `pdk::ihp-sg13g2` config (1912.5 x 100 um, `RESOLUTION=8`, `ENCODING=0`,
@@ -84,18 +84,34 @@ The **analog row is the mature block** (DRC 0, structural LVS walk, PEX, DC,
 
 ### 1. Decide the analog voltage domain first (P0)
 
-Option A (preferred): **1.2 V row with the wide-swing bias.**
-- `pdk_cell.py` IHP `vdd=1.2`, `bias="wide-swing"`; the series bias at 1.2 V
-  leaves `vcp ~= 0`, so the triode-NMOS wide-swing replica is required.
-- Re-run the P5 bias/carry study at 1.2 V, then regenerate the row GDS
-  (`gen_gds.py`) and re-run `signoff.py --stage all`.
-- The digital 1.2 V stdcell outputs then match the 1.2 V pair gates; no level
-  shifter, and the `sg13_lv` 1.5 V maximum is respected.
+**Decision (2026-11-18): 1.2 V.**  The 1.2 V P5 cell study was run with both
+bias topologies.  The **series** bias is the better path; it uses the existing
+row replica (no layout re-spin):
 
-Option B: **1.8 V with `sg13_hv` 3.3 V devices.**
-- New PCell/device config (`pmos_hv`/`nmos_hv`), new sizes and layout; the
-  1.2 V digital outputs still need a 1.8 V driver/level shifter.
-- Larger area/power; not preferred.
+| 1.2 V bias | 127->128 | 0->255 | dvcp | verdict |
+|---|---|---|---|---|
+| series | **-0.062 LSB, 2.26 ns** | -0.698 LSB | +0.72 mV | FAIL only by the 0.5 LSB / 0.7 mV thresholds |
+| wide-swing (nbias 0.5/1.0) | -0.783 LSB, settle inf | -1.772 LSB | +82.7 mV | FAIL |
+
+The wide-swing `vcp` is only 0.027 V and the 220 pF `vcp` node is kicked by
+82 mV at the carry; the triode bias cannot hold it.  The **series** carry is
+already good.  The 0->255 `settle inf` is not a topology failure: the final
+value is 0.698 LSB off, so it can never enter the 0.5 LSB window.  A ~0.2 %
+`iref` trim (16.032 uA instead of 16 uA) balances carry/full at about
++/-0.19 LSB, and `Cvcp` 220 -> 330 pF reduces the full-scale kick to about
+0.48 mV.  Re-run `pdk_cell.py ihp-sg13g2 --vdd 1.2 --bias series` with those
+two values; if it passes, keep the existing row GDS and only change the
+benches/wrapper.
+
+Option A (selected): **1.2 V row, series replica, trimmed iref + Cvcp.**
+- No row layout change; `gen_gds.py` replica stays as-is.
+- `signoff.py`/`dc_bench.py`/`_tran_decks` at 1.2 V and gates at 1.2 V.
+- The digital 1.2 V stdcell outputs then match directly; no level shifters,
+  and the `sg13_lv` 1.5 V maximum is respected.
+- The iout full-scale/gain trim lives in the wrapper's `iref` reference
+  (16.032 uA) and the `Cvcp` is 330 pF (240 pF at the vcp node plus margin).
+
+Option B (fallback): **1.8 V with `sg13_hv` 3.3 V devices.**
 
 Option C: keep 1.8 V `sg13_lv` with a written PDK/process waiver.
 - The model states 1.5 V max; a waiver is required before tapeout.  The
