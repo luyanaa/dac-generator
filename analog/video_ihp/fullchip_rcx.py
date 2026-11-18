@@ -107,8 +107,8 @@ def main() -> int:
                   "so the top-level PEX adds no wire length.  Full RC is the "
                   "row Magic RCX (4,456 R / 10,077 C) plus the digital "
                   "OpenRCX SPEF (R+C); the top PEX adds the full-chip "
-                  "capacitance.  The top_pex_rcx run is the same extraction "
-                  "with resistance for the assembled top."),
+                  "capacitance.  The block RCX union is the full-chip RCX; the "
+                  "all-in-one top run is optional (zero-length top wires)."),
     }
     (BUILD / "fullchip_rcx.json").write_text(json.dumps(out, indent=2) + "\n")
     print(json.dumps(out, indent=2))
