@@ -18,9 +18,8 @@ and the two blocks are **assembled with top-level DRC 0**:
 - assembly `assemble_ihp.py`: **510 independent merged Metal2 islands** and
   **top-level KLayout DRC 0**.
 
-Still open: a reference-CDL analog LVS, the wrapper/bias block, PPA/SFDR,
-full-chip LVS/PEX.  These are listed
-below with evidence.
+Still open: the wrapper/bias block, PPA/SFDR, and full-chip LVS/PEX.  These
+are listed below with evidence.
 
 ## What closed since the first gap report
 
@@ -30,6 +29,7 @@ below with evidence.
 | P0 IHP digital macro had no IHP run | **closed**: `runs/ihp_ant` final GDS/DEF/metrics | `runs/ihp_ant/final/metrics.json` |
 | P0/P1 1.2 V stdcell vs 1.8 V analog gate interface | **closed**: both 1.2 V, no level shifters | `VDD_NETS=[VDD]`, `GND_NETS=[VSS]`, 1.2 V analog row |
 | P1 no IHP assembly | **closed**: `assemble_ihp.py`, `y0=-9.5`, Metal2 10/0 | 510 islands, top DRC 0 |
+| P1 analog row LVS was structural only | **closed**: reference-CDL COMPARE mode | `analog/video_ihp/gen_cdl.py`, `build/lvs_ref/video_ihp.log`: "Netlists match" |
 | P1 `signoff.json` only had `pins` | **closed**: `--stage all` restored all 8 stages, all `ok: true` | `analog/video_ihp/build/signoff.json` (git-ignored; values in the README) |
 | P2 digital flow details (`VDD_NETS`, CTS, pin-order) | **closed**: VDD/VSS, CTS on, sky130 pin-order moved to `pdk::sky130*` | `openlane/dac_video_dig/config.librelane.json` |
 
@@ -41,7 +41,7 @@ below with evidence.
 |---|---|
 | build | 255 cells + replica, **1022 devices** (512 pmos / 510 nmos) |
 | DRC | PDK `ihp-sg13g2.drc`: **0 items** |
-| LVS | `run_lvs.py --net_only` + structural pad-pair walk: **1022 devices, 516 ports**, 255 cell mirrors + replica |
+| LVS | `run_lvs.py --net_only` + structural pad-pair walk: **1022 devices, 516 ports**, 255 cell mirrors + replica; **reference-CDL COMPARE mode: PASS, Netlists match** (1022 devices / 516 ports) |
 | PEX | Magic hierarchical: **1022 instances, 2.57 pF** |
 | DC | extracted, **16.032 uA**: **4.0866 mA (-0.037 %)**, vbp/vcp **0.6316/0.0267 V** |
 | MM | PSP103 mismatch, **16 seeds at 1.2 V**: cell sigma **0.704 %**, **DNL 0.1467 / INL 0.0906 LSB**, monotonic |
@@ -97,12 +97,7 @@ DIG_GDS=runs/ihp_ant/final/gds/dac_video_dig.gds \
 
 ## Remaining gaps
 
-1. **Reference-CDL analog LVS (P1).**  The row signoff is still the PDK
-   `run_lvs.py --net_only` extraction plus a structural pad-pair walk.  There
-   is no `gen_cdl.py` for the IHP row yet (unlike `video_ics55`), so a full
-   schematic-vs-layout compare with the extracted 1022-device netlist is still
-   missing.
-2. **Wrapper and bias (P1).**  The wrapper must provide:
+1. **Wrapper and bias (P1).**  The wrapper must provide:
    - **iref 16.032 uA** (resistor/current mirror with startup);
    - **470 pF on vcp**, **100 pF on vbp** (both are external components);
    - 1.2 V analog and 1.2 V digital rails (can be the same domain, but keep
@@ -111,17 +106,17 @@ DIG_GDS=runs/ihp_ant/final/gds/dac_video_dig.gds \
    - control/status pads: `clk`, `code[0..7]`, `stb`, `rst_n`, `valid`,
      `ready`; the digital `dout/dout_n` are already on the row's pad row;
    - no on-chip reference, startup or decap exists in either block.
-3. **PPA/SFDR (P2).**  Analog: 51,032 um^2, ~4.9 mW at 1.2 V, 25 MS/s, LSB
+2. **PPA/SFDR (P2).**  Analog: 51,032 um^2, ~4.9 mW at 1.2 V, 25 MS/s, LSB
    0.601 mV into 37.5 ohm.  Digital: 0.3865 mW, 129,330 um^2 core, setup/hold
    above.  Static SFDR can be computed from the 16-seed 1.2 V transfer (DNL
    0.1467 / INL 0.0906 LSB) with `video_ics55/static_sfdr.py`; dynamic carry
    0.029 LSB.  No full-chip SFDR yet.
-4. **Full-chip LVS/PEX (P2).**  The blocks are signed off separately and the
+3. **Full-chip LVS/PEX (P2).**  The blocks are signed off separately and the
    assembly is DRC-clean with isolated pad islands, but there is no top-level
    netlist, combined LVS, or full-chip RCX/SFDR.  The digital macro has SPEF
    and post-PnR STA; the analog row has Magic PEX; a top-level extraction is
    still missing.
-5. **RF/MOM:** not a gap.  The DAC uses neither.
+4. **RF/MOM:** not a gap.  The DAC uses neither.
 
 ## Digital flow notes (reproducible)
 
@@ -159,5 +154,4 @@ The previous 1.8 V row also needed `Cvcp=220 pF`; at 1.2 V the cell
 full-scale study sets **470 pF**.  The row signoff tran uses 470 pF and the
 same 100 pF on vbp.
 
-The critical path is now **wrapper/bias -> reference-CDL LVS -> full-chip
-LVS/PEX -> PPA/SFDR.**
+The critical path is now **wrapper/bias -> full-chip LVS/PEX -> PPA/SFDR.**

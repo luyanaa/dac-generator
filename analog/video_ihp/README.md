@@ -2,7 +2,7 @@
 
 The P5 cell on IHP SG13G2, built from the PDK's own `SG13_dev` PCells:
 255 cells + the diode-connected replica, **1022 devices** (512 pmos, 510
-nmos), 510 met2 pads on the 3.75 um grid.  **All eight signoff stages pass at
+nmos), 510 met2 pads on the 3.75 um grid.  **All nine signoff stages pass at
 1.2 V**: DRC 0, structural LVS walk on all 255 cells, 510 pins, PEX 1022
 instances / 2.57 pF, extracted DC **4.0866 mA (-0.037 %)** at vbp/vcp
 **0.6316/0.0267 V**, 16-seed mismatch **DNL 0.1467 / INL 0.0906 LSB**
@@ -71,6 +71,7 @@ The first DRC rounds were via rules: **Via1/Via2 are 0.19 um (min=max)**, not
 | build | `gen_gds.py` under KLayout with the sg13g2 technology; the generator's same-layer short check |
 | drc | PDK `tech/drc/ihp-sg13g2.drc`: **0 items** on the full 1918.5 x 26.6 um array |
 | lvs | PDK `tech/lvs/run_lvs.py --net_only --disable_tap_extraction`, then the pad-pair walk: **1022 devices (512 pmos / 510 nmos), 516 ports, all pmos bulks vdd, all nmos bulks vss, 255 cell mirrors + 1 replica mirror/cascode** |
+| lvs_full | `gen_cdl.py` reference (1022 devices, 516 ports) vs the GDS, PDK `run_lvs.py` **COMPARE** mode: **PASS, Netlists match** (0 errors) |
 | pex | magic hierarchical extraction, cthresh/rthresh 0: **1022 instances, 8421 caps, 2.57 pF, no floating node** |
 | dc | extracted array, **16.032 uA** at vcp, all 255 cells to iout, **1.2 V**: **4.0865 mA** (-0.037 %), **vbp 0.6316 V / vcp 0.0267 V** |
 | mm | PDK PSP103 mismatch (`mos_tt_mismatch` + per-instance `mm_ok=1`), one-hot 255-point `.dc` per seed; **1.2 V**, 16 seeds: cell sigma **0.704 %**, **DNL 0.1467 / INL 0.0906 LSB**, monotonic (the 1.8 V values were 0.196/0.122) |

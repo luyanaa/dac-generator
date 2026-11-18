@@ -326,6 +326,45 @@ def lvs(pdk: Path) -> dict:
             "netlist": str(cir)}
 
 
+def lvs_full(pdk: Path) -> dict:
+    """Reference-CDL LVS: the generated row CDL vs the drawn GDS.
+
+    `gen_cdl.py` writes the 1022-device schematic (255 cells + replica) with
+    the same `b{k}_{i}` pad tags as the layout.  The PDK `run_lvs.py` compares
+    it against the GDS (no `--net_only`), with the tap extraction disabled so
+    the reference does not need the ntap/ptap cells.
+    """
+    gen = ROOT / "gen_cdl.py"
+    if not gen.is_file():
+        die("no gen_cdl.py")
+    g = run([sys.executable, gen], cwd=ROOT, timeout=120)
+    (BUILD / "gen_cdl.log").write_text(g.stdout + g.stderr)
+    if g.returncode:
+        die("gen_cdl.py failed (build/gen_cdl.log)")
+    cdl = BUILD / "video_ihp.cdl"
+    run_dir = BUILD / "lvs_ref"
+    if run_dir.exists():
+        shutil.rmtree(run_dir)
+    runner = pdk / "libs.tech/klayout/tech/lvs/run_lvs.py"
+    if not runner.is_file():
+        die(f"no LVS runner at {runner}")
+    env = _lvs_env(pdk)
+    p = run(["/usr/bin/python3", runner, f"--layout={GDS}",
+             f"--netlist={cdl}", f"--topcell={TOP}",
+             f"--run_dir={run_dir}", "--disable_tap_extraction",
+             "--top_lvl_pins"], cwd=ROOT, env=env, timeout=7200)
+    (BUILD / "lvs_ref.log").write_text(p.stdout + p.stderr)
+    logs = sorted(run_dir.glob("*.log"))
+    text = "\n".join(x.read_text() for x in logs)
+    match = "Netlists match" in text
+    pass_status = "Status           | PASS" in text or "Netlists match" in text
+    ok = p.returncode == 0 and match and pass_status
+    return {"ok": ok, "mode": "reference-cdl", "devices": 1022,
+            "ports": 516, "netlists_match": match,
+            "netlist": str(cdl), "log": str(BUILD / "lvs_ref.log"),
+            "run_dir": str(run_dir)}
+
+
 def pex(pdk: Path) -> dict:
     """Magic hierarchical extraction: 1022 devices + the per-net capacitance."""
     spice = BUILD / "pex.spice"
@@ -696,7 +735,8 @@ def selftest() -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", default="all",
-                    choices=["all", "build", "drc", "lvs", "pex", "dc", "mm", "tran", "pins"])
+                    choices=["all", "build", "drc", "lvs", "lvs_full", "pex",
+                             "dc", "mm", "tran", "pins"])
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--samples", type=int, default=16)
     a = ap.parse_args(argv)
@@ -704,12 +744,13 @@ def main(argv=None) -> int:
         return selftest()
     pdk = find_pdk()
     report = {}
-    stages = (["build", "drc", "lvs", "pex", "dc", "mm", "tran", "pins"] if a.stage == "all"
-              else [a.stage])
+    stages = (["build", "drc", "lvs", "lvs_full", "pex", "dc", "mm",
+               "tran", "pins"] if a.stage == "all" else [a.stage])
     rc = 0
     for st in stages:
-        fn = {"build": build, "drc": drc, "lvs": lvs, "pex": pex,
-              "dc": dc, "mm": mm, "tran": tran, "pins": pins}[st]
+        fn = {"build": build, "drc": drc, "lvs": lvs,
+              "lvs_full": lvs_full, "pex": pex, "dc": dc, "mm": mm,
+              "tran": tran, "pins": pins}[st]
         try:
             if st == "build":
                 res = build(pdk)
