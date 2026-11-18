@@ -1,0 +1,42 @@
+{
+  "pdk": "ihp-sg13g2",
+  "ok": true,
+  "unit": {
+    "moscap": {
+      "device": "sg13_moscap_p 2x1 um (gate=top, nwell=bottom)",
+      "measured_table": "analog/cdac/build/ihp_moscap_c2.json",
+      "grid_v": "0..1.2, step 0.05",
+      "c_ff_vs_vdiff": "6.24 fF at 0 V, 24.9 fF at -1.1 V, 23.8 fF at +1.2 V",
+      "role": "study only: the bias dependence gives -26.7..+26.8 LSB INL at 8 bit"
+    },
+    "signoff_cap": {
+      "device": "cmim 7x7 um (PDK PCell)",
+      "cu_ff": 74.62,
+      "c_tot_ff": 19102.7,
+      "flat_with_bias": true
+    }
+  },
+  "electrical_gate": {
+    "bench": "gen_cdac.py --bench model --cap mim --pdk ihp-sg13g2 --seeds 10",
+    "sigma_c_over_c": 0.0004286,
+    "dnl_lsb": [-0.002267, 0.002477],
+    "inl_lsb": [-0.00267, 0.00267],
+    "fs_max_hz": 18107400,
+    "verdict": "PASS"
+  },
+  "moscap_study": {
+    "dnl_lsb": [-0.4998, 1.391],
+    "inl_lsb": [-26.74, 26.84],
+    "verdict": "study (not the signoff backend)"
+  },
+  "layout": {
+    "generator": "analog/cdac/gen_gds_ihp.py",
+    "gds": "analog/cdac/build/cdac_ihp.gds",
+    "units": 256,
+    "bit_blocks": {"B7": 128, "B6": 64, "B5": 32, "B4": 16, "B3": 8, "B2": 4, "B1": 2, "B0": 1, "VCM": 1},
+    "bbox_um": [-0.6, -8.6, 2214.8, 18.4],
+    "drc_items": 0,
+    "lvs": "PASS (9-entry reference CDL with m=128..1), 0 errors"
+  },
+  "signoff": "analog/cdac/build/ihp_signoff.json"
+}

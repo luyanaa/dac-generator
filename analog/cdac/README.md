@@ -243,3 +243,62 @@ Still open, and not claimed: the differential wrapper (two mirrored arrays
 driven with complementary codes), the comparator and TG bias (class C hand
 work), and the 256-code post-layout transient sweep. The next pass is a
 `.control` loop of `alter`/`op` over the extracted netlist.
+
+## IHP sg13g2 (1.2 V) implementation
+
+The leaf now has an `ihp-sg13g2` binding in `cdac.yaml` and a full IHP gate:
+
+```sh
+python3 analog/cdac/measure_c2_ihp.py --step 0.05 --write   # unit C(V)
+python3 analog/cdac/ihp_signoff.py                          # model + DRC + LVS
+```
+
+### Unit capacitor
+
+Two backends were measured on the PDK models:
+
+| backend | device | C | 8-bit result |
+|---|---|---|---|
+| moscap | `sg13_moscap_p` 2x1 um, gate=top, nwell=bottom | 6.24 fF at 0 V, 24.9 fF at -1.1 V | **study**: DNL -0.500..+1.391, INL **-26.74..+26.84 LSB** |
+| **cmim (signoff)** | `cmim` PCell 7x7 um | **74.62 fF**, flat with bias | DNL **-0.0023..+0.0025**, INL **-0.0027..+0.0027 LSB** |
+
+The mos capability is a genuine 2-terminal device (C = f(Vg-Vb)); the measured
+2-D table is stored as `cgg_ff_vs_vg_vb` / `cgb_ff_vs_vg_vb` and collapses onto
+the diagonal (reciprocity error 0).  The 0.85 V point of the AC grid is
+smoothed (single-point model artifact).  As in sky130, the moscap's bias
+dependence is far outside the 8-bit INL target, so the signoff capacitor is
+the flat MIM (`cap_cmim`), matching the leaf's `--cap mim` gate.
+
+### Electrical gate
+
+`gen_cdac.py --bench model --cap mim --pdk ihp-sg13g2 --seeds 10`:
+
+```
+DNL_mim -0.002267 +0.002477
+INL_mim -0.002670 +0.002670
+FS_mim 1.81074e+07
+VERDICT_mim PASS
+```
+
+Budget: C_unit 74.62 fF, C_tot 19.10 pF, kT/C 20.8 uV rms (4.4 mLSB),
+settling 4.47 ns/bit, fs_max 18.1 MS/s (target 1 MS/s).
+
+### Array layout
+
+`gen_gds_ihp.py` places 256 `cmim` PCells as contiguous bit blocks
+(B7=128 ... B0=1, VCM=1) and routes:
+
+- bottom plates: local Metal5 bridges per block, one tap per block, block
+  buses stacked in a channel below the row (wider span deeper) and nested
+  L-routes in the right margin to the 9 Metal5 pins;
+- top plate: one TopMetal1 bar across every cap plus a TM1 VSH pin.
+
+| gate | result |
+|---|---|
+| IHP KLayout DRC | **0 items** |
+| IHP KLayout LVS (9-entry reference, `m=128..1`) | **PASS, 0 errors** |
+
+`ihp_signoff.py` is the fail-closed gate and writes `build/ihp_signoff.json`
+(`ok: true`), mirrored by `ihp_status.json`.  The differential second side,
+the transmission gates and the comparator remain wrapper / class-C work, as
+in the sky130 leaf.

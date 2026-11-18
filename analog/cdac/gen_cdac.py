@@ -65,6 +65,19 @@ def load_cfg(path=None) -> dict:
         return yaml.safe_load(fh)
 
 
+def apply_pdk(cfg: dict, pdk: str) -> dict:
+    """Merge a per-PDK binding (unit, tables, supplies) over the top level."""
+    if pdk in (None, "", "sky130"):
+        return cfg
+    block = cfg.get(pdk)
+    if not block:
+        sys.exit(f"cdac.yaml has no {pdk!r} binding")
+    out = dict(cfg)
+    out.update(block)
+    out["pdk"] = pdk
+    return out
+
+
 # --------------------------------------------------------------------------
 # capacitor models
 # --------------------------------------------------------------------------
@@ -606,9 +619,11 @@ def main(argv=None) -> int:
     ap.add_argument("--seeds", type=int, default=1)
     ap.add_argument("--brief", action="store_true")
     ap.add_argument("--config", default=None)
+    ap.add_argument("--pdk", default="sky130",
+                    choices=["sky130", "ihp-sg13g2"])
     a = ap.parse_args(argv)
 
-    cfg = load_cfg(a.config)
+    cfg = apply_pdk(load_cfg(a.config), a.pdk)
     if a.bench == "unit":
         return bench_unit(cfg, a.brief)
     return bench_model(cfg, a)

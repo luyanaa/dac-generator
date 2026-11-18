@@ -9,7 +9,7 @@ Status 2026-11-19.  Scope: the four `analog/` architecture generators
 | **R-2R** | **PASS** | 25 `rppd` units + M1, `gen_gds_ihp.py` | **0** | **PASS** | `dac_r2r_dig` still gf180 config |
 | **resistor string** | **PASS** (4 kOhm unit) | 255 `rppd` units + 256 taps | **0** | **PASS** | `dac_string_dig` still gf180 config |
 | **current-steering** | **PASS** at 1.2 V (cell + DEM) | 30 cells + 60 switches, `gen_gds_ihp.py` | **0** | **PASS** | `dac_csteer_dig` still gf180 config |
-| **binary CDAC** | not started | not ported (sky130 moscap C(V) table) | — | — | `dac_cdac_dig` still sky130 config |
+| **binary CDAC** | **PASS** (flat `cmim`, measured moscap study) | 256 `cmim` units, `gen_gds_ihp.py` | **0** | **PASS** | `dac_cdac_dig` still sky130 config |
 
 ## R-2R (`analog/r2r`)
 
@@ -58,19 +58,23 @@ leaf; the generated split is the matched resistor string.
 
 ## Binary CDAC (`analog/cdac`)
 
-Not started on IHP.  The leaf's unit is a **sky130 MOSCAP** whose measured
-`Cgg(Vg,Vb)` / `Cgb(Vg,Vb)` tables are in `cdac.yaml`; the model is a
-2-D charge state function because the top plate floats.  An IHP port needs:
+- `cdac.yaml` `ihp-sg13g2`: measured `sg13_moscap_p` 2x1 um 2-D C(V) table
+  (0..1.2 V, 0.05 V grid, `measure_c2_ihp.py`) and the flat `cmim` signoff cap
+  (7x7 um, **74.62 fF**).
+- moscap is a **study**: 6.24 fF at 0 V to 24.9 fF at -1.1 V gives DNL
+  -0.500..+1.391 and INL **-26.74..+26.84 LSB**, far outside 8 bit.
+- Signoff backend `cmim`: 10 Pelgrom seeds (0.043 % per unit) give DNL
+  **-0.0023..+0.0025**, INL **-0.0027..+0.0027 LSB**, fs_max **18.1 MS/s**
+  (target 1 MS/s), `VERDICT_mim PASS`.
+- Layout: 256 `cmim` PCells in bit blocks (128/64/32/16/8/4/2/1 + VCM),
+  Metal5 block buses with nested L-routes to 9 pins, TopMetal1 VSH bar.
+  DRC **0**; 9-entry reference CDL (`m=128..1`) LVS **PASS**.
+- `ihp_signoff.py` -> `build/ihp_signoff.json` (`ok: true`).
 
-1. measure the IHP `moscap_n/p` (or `cmim`) C(V) tables at 1.2 V;
-2. rebuild the unit capacitor and the 2x256 array with the IHP PCells;
-3. port the SAR digital macro (`dac_cdac_dig`) to `sg13g2_stdcell`.
-
-The existing generator (`gen_cdac.py`, `gen_gds.py`, `signoff.py`) is
-sky130-specific at the device/C(V) level, so no IHP number is claimed.
+The differential second side, TGs and comparator stay wrapper / class-C work,
+exactly as in the sky130 leaf.
 
 ## Digital macros
-
 `openlane/dac_r2r_dig`, `dac_string_dig`, `dac_csteer_dig`, `dac_cdac_dig`
 still have only their original PDK configs (`gf180mcu*` / `sky130*`), no
 `pdk::ihp-sg13g2` and no `runs/`.  The IHP digital flow that already works is
