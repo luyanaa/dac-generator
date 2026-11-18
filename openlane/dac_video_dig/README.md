@@ -90,7 +90,7 @@ The same RTL is hardened on `sg13g2_stdcell` with `RESOLUTION=8`,
 510 `dout/dout_n` on the exact row grid, 13 control pins on the top edge).
 The IHP section of `config.librelane.json` sets `VDD_NETS=[VDD]`,
 `GND_NETS=[VSS]`, `RUN_CTS=true`, `PDN_RAIL_WIDTH=0.44`, and
-`RUN_MAGIC_DRC=false` (Magic DRC OOM-kills this 28k-instance 1912x100 macro;
+`RUN_MAGIC_DRC=false` (Magic DRC OOM-kills this 1912x100 macro (11,370 instances, 1,203 stdcells);
 the PDK KLayout deck is the golden check).  The sky130 `IO_PIN_ORDER_CFG`
 and `FP_DEF_TEMPLATE` live in `pdk::sky130*` so they cannot override IHP.
 

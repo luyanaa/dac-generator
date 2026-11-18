@@ -140,7 +140,7 @@ librelane config.librelane.json \
 
 The IHP section sets `VDD_NETS=[VDD]`, `GND_NETS=[VSS]`, `RUN_CTS=true`,
 `FP_DEF_TEMPLATE=pin_template_ihp130.def`, `PDN_RAIL_WIDTH=0.44`, and
-`RUN_MAGIC_DRC=false` (Magic DRC OOM-killed the 28k-instance 1912x100 macro;
+`RUN_MAGIC_DRC=false` (Magic DRC OOM-killed the 1912x100 macro;
 the PDK KLayout deck is the golden check).  Three details matter:
 
 - **PDN rail width 0.44 um.**  The `sg13g2` cell power pin is 0.44 um tall

@@ -111,7 +111,7 @@ wrapper requirements, not part of this macro.
 
 The IHP digital macro is hardened in `openlane/dac_video_dig` with
 `config.librelane.json` (`RESOLUTION=8`, `ENCODING=0`, die 1912.5 x 100 um,
-`pin_template_ihp130.def`).  Run `ihp_pdn44` finishes clean:
+`pin_template_ihp130.def`).  Run `ihp_pdn44` is clean:
 
 * **KLayout DRC 0**; Netgen LVS **0 device/net/pin differences**;
 * **523 Metal2 pins**, the 510 `dout/dout_n` on the exact `x = 2.25 + 7.5k /
