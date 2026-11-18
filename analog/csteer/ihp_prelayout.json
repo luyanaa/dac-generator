@@ -1,0 +1,29 @@
+{
+  "pdk": "ihp-sg13g2",
+  "vdd": 1.2,
+  "prelayout_ok": true,
+  "gds_ok": false,
+  "layout_note": "analog/csteer/gen_gds.py still uses the gf180 pfet/nfet PCell geometry; the 30-cell/60-switch IHP GDS is not implemented",
+  "unit_cell": {
+    "mirror": "sg13_lv_pmos 8/1",
+    "cascode": "sg13_lv_pmos 8/0.5",
+    "switch": "sg13_lv_nmos 4/0.28",
+    "vcp_V": 0.10,
+    "i_cell_uA": 15.92,
+    "ro_MOhm": 1.3,
+    "vth_sensitivity_pct_per_mV": -0.813
+  },
+  "dc_dem_1p8pct": {
+    "bench_dnl_lsb": [-0.890, 0.275],
+    "bench_inl_lsb": [-0.483, 1.373],
+    "dem_mean_dnl_lsb": [-0.515, 0.275],
+    "dem_mean_inl_lsb": [-0.483, 0.483],
+    "dem_noise_rms_mLSB": 391.0
+  },
+  "evidence": [
+    "analog/csteer/build/cell_matrix.csv",
+    "analog/csteer/build/inl_dnl.csv",
+    "analog/csteer/build/ihp_dc.log",
+    "analog/csteer/build/ihp_measure_dc.log"
+  ]
+}
