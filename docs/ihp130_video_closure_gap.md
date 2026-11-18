@@ -10,13 +10,11 @@ DAC leaf, not a new signoff result.  Evidence is from the current workspace:
 The **analog row is the mature block** (DRC 0, structural LVS walk, PEX, DC,
 16-seed mismatch, carry transient).  The following are not closed:
 
-1. **Voltage domain (P0).** The row runs at **1.8 V** (`pdk_cell.py` IHP
-   config, `dc_bench.py`, `tran` decks), but the PDK `cornerMOSlv.lib` states
-   **maximum drain-source voltage 1.5 V** for `sg13_lv`.  The pair gate is
-   driven at 1.8 V with its drain near 0 V in the DC bench, i.e. Vgd ~1.8 V.
-   This is outside the model's stated maximum; DRC/LVS do not check it.  A
-   1.8 V row needs a reliability waiver, a 1.2 V re-spin (series replica, trimmed iref), or
-   `sg13_hv` 3.3 V devices.
+1. **Voltage domain (P0, being closed).** The old row ran at **1.8 V**, but
+   the PDK `cornerMOSlv.lib` states **maximum drain-source voltage 1.5 V**
+   for `sg13_lv`.  The row is moving to **1.2 V** with the existing series
+   replica, `iref` 16.032 uA and `Cvcp` 330 pF.  Row DC and carry pass at
+   1.2 V (see below); the full signoff is running.
 2. **IHP digital macro (P0).** `openlane/dac_video_dig` has an
    `pdk::ihp-sg13g2` config (1912.5 x 100 um, `RESOLUTION=8`, `ENCODING=0`,
    `pin_template_ihp130.def`), but `runs/` contains only `sky130` and
@@ -68,8 +66,8 @@ The **analog row is the mature block** (DRC 0, structural LVS walk, PEX, DC,
 
 | item | evidence |
 |---|---|
-| analog row signoff | `analog/video_ihp/README.md`: DRC 0, LVS walk 1022 devices, PEX 2.57 pF, DC 4.0815 mA, DNL/INL 0.196/0.122, carry 0.062 LSB |
-| analog 1.8 V | `analog/video/pdk_cell.py` `"ihp-sg13g2": {"vdd": 1.8, ... "sg13_lv_*"}`, `build/dc_bench.py` `Vdd vdd 0 1.8`, `Vd_* ... 1.8` |
+| analog row signoff | `analog/video_ihp/README.md`: DRC 0, LVS walk 1022 devices, PEX 2.57 pF; at 1.2 V series DC 4.0865 mA, vbp/vcp 0.6316/0.0267 V, carry 0.039 LSB |
+| analog 1.8 V history | `analog/video/pdk_cell.py` now defaults IHP to 1.2 V; the 1.8 V values were DNL/INL 0.196/0.122, carry 0.062 LSB |
 | `sg13_lv` max | `pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib` line 63: "Maximum drain-source voltage: 1.5" |
 | structural LVS | `analog/video_ihp/signoff.py` `run_lvs.py ... --net_only`, then `check()`; no reference CDL |
 | signoff JSON | `analog/video_ihp/build/signoff.json` has only `pins`; logs `drc.log`, `lvs.log`, `dc_transfer.log`, `pex.spice` exist |
@@ -102,6 +100,15 @@ value is 0.698 LSB off, so it can never enter the 0.5 LSB window.  A ~0.2 %
 0.48 mV.  Re-run `pdk_cell.py ihp-sg13g2 --vdd 1.2 --bias series` with those
 two values; if it passes, keep the existing row GDS and only change the
 benches/wrapper.
+
+**Row-level validation (2026-11-18, 1.2 V series, iref 16.032 uA, Cvcp
+330 pF):**
+- extracted DC: **4.0865 mA (-0.037 %)**, **vbp 0.6316 V / vcp 0.0267 V**;
+- carry 127->128: **0.039 LSB at 40 ns**, vbp/vcp drift **-0.032 / -0.094 mV**;
+- the existing row GDS is unchanged; the full `signoff.py --stage all`
+  (build/DRC/LVS/PEX/DC/MM/tran/pins) is running and the 16-seed 1.2 V
+  mismatch MC is being re-run.  The 1.8 V mismatch values (DNL 0.196 /
+  INL 0.122 LSB) are the last full-MC numbers.
 
 Option A (selected): **1.2 V row, series replica, trimmed iref + Cvcp.**
 - No row layout change; `gen_gds.py` replica stays as-is.
@@ -183,8 +190,11 @@ Write an IHP `assemble.py` (met2 10/0):
 ## What is already closed
 
 - Analog row generator and layout: 255 cells + replica, 1022 devices,
-  510 met2 pads on the 3.75 um grid, DRC 0, PEX 1022 instances / 2.57 pF,
-  DC 4.0815 mA, 16-seed DNL/INL 0.196/0.122, carry 0.062 LSB.
+  510 met2 pads on the 3.75 um grid, DRC 0, PEX 1022 instances / 2.57 pF.
+  At **1.2 V series / iref 16.032 uA / Cvcp 330 pF**: DC 4.0865 mA
+  (-0.037 %), vbp/vcp 0.6316/0.0267 V, carry 0.039 LSB, drift
+  -0.032/-0.094 mV.  The 1.8 V 16-seed MC was DNL/INL 0.196/0.122; the
+  1.2 V MC is re-running.
 - Digital pin contract: `pin_template_ihp130.def`, 523 pins, 510 outputs on
   the exact analog grid, 8-bit binary, 100 um die.
 - IHP PDK LibreLane support: `sg13g2_stdcell`, KLayout DRC/LVS, Magic,

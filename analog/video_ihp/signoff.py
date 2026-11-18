@@ -55,6 +55,13 @@ PIN_A, PIN_B = 2.25, 6.00
 N_CELLS = 255
 RAILS = {"vdd", "vss", "vbp", "vcp", "iout", "idump"}
 
+# 1.2 V series-bias signoff (2026-11-18).  The PDK sg13_lv maximum Vds is
+# 1.5 V, so the old 1.8 V supply was out of range.  iref +0.2 % balances the
+# carry/full-scale; Cvcp 330 pF keeps the 0->255 bias kick under 0.7 mV.
+VDD = 1.2
+IREF_UA = 16.032
+VCP_CAP_PF = 330.0
+
 
 def die(msg: str) -> None:
     print(f"error: {msg}", file=sys.stderr)
@@ -379,10 +386,10 @@ def dc(pdk: Path) -> dict:
             if not ln.strip().startswith((".subckt", ".ends"))]
     out = ["* ihp extracted array DC: all 255 cells to iout",
            f'.lib "{lib}" mos_tt', ""] + body
-    out += ["", "Vdd vdd 0 1.8", "Vss vss 0 0", "Iref vcp 0 16u",
+    out += ["", "Vdd vdd 0 %g" % VDD, "Vss vss 0 0", "Iref vcp 0 %gu" % IREF_UA,
             "Viout iout 0 0", "Vdump idump 0 0"]
     for tag in cell_tags():
-        out += [f"Vd_{tag} d_{tag} 0 1.8", f"Vdb_{tag} db_{tag} 0 0"]
+        out += [f"Vd_{tag} d_{tag} 0 %g" % VDD, f"Vdb_{tag} db_{tag} 0 0"]
     out += [".op", ".control", "run", "print i(Viout)", "print v(vbp) v(vcp)",
             ".endc", ".end"]
     deck = BUILD / "dc_transfer.spice"
@@ -400,9 +407,9 @@ def dc(pdk: Path) -> dict:
         die("ngspice produced no iout/vbp/vcp (see build/dc_transfer.log)")
     iout = abs(float(m.group(1)))
     vbp, vcp = float(vb.group(1)), float(vc.group(1))
-    want = N_CELLS * 16e-6
-    ok = (abs(iout / want - 1) < 0.02 and 1.0 < vbp < 1.5
-          and 0.4 < vcp < 0.9)
+    want = N_CELLS * IREF_UA * 1e-6
+    ok = (abs(iout / want - 1) < 0.02 and 0.4 < vbp < 1.0
+          and 0.0 < vcp < 0.3)
     return {"ok": ok, "iout_full_scale_mA": round(iout * 1e3, 4),
             "iout_error_pct": round((iout / want - 1) * 100, 3),
             "vbp_V": round(vbp, 4), "vcp_V": round(vcp, 4),
@@ -420,12 +427,12 @@ def _mm_deck(pdk: Path, seed: int, mismatch: bool, dat: Path) -> Path:
     out = ["* ihp one-hot mismatch sweep",
            f'.lib "{lib}" ' + ("mos_tt_mismatch" if mismatch else "mos_tt"),
            ""] + devs
-    out += ["Vdd vdd 0 1.8", "Vss vss 0 0", "Iref vcp 0 16u",
+    out += ["Vdd vdd 0 %g" % VDD, "Vss vss 0 0", "Iref vcp 0 %gu" % IREF_UA,
             "Vdump idump 0 0", "Vsel sel 0 0"]
     for j, t in enumerate(cell_tags()):
         on = f"(abs(v(sel)-{j})<0.5)"
-        out += [f"Bd_{t} d_{t} 0 V = 1.8*{on}",
-                f"Bdb_{t} db_{t} 0 V = 1.8*(1-{on})"]
+        out += [f"Bd_{t} d_{t} 0 V = %g*{on}" % VDD,
+                f"Bdb_{t} db_{t} 0 V = %g*(1-{on})" % VDD]
     out += ["Vmi iout 0 0", ".control", f"setseed {seed}",
             "dc Vsel 0 254 1", f"wrdata {dat} i(Vmi)", ".endc", ".end"]
     deck = BUILD / (f"mm_seed{seed}.spice" if mismatch else "mm_base.spice")
@@ -479,7 +486,7 @@ def mm(pdk: Path, samples: int = 16, seed0: int = 0) -> dict:
     p = run(["ngspice", "-b", base], cwd=BUILD, env=env, timeout=3600)
     (BUILD / "mm_base.log").write_text(p.stdout + p.stderr)
     cells0 = _mm_cells(BUILD / "mm_base.dat")
-    want = 16e-6
+    want = IREF_UA * 1e-6
     base_err = max(abs(c / want - 1) for c in cells0)
     if base_err > 0.03:
         die(f"zero-mismatch cells deviate {base_err * 100:.2f}% from 16 uA")
@@ -522,14 +529,14 @@ def _tran_decks(pdk: Path):
             if not ln.strip().startswith((".subckt", ".ends"))]
     tags = cell_tags()
     head = ["* ihp carry 127 -> 128", f'.lib "{lib}" mos_tt'] + body
-    head += ["Vdd vdd 0 1.8", "Vss vss 0 0", "Iref vcp 0 16u",
+    head += ["Vdd vdd 0 %g" % VDD, "Vss vss 0 0", "Iref vcp 0 %gu" % IREF_UA,
              "Vdump idump 0 0", "Rl iout 0 37.5", "Cl iout 0 2p",
-             "Cvcp vcp 0 220p", "Cvbp vbp 0 100p"]
+             "Cvcp vcp 0 %gp" % VCP_CAP_PF, "Cvbp vbp 0 100p"]
     op = list(head)
     for j, t in enumerate(tags):
         on = (128 >> cell_bit(j)) & 1
-        op += [f"Vd_{t} d_{t} 0 {1.8 if on else 0}",
-               f"Vdb_{t} db_{t} 0 {0 if on else 1.8}"]
+        op += [f"Vd_{t} d_{t} 0 {VDD if on else 0}",
+               f"Vdb_{t} db_{t} 0 {0 if on else VDD}"]
     op += [".op", ".control", "run", "print v(iout) v(vbp) v(vcp)",
            ".endc", ".end"]
     (BUILD / "tran_op.spice").write_text("\n".join(op) + "\n")
@@ -537,12 +544,12 @@ def _tran_decks(pdk: Path):
     t0, edge, skew = 1e-9, 20e-12, 25e-12
     for j, t in enumerate(tags):
         k = cell_bit(j)
-        g0 = 1.8 if (127 >> k) & 1 else 0.0
-        g1 = 1.8 if (128 >> k) & 1 else 0.0
+        g0 = VDD if (127 >> k) & 1 else 0.0
+        g1 = VDD if (128 >> k) & 1 else 0.0
         tt = t0 + k * skew
         tr.append(f"Vd_{t} d_{t} 0 PWL(0 {g0} {tt} {g0} {tt + edge} {g1})")
-        tr.append(f"Vdb_{t} db_{t} 0 PWL(0 {1.8 - g0} {tt} {1.8 - g0} "
-                  f"{tt + edge} {1.8 - g1})")
+        tr.append(f"Vdb_{t} db_{t} 0 PWL(0 {VDD - g0} {tt} {VDD - g0} "
+                  f"{tt + edge} {VDD - g1})")
     tr += [".tran 5p 40n", ".control", "run",
            f"wrdata {BUILD / 'tran.dat'} v(iout) v(vbp) v(vcp)",
            ".endc", ".end"]
@@ -587,7 +594,7 @@ def tran(pdk: Path) -> dict:
     # t, vcp.
     t, iout, vbp, vcp = (rows[-1][0], rows[-1][1], rows[-1][3],
                          rows[-1][5])
-    lsb_v = 16e-6 * 37.5          # one cell into 37.5 ohm
+    lsb_v = IREF_UA * 1e-6 * 37.5   # one cell into 37.5 ohm
     err_lsb = abs(iout - iout0) / lsb_v
     ok = (abs(t - 40e-9) < 1e-9 and err_lsb <= 0.5
           and abs(vbp - vbp0) <= 2e-3 and abs(vcp - vcp0) <= 2e-3)

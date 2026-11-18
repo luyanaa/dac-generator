@@ -53,7 +53,7 @@ PDKS: dict[str, dict] = {
         "env": {},
     },
     "ihp-sg13g2": {
-        "vdd": 1.8,
+        "vdd": 1.2,
         "root": "~/.ciel/ciel/ihp-sg13/versions/*/ihp-sg13g2",
         "lib": "{root}/libs.tech/ngspice/models/cornerMOSlv.lib",
         "section": "mos_tt",
@@ -65,7 +65,10 @@ PDKS: dict[str, dict] = {
         "env": {"PDK": "ihp-sg13g2"},
         "pdk_root_env": True,
         "mir": (8.0, 1.0), "cas": (8.0, 0.5), "pair": (4.0, 0.28),
-        "vcp_cap_pf": 220.0,
+        # 1.2 V series: trim iref +0.2 % balances the carry/full-scale;
+        # Cvcp 330 pF keeps the 0->255 bias kick under 0.7 mV.
+        "vcp_cap_pf": 330.0,
+        "iref_ua": 16.032,
         # "series": replica mirror + diode cascode, vcp = Vdd - 2*Vsg.
         # "wide-swing": mirror copy + triode NMOS, vcp = I*Ron (positive at
         # low Vdd); the cell cascodes still use cfg["cas"].
@@ -135,13 +138,14 @@ def deck(cfg: dict, root: Path, name: str, frm: int, to: int,
     dat = BUILD / f"pdk_{cfg['name']}_{name}.dat"
     op = BUILD / f"pdk_{cfg['name']}_{name}_op.dat"
     bias = cfg.get("bias", "series")
+    iref_ua = float(cfg.get("iref_ua", I_UNIT_UA))
     iref_node = "vbp" if bias == "wide-swing" else "vcp"
     lines = [f"* {cfg['name']} dump-tail cell, {frm}->{to}",
              f'.lib "{lib}" {cfg["section"]}',
              f"Vdd vdd 0 {vdd:g}",
              "Vss vss 0 0",
              "Vdump idump 0 0",
-             f"Iref {iref_node} 0 {I_UNIT_UA:g}u",
+             f"Iref {iref_node} 0 {iref_ua:g}u",
              f"Rl iout 0 {RL:g}",
              f"Cl iout 0 {CL_PF:g}p",
              f"Cvcp vcp 0 {cfg['vcp_cap_pf']:g}p"]
@@ -189,7 +193,7 @@ def deck(cfg: dict, root: Path, name: str, frm: int, to: int,
         lines.append(fmt.format(n="Xrca", d="cd_rep", g="vcp", s="md_rep",
                                 b="vdd", m=cfg["pfet"], w=cfg["cas"][0],
                                 l=cfg["cas"][1]))
-        lines.append(f"Isink cd_rep 0 {I_UNIT_UA:g}u")
+        lines.append(f"Isink cd_rep 0 {iref_ua:g}u")
     else:
         lines.append(fmt.format(n="Xrc", d="vcp", g="vcp", s="vbp", b="vdd",
                                 m=cfg["pfet"], w=cfg["cas"][0],
@@ -288,7 +292,7 @@ def run(cfg: dict, root: Path, frm: int, to: int, kind: str,
     v = [r[names["v(iout)"]] for r in rows]
     vb = [r[names["v(vbp)"]] for r in rows]
     vc = [r[names["v(vcp)"]] for r in rows]
-    lsb_v = I_UNIT_UA * 1e-6 * RL
+    lsb_v = float(cfg.get("iref_ua", I_UNIT_UA)) * 1e-6 * RL
     at = (T0_NS + PERIOD_NS) * 1e-9
     i41 = min(range(len(t)), key=lambda i: abs(t[i] - at))
     settled = v[i41] / lsb_v
@@ -337,6 +341,10 @@ def main(argv=None) -> int:
                     help="reference voltage for --bias follower")
     ap.add_argument("--sf", default=None,
                     help="source-follower NMOS W,L in um (e.g. 1.0,0.28)")
+    ap.add_argument("--iref", type=float, default=None,
+                    help="reference current in uA (default: the entry's iref_ua)")
+    ap.add_argument("--cvcp", type=float, default=None,
+                    help="vcp decoupling cap in pF (default: the entry's vcp_cap_pf)")
     a = ap.parse_args(argv)
     if a.all:
         # One process per PDK: the models are loaded per deck and the two
@@ -388,6 +396,10 @@ def main(argv=None) -> int:
         cfg["vref"] = a.vref
     if a.sf is not None:
         cfg["sf"] = tuple(float(x) for x in a.sf.split(","))
+    if a.iref is not None:
+        cfg["iref_ua"] = a.iref
+    if a.cvcp is not None:
+        cfg["vcp_cap_pf"] = a.cvcp
     if cfg.get("blocked"):
         print(f"{a.pdk}: blocked - {cfg['blocked']}", file=sys.stderr)
         return 2
@@ -442,12 +454,18 @@ def main(argv=None) -> int:
                   f"({rows[0]['vcp_dc']:.4f} V at the operating point)")
     rep = {"pdk": a.pdk, "vdd": cfg["vdd"], "ok": ok,
            "mirror": cfg["mir"], "cascode": cfg["cas"], "pair": cfg["pair"],
+           "iref_ua": cfg.get("iref_ua", I_UNIT_UA),
+           "cvcp_pf": cfg.get("vcp_cap_pf"),
            "runs": rows}
     tag = a.pdk if (a.vdd is None and a.corner is None and a.bias is None
                     and a.nbias is None and a.mir is None and a.cas is None) \
         else f"{a.pdk}_{cfg['section']}_{cfg['vdd']:g}_{cfg.get('bias', 'series')}"
     if cfg.get("bias") == "wide-swing":
         tag += f"_n{cfg['nbias'][0]:g}x{cfg['nbias'][1]:g}"
+    if "iref_ua" in cfg or a.iref is not None:
+        tag += f"_i{float(cfg.get('iref_ua', 16.0)):g}"
+    if a.cvcp is not None or cfg.get("vcp_cap_pf") != PDKS[a.pdk].get("vcp_cap_pf"):
+        tag += f"_c{float(cfg.get('vcp_cap_pf', 220.0)):g}"
     if a.mir is not None or a.cas is not None:
         tag += f"_m{cfg['mir'][0]:g}x{cfg['mir'][1]:g}_c{cfg['cas'][0]:g}x{cfg['cas'][1]:g}"
     if cfg.get("bias") == "clamp":

@@ -4,8 +4,18 @@ The P5 cell on IHP SG13G2, built from the PDK's own `SG13_dev` PCells:
 255 cells + the diode-connected replica, **1022 devices** (512 pmos, 510
 nmos), 510 met2 pads on the 3.75 um grid.  Signoff: **DRC 0**, **LVS walk
 passes on all 255 cells**, **510 pins**, **PEX 1022 instances / 2.57 pF**,
-**extracted DC 4.0815 mA at vbp/vcp 1.2318/0.6271 V**, **mismatch DNL 0.196 /
-INL 0.122 LSB** (16 seeds), **carry settle 0.062 LSB**.
+**extracted DC 4.0865 mA (-0.037 %) at vbp/vcp 0.6316/0.0267 V**, **carry
+settle 0.039 LSB** at **1.2 V**.  The 16-seed mismatch MC is being re-run at
+1.2 V (the 1.8 V values were DNL 0.196 / INL 0.122 LSB).
+
+**Status 2026-11-18:** the row is moving from 1.8 V to **1.2 V** because the
+PDK `sg13_lv` model states **maximum Vds 1.5 V**; the old 1.8 V supply and
+1.8 V pair-gate drive were outside that limit.  The 1.2 V **series** replica
+with `iref` **16.032 uA** and `Cvcp` **330 pF** passes the extracted DC and
+the 127->128 carry (0.039 LSB, vbp/vcp drift -0.032/-0.094 mV).  The 1.2 V
+**wide-swing** bias fails (carry -0.783 LSB, full -1.772 LSB, dvcp +82.7 mV)
+and is not used.  The digital `sg13g2_stdcell` is 1.2 V, so the 510 outputs
+match directly with no level shifters.
 
 ## Device source: the PDK PCells work headless
 
@@ -26,7 +36,7 @@ batch KLayout with three load-bearing details:
    materialised by `layout.flatten(top)`.
 
 Sizes from `../video/pdk_cell.py`: mirror pmos 8/1, cascode pmos 8/0.5, pair
-nmos 4/0.28, at 1.8 V.
+nmos 4/0.28, at **1.2 V** (series bias; PDK `sg13_lv` max Vds 1.5 V).
 
 ## Array
 
@@ -61,9 +71,9 @@ The first DRC rounds were via rules: **Via1/Via2 are 0.19 um (min=max)**, not
 | drc | PDK `tech/drc/ihp-sg13g2.drc`: **0 items** on the full 1918.5 x 26.6 um array |
 | lvs | PDK `tech/lvs/run_lvs.py --net_only --disable_tap_extraction`, then the pad-pair walk: **1022 devices (512 pmos / 510 nmos), 516 ports, all pmos bulks vdd, all nmos bulks vss, 255 cell mirrors + 1 replica mirror/cascode** |
 | pex | magic hierarchical extraction, cthresh/rthresh 0: **1022 instances, 8421 caps, 2.57 pF, no floating node** |
-| dc | extracted array, 16 uA at vcp, all 255 cells to iout: **4.0815 mA** (+0.036 %), **vbp 1.2318 V / vcp 0.6271 V** - the study's 1.232/0.627 V |
-| mm | PDK PSP103 mismatch (`mos_tt_mismatch` + per-instance `mm_ok=1`), one-hot 255-point `.dc` per seed, 16 seeds: cell sigma **0.657 %**, **DNL 0.196 / INL 0.122 LSB**, monotonic |
-| tran | carry 127->128, 220 pF on vcp **+ 100 pF on vbp**, 37.5 ohm + 2 pF: **0.062 LSB** at 40 ns, vbp/vcp drift 0.05/0.14 mV |
+| dc | extracted array, **16.032 uA** at vcp, all 255 cells to iout, **1.2 V**: **4.0865 mA** (-0.037 %), **vbp 0.6316 V / vcp 0.0267 V** |
+| mm | PDK PSP103 mismatch (`mos_tt_mismatch` + per-instance `mm_ok=1`), one-hot 255-point `.dc` per seed; **1.8 V** 16 seeds: cell sigma 0.657 %, DNL 0.196 / INL 0.122 LSB; **1.2 V re-run in progress** |
+| tran | carry 127->128, **330 pF on vcp + 100 pF on vbp**, 37.5 ohm + 2 pF, **1.2 V**: **0.039 LSB** at 40 ns, vbp/vcp drift **-0.032/-0.094 mV** |
 | pins | 510 met2 pads on the 3.75 um grid, 516 labels (10/25) |
 
 The LVS runner needs KLayout >= 0.30.7 for its version gate and the
@@ -87,9 +97,10 @@ The mismatch MC uses the PDK's own law: the `mos_tt_mismatch` section and
 `mm_ok=1` on every device, so each extracted instance draws its own
 `delvto`/`factuo`; one 255-point one-hot `.dc` per seed recovers every cell's
 current and the 256-code transfer is exact superposition.  16 seeds give
-sigma 0.657 %, DNL 0.196, INL 0.122 LSB.
+sigma 0.657 %, DNL 0.196, INL 0.122 LSB at 1.8 V; the 1.2 V MC is re-running.
 
-The carry transient (127 -> 128, 5 ps step, 40 ns) needs **100 pF on vbp in
-addition to the 220 pF on vcp**: with vcp only the vbp line is kicked 0.82 mV
-and the carry lands 0.877 LSB; with the vbp cap it is 0.062 LSB.  Both caps
-are wrapper requirements, not part of this macro.
+The 1.2 V carry transient (127 -> 128, 5 ps step, 40 ns) uses **330 pF on
+vcp + 100 pF on vbp**: 0.039 LSB, vbp/vcp drift -0.032/-0.094 mV.  The 1.8 V
+row needed 220 pF on vcp; at 1.2 V the larger `Cvcp` keeps the 0->255 bias
+kick under 0.7 mV.  Both caps are wrapper requirements, not part of this
+macro.
