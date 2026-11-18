@@ -79,7 +79,8 @@ def bench_cell(corner: str, temp: float, voff: float = 0.0, pdk: str = "gf180"):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pdk", default="gf180", choices=["gf180", "sky130"])
+    ap.add_argument("--pdk", default="gf180",
+                    choices=["gf180", "sky130", "ihp-sg13g2"])
     ap.add_argument("--full", action="store_true")
     ap.add_argument("--brief", action="store_true")
     a = ap.parse_args()

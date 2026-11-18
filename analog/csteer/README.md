@@ -473,3 +473,22 @@ Not verified / not done:
 * **sky130 refuses.** Binned BSIM4 models cannot be selected by ngspice 44.2
   here, so cell matching and ro would be unverified; `gen_csteer.py` exits
   instead of emitting an untrustworthy deck.
+
+## IHP sg13g2 (1.2 V) status
+
+`csteer.yaml` has an `ihp-sg13g2` binding: `sg13_lv` 1.2 V, the same 8/1
+mirror + 8/0.5 cascode unit cell, `vcp=0.10 V` (the 1.2 V cascode gate; 1.5 V
+was a 3.3 V-only value).  The device bench and the ideal-cell/DEM benches pass:
+
+| gate | result |
+|---|---|
+| unit cell, `run_cell.py --pdk ihp-sg13g2` | **15.92 uA** (target 16), **ro 1.3 MOhm**, Vth sensitivity **-0.813 %/mV** |
+| DC/DEM with the 1.8 % Pelgrom model | bench DNL **-0.890..+0.275**, INL **-0.483..+1.373**; DEM-mean DNL **-0.515..+0.275**, INL **-0.483..+0.483**; dem noise 391 mLSB rms |
+| supply | 1.2 V (no 3.3 V devices needed) |
+
+Not yet ported: the 30-cell + 60-switch **IHP GDS**.  `gen_gds.py` is still the
+gf180 `pfet` PCell generator (M1/poly geometry and 5.5 um cell pitch are
+gf180-specific), and the 60 switch drivers / differential wrapper / 1 kOhm
+termination were already class-C hand layout in the gf180 leaf.  The IHP
+pre-layout uses the same ideal-cell model and the measured IHP cell current;
+the layout is the next step.

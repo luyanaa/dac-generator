@@ -79,3 +79,16 @@ pdk:
     nfet: sky130_fd_pr__nfet_01v8
     pfet: sky130_fd_pr__pfet_01v8
     vmax: 3.3
+
+  ihp-sg13g2:
+    # 1.2 V sg13_lv MOS; the 16 uA unit cell uses the same 8/1 mirror and
+    # 8/0.5 cascode as the video P5 cell.  vcp is the cascode gate (not the
+    # row's vcp); 0.55 V keeps the mirror in saturation at 1.2 V.
+    vdd: 1.2
+    vmax: 1.2
+    vcp: 0.10
+    vout_max: 1.0
+    model_lib: models/cornerMOSlv.lib
+    design_file: null
+    nfet: sg13_lv_nmos
+    pfet: sg13_lv_pmos

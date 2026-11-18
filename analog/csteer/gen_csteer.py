@@ -43,7 +43,8 @@ def pdk_root(cfg, pdk: str, override: str | None) -> Path:
     if override:
         return Path(override)
     fam = {"gf180": ("gf180mcu", "gf180mcuA"),
-           "sky130": ("sky130", "sky130A")}.get(pdk)
+           "sky130": ("sky130", "sky130A"),
+           "ihp-sg13g2": ("ihp-sg13", "ihp-sg13g2")}.get(pdk)
     if fam is None:
         sys.exit(f"unsupported pdk {pdk}")
     base = Path(os.path.expanduser(f"~/.ciel/ciel/{fam[0]}/versions"))
@@ -59,6 +60,12 @@ def models(cfg, pdk: str, root: Path, temp: float, corner: str = "tt") -> str:
     lib = libdir / p["model_lib"]
     if not lib.is_file():
         sys.exit(f"model library not found: {lib}")
+    if pdk == "ihp-sg13g2":
+        lines = [f'.lib "{lib}" mos_tt']
+        if p.get("design_file"):
+            lines.append(f'.include "{libdir / p["design_file"]}"')
+        lines.append(f".temp {temp}")
+        return "\n".join(lines)
     if pdk == "gf180":
         libs = ["typical"] if corner == "tt" else [corner]
     else:
@@ -70,7 +77,24 @@ def models(cfg, pdk: str, root: Path, temp: float, corner: str = "tt") -> str:
     return "\n".join(lines)
 
 
-def cells(cfg, mismatch: float, seed: int, pointer: int) -> tuple[list[str], dict]:
+def vdd_of(cfg, pdk: str) -> float:
+    return float(cfg["pdk"][pdk].get("vdd", cfg["vdd"]))
+
+
+def dev(pdk: str, p: dict, name: str, d: str, g: str, s: str, b: str,
+        w: float, l: float, kind: str = "pfet") -> str:
+    """MOS instance in the PDK's own syntax.
+
+    gf180's `_03v3` and sky130's devices are SPICE primitives (`M`); the IHP
+    PSP103 `sg13_lv_*` devices are four-terminal subcircuits (`X`).
+    """
+    model = p[kind]
+    if pdk == "ihp-sg13g2":
+        return f"X{name} {d} {g} {s} {b} {model} w={w:g}u l={l:g}u"
+    return f"M{name} {d} {g} {s} {b} {model} w={w:g}u l={l:g}u"
+
+
+def cells(cfg, pdk: str, mismatch: float, seed: int, pointer: int) -> tuple[list[str], dict]:
     """Ideal current cells with gain error and finite ro.
 
     There are 15 unary cells, so DWA has 15 pointer states (not 16): the cell
@@ -84,7 +108,7 @@ def cells(cfg, mismatch: float, seed: int, pointer: int) -> tuple[list[str], dic
     i_lsb = cfg["i_lsb_ua"] * 1e-6
     i_unit = cfg["i_unit_ua"] * 1e-6
     ro_u = cfg["ro_unit"]
-    vdd = cfg["vdd"]
+    vdd = vdd_of(cfg, pdk)
     rng = random.Random(seed)
     errs = {"unary": [], "binary": [], "sigma": mismatch, "pointer": pointer}
 
@@ -128,7 +152,7 @@ def cells(cfg, mismatch: float, seed: int, pointer: int) -> tuple[list[str], dic
     return out, errs
 
 
-def bench_dc(cfg, dat: str, pointer: int, mismatch: float, seed: int,
+def bench_dc(cfg, pdk: str, dat: str, pointer: int, mismatch: float, seed: int,
              riv: float = 0.0) -> tuple[str, dict]:
     """Virtual-ground bench by default; `riv` switches to a passive I-V.
 
@@ -137,8 +161,8 @@ def bench_dc(cfg, dat: str, pointer: int, mismatch: float, seed: int,
     code-dependent gain error, so both are useful and both are reported.
     """
     bits = int(cfg["bits"])
-    vdd = cfg["vdd"]
-    body, errs = cells(cfg, mismatch, seed, pointer)
+    vdd = vdd_of(cfg, pdk)
+    body, errs = cells(cfg, pdk, mismatch, seed, pointer)
     out = ["* bench: DC sweep of all codes at a fixed DEM pointer",
            f"Vdd vdd 0 {vdd}", "Vcode code 0 0", ""]
     out += body
@@ -160,7 +184,9 @@ def bench_dc(cfg, dat: str, pointer: int, mismatch: float, seed: int,
 def bench_cell(cfg, pdk: str, dat: str, voff: float) -> str:
     """One unit cell: cascoded PMOS mirror, plus its bias branches."""
     p = cfg["pdk"][pdk]
-    vdd = cfg["vdd"]
+    vdd = vdd_of(cfg, pdk)
+    vcp = float(p.get("vcp", 1.5))
+    vout_max = float(p.get("vout_max", 3.2))
     w, l = cfg["cell_w"], cfg["cell_l"]
     cw, cl = cfg["casc_w"], cfg["casc_l"]
     i_u = cfg["i_unit_ua"]
@@ -169,21 +195,21 @@ def bench_cell(cfg, pdk: str, dat: str, voff: float) -> str:
         f"Vdd vdd 0 {vdd}",
         "* mirror bias: Iref into a diode-connected device sets Vbp",
         f"Iref vbp 0 {i_u}u",
-        f"M1 vbp vbp vdd vdd {p['pfet']} w={w}u l={l}u",
+        dev(pdk, p, "1", "vbp", "vbp", "vdd", "vdd", w, l),
         "* cascode gate bias: ideal source here; the production cell needs a",
         "* wide-swing cascode bias generator (see README, class-C layout note).",
         "* vcp = 1.5 V leaves the mirror device in saturation at 16 uA.",
-        "Vcp vcp 0 1.5",
+        f"Vcp vcp 0 {vcp:g}",
         "* the cell under test, with an optional Vth offset in the gate lead",
         f"Voff vbp2 vbp dc {voff}",
-        f"Mcell n1 vbp2 vdd vdd {p['pfet']} w={w}u l={l}u",
-        f"Mcasc out vcp n1 vdd {p['pfet']} w={cw}u l={cl}u",
+        dev(pdk, p, "cell", "n1", "vbp2", "vdd", "vdd", w, l),
+        dev(pdk, p, "casc", "out", "vcp", "n1", "vdd", cw, cl),
         "* sweep the output node; the flat part of I(Vout) gives ro",
         "Vout out 0 0",
         ".control",
         "set wr_singlescale",
         "set wr_vecnames",
-        "dc Vout 30m 3.2 10m",
+        f"dc Vout 30m {vout_max:g} 10m",
         f"wrdata {dat} v(out) i(Vout)",
         ".endc",
         ".end",
@@ -201,7 +227,9 @@ def _switch_devs(cfg, pdk: str) -> str:
     copies both the mirror bias and the cascode Vgs -- no ideal bias source.
     """
     p = cfg["pdk"][pdk]
-    vdd = cfg["vdd"]
+    vdd = vdd_of(cfg, pdk)
+    vcp = float(p.get("vcp", 1.5))
+    vout_max = float(p.get("vout_max", 3.2))
     w, l = cfg["cell_w"], cfg["cell_l"]
     cw, cl = cfg["casc_w"], cfg["casc_l"]
     i_u = cfg["i_unit_ua"]
@@ -210,13 +238,13 @@ def _switch_devs(cfg, pdk: str) -> str:
     return "\n".join([
         f"Vdd vdd 0 {vdd}",
         f"Iref vcp 0 {i_u}u",
-        f"Mref vbp vbp vdd vdd {p['pfet']} w={w}u l={l}u",
-        f"Mbcas vcp vcp vbp vdd {p['pfet']} w={cw}u l={cl}u",
+        dev(pdk, p, "ref", "vbp", "vbp", "vdd", "vdd", w, l),
+        dev(pdk, p, "bcas", "vcp", "vcp", "vbp", "vdd", cw, cl),
         "* the cell under test plus its differential NMOS steering pair",
-        f"M1 n1 vbp vdd vdd {p['pfet']} w={w}u l={l}u",
-        f"Mcasc cd vcp n1 vdd {p['pfet']} w={cw}u l={cl}u",
-        f"Mswp ioutp swp cd 0 {p['nfet']} w={sw_w}u l={sw_l}u",
-        f"Mswn idump swn cd 0 {p['nfet']} w={sw_w}u l={sw_l}u",
+        dev(pdk, p, "1", "n1", "vbp", "vdd", "vdd", w, l),
+        dev(pdk, p, "casc", "cd", "vcp", "n1", "vdd", cw, cl),
+        dev(pdk, p, "swp", "ioutp", "swp", "cd", "0", sw_w, sw_l, "nfet"),
+        dev(pdk, p, "swn", "idump", "swn", "cd", "0", sw_w, sw_l, "nfet"),
         "Voutp ioutp 0 0",
         "Voutn idump 0 0",
     ])
@@ -239,7 +267,7 @@ def bench_switch(cfg, pdk: str, dc_out: Path, tran_out: Path,
     voltage and the cascode drain never floats.  The complement is ideal here;
     the digital half (or a local inverter) provides it.
     """
-    vdd = cfg["vdd"]
+    vdd = vdd_of(cfg, pdk)
     edge = float(cfg.get("sw_edge_ns", 0.2))
     skew = float(cfg.get("sw_skew_ns", 0.03))
     dc_body = "\n".join([
@@ -274,7 +302,7 @@ def bench_bias(cfg, pdk: str) -> str:
     return "\n".join([
         "* replica cascode bias + one cell, operating point",
         _switch_devs(cfg, pdk),
-        f"Vswp swp 0 {cfg['vdd']}",
+        f"Vswp swp 0 {vdd_of(cfg, pdk):g}",
         "Vswn swn 0 0",
         ".control", "op",
         "print v(vbp) v(vcp) v(n1) v(cd) v(ioutp) i(Voutp)",
@@ -287,7 +315,8 @@ def bench_bias(cfg, pdk: str) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pdk", default="gf180", choices=["gf180", "sky130"])
+    ap.add_argument("--pdk", default="gf180",
+                    choices=["gf180", "sky130", "ihp-sg13g2"])
     ap.add_argument("--bench", default="dc",
                     choices=["dc", "cell", "switch", "bias"])
     ap.add_argument("--pdk-root", default=None)
@@ -337,7 +366,7 @@ def main() -> None:
         return
 
     if a.bench == "dc":
-        body, errs = bench_dc(cfg, dat, a.pointer, a.mismatch, a.seed, a.riv)
+        body, errs = bench_dc(cfg, a.pdk, dat, a.pointer, a.mismatch, a.seed, a.riv)
         text = "\n".join([
             f"* Current-steering DAC, {cfg['bits']} bit, {a.pdk}, dc bench",
             "* Generated by analog/csteer/gen_csteer.py -- do not edit.",

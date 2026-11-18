@@ -191,7 +191,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("what", nargs="?", default="all",
                     choices=["all", "matrix", "event"])
-    ap.add_argument("--pdk", default="gf180", choices=["gf180", "sky130"])
+    ap.add_argument("--pdk", default="gf180", choices=["gf180", "sky130", "ihp-sg13g2"])
     ap.add_argument("--brief", action="store_true")
     ap.add_argument("--corner", default="tt")
     ap.add_argument("--temp", type=float, default=25.0)

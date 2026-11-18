@@ -39,7 +39,7 @@ def parse_brief(text: str):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pdk", default="gf180", choices=["gf180", "sky130"])
+    ap.add_argument("--pdk", default="gf180", choices=["gf180", "sky130", "ihp-sg13g2"])
     ap.add_argument("--sigma", type=float, default=0.018)
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--corner", default="tt")
