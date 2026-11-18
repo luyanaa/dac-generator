@@ -18,6 +18,14 @@ cd "$(dirname "$0")"
 
 BENCH=${1:-all}
 PDK=${PDK:-gf180}
+if [ "$PDK" = ihp-sg13g2 ]; then
+    # The IHP PSP103 models are OSDI; ~/.spiceinit resolves them through
+    # $PDK_ROOT/$PDK, so point both at the newest ciel install.
+    _ihp=$(ls -d "$HOME"/.ciel/ciel/ihp-sg13/versions/*/ 2>/dev/null | tail -1)
+    [ -n "$_ihp" ] || { echo "error: no ihp-sg13 ciel install" >&2; exit 2; }
+    PDK_ROOT=${_ihp%/}
+    export PDK_ROOT PDK
+fi
 
 case "$BENCH" in
 dc)

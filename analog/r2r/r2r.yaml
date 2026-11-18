@@ -81,3 +81,26 @@ pdk:
     res_l_param: l
     res_rsh: 2000.0
     vmax: 3.3
+
+  ihp-sg13g2:
+    # 1.2 V sg13_lv MOS + rppd 260 ohm/sq poly.  Keep the gf180 unit geometry
+    # (W=2, L=150) for the same 25-unit ladder; the rppd unit is then 19.5 kOhm
+    # instead of gf180's 26.25 kOhm, and the trim absorbs the 1.2 V driver.
+    vdd: 1.2
+    vmax: 1.2
+    model_lib: models/cornerMOSlv.lib
+    model_lib_res: models/cornerRES.lib
+    design_file: null
+    libs: [mos_tt]
+    res_subckt: rppd
+    res_ports: [p, n, b]
+    nfet: sg13_lv_nmos
+    pfet: sg13_lv_pmos
+    res_w_param: w
+    res_l_param: l
+    res_rsh: 260.0
+    unit_l: 150.0
+    trim_l: 148.36
+    drv_wn: 3.0
+    drv_wp: 8.0
+    drv_l: 0.13

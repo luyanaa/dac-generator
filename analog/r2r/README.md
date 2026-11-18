@@ -199,3 +199,32 @@ in `r2r.yaml` but **not simulated**: ngspice 44.2 cannot select a bin from the
 reason. Do not quote sky130 numbers from this leaf.
 
 See `docs/analog_dac_integration_plan.md` section 7.1 for the gate table.
+
+## IHP sg13g2 (1.2 V) implementation
+
+`r2r.yaml` now has an `ihp-sg13g2` binding: `sg13_lv` 1.2 V MOS, `rppd`
+260 ohm/sq poly, unit W=2 um / L=150 um (19.5 kOhm), trimmed unit
+L=148.36 um (19.287 kOhm), drivers Wn=3/Wp=8 um L=0.13 um.  The full analog
+gate is:
+
+```sh
+python3 analog/r2r/ihp_signoff.py
+# or, for the two benches only:
+PDK=ihp-sg13g2 ./run.sh dc
+```
+
+Result (`analog/r2r/build/ihp_signoff.json`):
+
+| gate | result |
+|---|---|
+| pre-layout DC | DNL **-0.041..+0.004 LSB**, INL **-0.067..0.000 LSB**, monotonic, Vfs 1.195 V |
+| settling (0,1,127,128,255; 1 us/step) | worst **723 ns** to 0.5 LSB (LSB 4.687 mV) |
+| layout | 25 `rppd` PCells + M1 straps, bbox (-144,-380)..(334,1173) um |
+| IHP KLayout DRC | **0 items** |
+| IHP KLayout LVS (reference 16-resistor ladder) | **PASS, Netlists match** |
+
+The analog GDS contains the ladder only, exactly like the gf180 leaf: the
+per-bit CMOS buffers are `gen_r2r.py` pre-layout devices and the digital
+half (`dac_r2r_dig`) is a separate standard-cell macro.  The R-2R topology
+is the same 25-unit ladder; only the resistor sheet and supply/driver
+sizing change.
